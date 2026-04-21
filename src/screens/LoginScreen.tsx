@@ -8,36 +8,21 @@ import {BrandMark} from '@/components/BrandMark';
 import {Button} from '@/components/Button';
 import {Screen} from '@/components/Screen';
 import {TagChip} from '@/components/TagChip';
-import {getAuthCapabilities} from '@/features/auth/authService';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import {toUserMessage} from '@/utils/errors';
 
 export const LoginScreen = () => {
   const signInWithGoogle = useAppStore(state => state.signInWithGoogle);
-  const signInWithDev = useAppStore(state => state.signInWithDev);
   const isOnline = useAppStore(state => state.isOnline);
-  const [pending, setPending] = useState<'google' | 'dev' | null>(null);
-
-  const authCapabilities = getAuthCapabilities();
+  const [pending, setPending] = useState<'google' | null>(null);
 
   const handleGoogle = async () => {
     try {
       setPending('google');
       await signInWithGoogle();
     } catch (error) {
-      Alert.alert('Login Google', toUserMessage(error));
-    } finally {
-      setPending(null);
-    }
-  };
-
-  const handleDev = async () => {
-    try {
-      setPending('dev');
-      await signInWithDev();
-    } catch (error) {
-      Alert.alert('Sessao local', toUserMessage(error));
+      Alert.alert('Entrar com Google', toUserMessage(error));
     } finally {
       setPending(null);
     }
@@ -58,7 +43,7 @@ export const LoginScreen = () => {
           <Text style={styles.title}>LogGYM</Text>
           <Text style={styles.headline}>Treine. Registre. Evolua.</Text>
           <Text style={styles.description}>
-            Entre e comece do jeito certo, sem excesso na tela.
+            Seus treinos, cargas e anotacoes no mesmo lugar.
           </Text>
 
           <View style={styles.badges}>
@@ -67,13 +52,14 @@ export const LoginScreen = () => {
               active
               accentColor={isOnline ? theme.colors.success : theme.colors.warning}
             />
-            <TagChip label="Offline-first" active />
-            <TagChip label="Sessao segura" active />
+            <TagChip label="Uso rapido" active />
           </View>
         </LinearGradient>
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(70).duration(360)} style={styles.summaryCard}>
+      <Animated.View
+        entering={FadeInDown.delay(70).duration(360)}
+        style={styles.summaryCard}>
         {isOnline ? (
           <Wifi color={theme.colors.success} size={18} />
         ) : (
@@ -81,8 +67,8 @@ export const LoginScreen = () => {
         )}
         <Text style={styles.summaryText}>
           {isOnline
-            ? 'Depois do primeiro login, seus dados continuam disponiveis offline.'
-            : 'Conecte-se para entrar com Google. Depois disso o uso segue offline normalmente.'}
+            ? 'Depois da primeira entrada, seus treinos continuam com voce mesmo sem internet.'
+            : 'Conecte-se para entrar com Google. Depois disso voce pode seguir usando o app normalmente.'}
         </Text>
       </Animated.View>
 
@@ -92,16 +78,6 @@ export const LoginScreen = () => {
           onPress={handleGoogle}
           disabled={pending !== null || !isOnline}
         />
-
-        {authCapabilities.allowDevLogin ? (
-          <Button
-            variant="ghost"
-            label={pending === 'dev' ? 'Abrindo modo DEV...' : 'Modo DEV'}
-            onPress={handleDev}
-            disabled={pending !== null}
-            fullWidth={false}
-          />
-        ) : null}
       </View>
     </Screen>
   );

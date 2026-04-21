@@ -1,6 +1,10 @@
 import {useDeferredValue, useState} from 'react';
-import {Alert, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
+import {CalendarDays, X} from 'lucide-react-native';
 
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
@@ -18,20 +22,53 @@ type AppNavigation = NavigationProp<MainTabParamList & RootStackParamList>;
 export const WorkoutsScreen = () => {
   const navigation = useNavigation<AppNavigation>();
   const workouts = useAppStore(state => state.workouts);
+  const history = useAppStore(state => state.history);
   const refreshData = useAppStore(state => state.refreshData);
   const isRefreshing = useAppStore(state => state.isRefreshing);
   const session = useAppStore(state => state.session);
   const [search, setSearch] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const normalized = deferredSearch.trim().toLowerCase();
-  const filteredWorkouts = !normalized
-    ? workouts
-    : workouts.filter(workout =>
-        `${workout.name} ${workout.focus} ${workout.notes}`
+  const workoutsForDate = selectedDate
+    ? new Set(
+        history
+          .filter(item => {
+            if (!item.workoutId) {
+              return false;
+            }
+
+            const itemDate = new Date(item.performedAt);
+
+            return (
+              itemDate.getDate() === selectedDate.getDate() &&
+              itemDate.getMonth() === selectedDate.getMonth() &&
+              itemDate.getFullYear() === selectedDate.getFullYear()
+            );
+          })
+          .map(item => item.workoutId)
+          .filter((workoutId): workoutId is string => Boolean(workoutId)),
+      )
+    : null;
+  const filteredWorkouts = workouts.filter(workout => {
+    const matchesSearch = normalized
+      ? `${workout.name} ${workout.focus} ${workout.notes}`
           .toLowerCase()
-          .includes(normalized),
-      );
+          .includes(normalized)
+      : true;
+    const matchesDate = workoutsForDate ? workoutsForDate.has(workout.id) : true;
+
+    return matchesSearch && matchesDate;
+  });
+  const selectedDateLabel = selectedDate
+    ? selectedDate.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
+    : null;
 
   const handleDuplicate = async (workoutId: string) => {
     if (!session) {
@@ -44,6 +81,14 @@ export const WorkoutsScreen = () => {
       navigation.navigate('WorkoutDetail', {workoutId: duplicatedId});
     } catch (error) {
       Alert.alert('Duplicar treino', toUserMessage(error));
+    }
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    setShowDatePicker(false);
+
+    if (event.type === 'set' && date) {
+      setSelectedDate(date);
     }
   };
 
@@ -70,6 +115,48 @@ export const WorkoutsScreen = () => {
         onChangeText={setSearch}
       />
 
+      <View style={styles.filterActions}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setShowDatePicker(true)}
+          style={({pressed}) => [
+            styles.calendarButton,
+            pressed ? styles.filterPressed : null,
+          ]}>
+          <CalendarDays color={theme.colors.accent} size={18} />
+          <Text style={styles.calendarButtonLabel}>
+            {selectedDateLabel ? selectedDateLabel : 'Filtrar por data'}
+          </Text>
+        </Pressable>
+
+        {selectedDate ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setSelectedDate(null)}
+            style={({pressed}) => [
+              styles.clearButton,
+              pressed ? styles.filterPressed : null,
+            ]}>
+            <X color={theme.colors.textMuted} size={16} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {showDatePicker ? (
+        <DateTimePicker
+          value={selectedDate ?? new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      ) : null}
+
+      {selectedDateLabel ? (
+        <Text style={styles.filterSummary}>
+          Mostrando treinos registrados em {selectedDateLabel}.
+        </Text>
+      ) : null}
+
       <View style={styles.list}>
         {filteredWorkouts.length ? (
           filteredWorkouts.map(workout => (
@@ -86,7 +173,11 @@ export const WorkoutsScreen = () => {
         ) : (
           <EmptyState
             title="Nenhum treino encontrado"
-            description="Ajuste a busca ou crie um novo template para comecar."
+            description={
+              selectedDateLabel
+                ? 'Nao houve treino registrado nessa data. Escolha outro dia ou limpe o filtro.'
+                : 'Ajuste a busca ou crie um novo template para comecar.'
+            }
           />
         )}
       </View>
@@ -102,6 +193,45 @@ export const WorkoutsScreen = () => {
 const styles = StyleSheet.create({
   list: {
     gap: theme.spacing.md,
+  },
+  filterActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  calendarButton: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  calendarButtonLabel: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+  },
+  clearButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  filterPressed: {
+    opacity: 0.92,
+    transform: [{scale: 0.985}],
+  },
+  filterSummary: {
+    ...theme.typography.caption,
+    color: theme.colors.textSoft,
   },
   footerHint: {
     ...theme.typography.caption,

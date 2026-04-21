@@ -23,7 +23,7 @@ export const WorkoutCard = ({
       <View style={styles.copy}>
         <Text style={styles.title}>{workout.name}</Text>
         <Text style={styles.meta}>
-          {workout.focus} · {workout.exerciseCount} exercicios
+          {workout.focus} - {workout.exerciseCount} exercicios
         </Text>
       </View>
       <ChevronRight color={theme.colors.textMuted} size={18} />

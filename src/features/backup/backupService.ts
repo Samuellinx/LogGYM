@@ -263,7 +263,7 @@ const readBackupPayloadFromPicker = async () => {
   });
 
   if (!pickedFile.hasRequestedType) {
-    throw new Error('Selecione um arquivo JSON valido do LogGYM.');
+    throw new Error('Selecione um arquivo de backup do LogGYM.');
   }
 
   if (pickedFile.size && pickedFile.size > MAX_BACKUP_SIZE_BYTES) {
@@ -289,8 +289,21 @@ const readBackupPayloadFromPicker = async () => {
 
   try {
     const contents = await FileSystem.readFile(localPath);
-    const parsedJson = JSON.parse(contents) as unknown;
-    const payload = backupFileSchema.parse(parsedJson);
+    let parsedJson: unknown;
+
+    try {
+      parsedJson = JSON.parse(contents) as unknown;
+    } catch {
+      throw new Error('O arquivo selecionado nao e um backup valido do LogGYM.');
+    }
+
+    let payload: BackupFilePayload;
+
+    try {
+      payload = backupFileSchema.parse(parsedJson);
+    } catch {
+      throw new Error('O arquivo selecionado nao e compativel com o LogGYM.');
+    }
 
     validateBackupRelations(payload);
 
@@ -326,7 +339,7 @@ export const exportBackupForCurrentUser = async (
     });
 
     if (savedDocument.error) {
-      throw new Error(`Falha ao salvar o backup: ${savedDocument.error}`);
+      throw new Error('Nao foi possivel salvar o backup agora.');
     }
 
     return {

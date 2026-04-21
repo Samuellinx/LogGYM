@@ -16,7 +16,7 @@ export const OfflineBanner = ({visible}: OfflineBannerProps) => {
     <View style={styles.container}>
       <CloudOff color={theme.colors.warning} size={16} />
       <Text style={styles.label}>
-        Offline ativo. Seus treinos continuam funcionando com SQLite local.
+        Sem internet no momento. Seus treinos continuam disponiveis neste aparelho.
       </Text>
     </View>
   );

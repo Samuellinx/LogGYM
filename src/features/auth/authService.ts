@@ -69,25 +69,26 @@ const mapGoogleError = (error: unknown) => {
   if (isErrorWithCode(error)) {
     const code = String(error.code ?? '');
     const message = error.message ?? '';
+    const loweredMessage = message.toLowerCase();
 
     if (code === '10' || message.includes('DEVELOPER_ERROR')) {
       return new Error(
-        [
-          'DEVELOPER_ERROR: a configuracao OAuth Android nao bate com a assinatura atual do app.',
-          'Confira no Google Cloud Console um cliente Android com package name `com.loggym`.',
-          'Em DEV, este projeto agora prioriza a keystore padrao `%USERPROFILE%\\.android\\debug.keystore`.',
-          'Se esse arquivo nao existir, ele cai para `android/app/debug.keystore`.',
-          'O `webClientId` nao e obrigatorio para este fluxo basico de login.',
-        ].join(' '),
+        'Nao foi possivel concluir a entrada com Google neste aparelho. Tente novamente em instantes.',
       );
+    }
+
+    if (loweredMessage.includes('cancel')) {
+      return new Error('Login com Google cancelado.');
     }
   }
 
   if (error instanceof Error) {
-    return error;
+    if (error.message.toLowerCase().includes('cancel')) {
+      return new Error('Login com Google cancelado.');
+    }
   }
 
-  return new Error('Falha ao iniciar o login Google.');
+  return new Error('Nao foi possivel entrar com Google agora.');
 };
 
 export const signInWithGoogleAccount = async () => {

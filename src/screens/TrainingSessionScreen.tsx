@@ -17,13 +17,16 @@ import {Button} from '@/components/Button';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {TextField} from '@/components/TextField';
-import {getWorkoutDetail, saveTrainingSession} from '@/features/workouts/workoutRepository';
-import type {WorkoutDetail} from '@/types/domain';
+import {
+  getWorkoutDetail,
+  saveTrainingSession,
+} from '@/features/workouts/workoutRepository';
 import {RootStackParamList} from '@/navigation/types';
-import {theme} from '@/theme';
-import {formatDateLong} from '@/utils/formatters';
-import {toUserMessage} from '@/utils/errors';
 import {useAppStore} from '@/store/useAppStore';
+import {theme} from '@/theme';
+import type {WorkoutDetail} from '@/types/domain';
+import {toUserMessage} from '@/utils/errors';
+import {formatDateLong} from '@/utils/formatters';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainingSession'>;
 
@@ -58,8 +61,7 @@ const createDraftFromWorkout = (workout: WorkoutDetail): DraftExercise[] =>
     sets: [createBlankSet()],
   }));
 
-const parseNumber = (value: string) =>
-  Number(value.replace(',', '.').trim());
+const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 
 export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
@@ -149,7 +151,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         const nextSets =
           exercise.sets.length === 1
             ? [createBlankSet()]
-            : exercise.sets.filter((_, currentSetIndex) => currentSetIndex !== setIndex);
+            : exercise.sets.filter(
+                (_, currentSetIndex) => currentSetIndex !== setIndex,
+              );
 
         return {
           ...exercise,
@@ -217,7 +221,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           <View style={styles.hero}>
             <Text style={styles.title}>{workout.name}</Text>
             <Text style={styles.subtitle}>
-              {workout.focus} · {workout.exerciseCount} exercicios
+              {workout.focus} - {workout.exerciseCount} exercicios
             </Text>
             <Button
               fullWidth={false}
@@ -251,7 +255,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   <View style={styles.exerciseHeaderCopy}>
                     <Text style={styles.exerciseName}>{exercise.exerciseName}</Text>
                     <Text style={styles.exerciseMeta}>
-                      {exercise.muscleGroup} · alvo {exercise.targetReps}
+                      {exercise.muscleGroup} - alvo {exercise.targetReps}
                     </Text>
                   </View>
                   <Button

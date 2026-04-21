@@ -1,17 +1,18 @@
 import {useState} from 'react';
 import {Alert, Image, StyleSheet, Text, View} from 'react-native';
-import {ShieldCheck, Wifi, WifiOff} from 'lucide-react-native';
+import {Wifi, WifiOff} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TagChip} from '@/components/TagChip';
-import {getAuthCapabilities} from '@/features/auth/authService';
-import {exportBackupForCurrentUser, importBackupForCurrentUser} from '@/features/backup/backupService';
+import {
+  exportBackupForCurrentUser,
+  importBackupForCurrentUser,
+} from '@/features/backup/backupService';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import {toUserMessage} from '@/utils/errors';
-import {securityHighlights} from '@/utils/constants';
 import {formatSessionDate} from '@/utils/formatters';
 
 export const ProfileScreen = () => {
@@ -23,12 +24,10 @@ export const ProfileScreen = () => {
   const isOnline = useAppStore(state => state.isOnline);
   const refreshData = useAppStore(state => state.refreshData);
   const signOut = useAppStore(state => state.signOut);
-
-  const authCapabilities = getAuthCapabilities();
   const isBackupBusy = backupAction !== null;
 
   const handleLogout = () => {
-    Alert.alert('Encerrar sessao', 'Deseja realmente sair do LogGYM?', [
+    Alert.alert('Sair da conta', 'Deseja realmente sair do LogGYM?', [
       {text: 'Cancelar', style: 'cancel'},
       {
         text: 'Sair',
@@ -57,16 +56,16 @@ export const ProfileScreen = () => {
       }
 
       Alert.alert(
-        'Backup exportado',
+        'Copia salva',
         [
           `${result.fileName} salvo com sucesso.`,
-          `${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series foram empacotados no JSON.`,
+          `${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series foram incluidos nesse arquivo.`,
         ].join(' '),
       );
     } catch (error) {
       Alert.alert(
-        'Falha ao exportar backup',
-        toUserMessage(error, 'Nao foi possivel exportar o backup local.'),
+        'Nao foi possivel salvar sua copia',
+        toUserMessage(error, 'Nao foi possivel exportar seus treinos agora.'),
       );
     } finally {
       setBackupAction(null);
@@ -90,16 +89,16 @@ export const ProfileScreen = () => {
       await refreshData();
 
       Alert.alert(
-        'Backup restaurado',
+        'Copia restaurada',
         [
           `${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series foram restaurados.`,
-          'O backup precisa pertencer exatamente a esta conta para ser aceito.',
+          'A restauracao so aceita arquivos da sua propria conta.',
         ].join(' '),
       );
     } catch (error) {
       Alert.alert(
-        'Falha ao importar backup',
-        toUserMessage(error, 'Nao foi possivel restaurar o backup local.'),
+        'Nao foi possivel restaurar sua copia',
+        toUserMessage(error, 'Nao foi possivel restaurar seus treinos agora.'),
       );
     } finally {
       setBackupAction(null);
@@ -108,12 +107,12 @@ export const ProfileScreen = () => {
 
   const handleImportBackup = () => {
     Alert.alert(
-      'Importar backup',
-      'Isso vai substituir os treinos e historico locais da conta atual pelos dados do arquivo selecionado. Deseja continuar?',
+      'Restaurar copia',
+      'Isso vai substituir os treinos e o historico atuais pelos dados do arquivo selecionado. Deseja continuar?',
       [
         {text: 'Cancelar', style: 'cancel'},
         {
-          text: 'Importar',
+          text: 'Restaurar',
           style: 'destructive',
           onPress: () => {
             runImportBackup().catch(() => undefined);
@@ -153,18 +152,14 @@ export const ProfileScreen = () => {
         />
         <TagChip
           label={
-            session?.provider === 'google' ? 'Conta Google' : 'Sessao local DEV'
+            session?.provider === 'google' ? 'Conta conectada' : 'Conta de teste'
           }
           active
           accentColor={theme.colors.accentSecondary}
         />
-        <TagChip
-          label={authCapabilities.hasWebClientId ? 'Web client definido' : 'Sem web client'}
-          active={authCapabilities.isGoogleConfigured}
-        />
       </View>
 
-      <SectionHeader title="Resumo local" subtitle="Indicadores extraidos do SQLite local" />
+      <SectionHeader title="Seu resumo" subtitle="Visao geral do que ja esta salvo" />
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryText}>{workouts.length} treinos ativos</Text>
@@ -172,17 +167,6 @@ export const ProfileScreen = () => {
         <Text style={styles.summaryText}>
           {dashboard?.totalTrackedSets ?? 0} series registradas
         </Text>
-      </View>
-
-      <SectionHeader title="Seguranca aplicada" subtitle="Medidas basicas ja embarcadas no app" />
-
-      <View style={styles.securityList}>
-        {securityHighlights.map(item => (
-          <View key={item} style={styles.securityItem}>
-            <ShieldCheck color={theme.colors.accent} size={18} />
-            <Text style={styles.securityText}>{item}</Text>
-          </View>
-        ))}
       </View>
 
       <View style={styles.networkCard}>
@@ -193,42 +177,42 @@ export const ProfileScreen = () => {
         )}
         <Text style={styles.networkText}>
           {isOnline
-            ? 'Conexao ativa. O login Google e futuras sincronizacoes podem funcionar normalmente.'
-            : 'Sem internet. O app continua operando com os dados locais e a sessao persistida.'}
+            ? 'Tudo certo para continuar usando o app e manter seus treinos atualizados.'
+            : 'Sem internet no momento. O que ja esta salvo continua disponivel neste aparelho.'}
         </Text>
       </View>
 
       <SectionHeader
-        title="Backup local"
-        subtitle="Exporte ou restaure um arquivo JSON validado do LogGYM"
+        title="Sua copia dos treinos"
+        subtitle="Guarde ou recupere seus dados quando precisar"
       />
 
       <View style={styles.backupCard}>
-        <Text style={styles.backupTitle}>Backup manual e offline</Text>
+        <Text style={styles.backupTitle}>Backup manual</Text>
         <Text style={styles.backupText}>
-          O backup leva seus treinos, exercicios, sessoes e series para um JSON.
-          A restauracao so aceita o mesmo email e o mesmo provedor autenticado.
+          Exporte um arquivo com seus treinos, exercicios, sessoes e series para
+          manter uma copia segura fora do app.
         </Text>
         <Text style={styles.backupHint}>
-          Use isso para trocar de aparelho ou manter uma copia externa fora do banco local.
+          Ao restaurar, somente a conta atual pode usar esse arquivo.
         </Text>
       </View>
 
       <Button
         variant="secondary"
-        label={backupAction === 'export' ? 'Exportando backup...' : 'Exportar backup'}
+        label={backupAction === 'export' ? 'Salvando copia...' : 'Exportar copia'}
         onPress={handleExportBackup}
         disabled={!session || isBackupBusy}
       />
       <Button
         variant="secondary"
-        label={backupAction === 'import' ? 'Importando backup...' : 'Importar backup'}
+        label={backupAction === 'import' ? 'Restaurando copia...' : 'Importar copia'}
         onPress={handleImportBackup}
         disabled={!session || isBackupBusy}
       />
 
-      <Button variant="secondary" label="Atualizar paineis" onPress={refreshData} />
-      <Button variant="danger" label="Sair da sessao" onPress={handleLogout} />
+      <Button variant="secondary" label="Atualizar dados" onPress={refreshData} />
+      <Button variant="danger" label="Sair" onPress={handleLogout} />
     </Screen>
   );
 };
@@ -291,24 +275,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   summaryText: {
-    ...theme.typography.body,
-    color: theme.colors.textMuted,
-  },
-  securityList: {
-    gap: theme.spacing.sm,
-  },
-  securityItem: {
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  securityText: {
-    flex: 1,
     ...theme.typography.body,
     color: theme.colors.textMuted,
   },

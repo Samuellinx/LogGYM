@@ -59,7 +59,7 @@ export const HistoryScreen = () => {
 
       <View style={styles.summary}>
         <Text style={styles.summaryText}>
-          {filteredHistory.length} sessoes · {formatVolume(totalVolume)} de volume total
+          {filteredHistory.length} sessoes - {formatVolume(totalVolume)} de volume total
         </Text>
       </View>
 
@@ -71,14 +71,14 @@ export const HistoryScreen = () => {
                 <View style={styles.cardCopy}>
                   <Text style={styles.cardTitle}>{item.workoutName}</Text>
                   <Text style={styles.cardMeta}>
-                    {item.focus} · {formatSessionDate(item.performedAt)}
+                    {item.focus} - {formatSessionDate(item.performedAt)}
                   </Text>
                 </View>
                 <Text style={styles.cardLoad}>{formatLoad(item.topLoad)}</Text>
               </View>
 
               <Text style={styles.cardStats}>
-                {item.totalSets} series · {formatVolume(item.totalVolume)}
+                {item.totalSets} series - {formatVolume(item.totalVolume)}
               </Text>
 
               {item.overallNotes ? (

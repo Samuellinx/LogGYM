@@ -1,4 +1,5 @@
-import {Alert, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {useDeferredValue, useState} from 'react';
+import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import Animated, {FadeInDown} from 'react-native-reanimated';
@@ -8,6 +9,7 @@ import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {StatCard} from '@/components/StatCard';
 import {TagChip} from '@/components/TagChip';
+import {TextField} from '@/components/TextField';
 import {WorkoutCard} from '@/components/WorkoutCard';
 import {duplicateWorkout} from '@/features/workouts/workoutRepository';
 import {MainTabParamList, RootStackParamList} from '@/navigation/types';
@@ -28,10 +30,25 @@ export const DashboardScreen = () => {
   const session = useAppStore(state => state.session);
   const refreshData = useAppStore(state => state.refreshData);
   const isRefreshing = useAppStore(state => state.isRefreshing);
+  const workouts = useAppStore(state => state.workouts);
+  const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
 
   const heroSubtitle = dashboard?.lastSession?.performedAt
     ? `Ultima sessao: ${formatSessionDate(dashboard.lastSession.performedAt)}`
     : 'Seu espaco esta pronto para receber o primeiro treino.';
+  const normalized = deferredSearch.trim().toLowerCase();
+  const highlightedWorkouts = !normalized
+    ? dashboard?.suggestedTemplates ?? []
+    : workouts.filter(workout =>
+        `${workout.name} ${workout.focus} ${workout.notes}`
+          .toLowerCase()
+          .includes(normalized),
+      );
+  const workoutSectionTitle = normalized ? 'Resultados da busca' : 'Treinos em foco';
+  const workoutSectionSubtitle = normalized
+    ? 'Toque em um treino para abrir, iniciar ou duplicar.'
+    : 'Seus templates prontos para uso rapido';
 
   const handleDuplicate = async (workoutId: string) => {
     if (!session) {
@@ -45,6 +62,10 @@ export const DashboardScreen = () => {
     } catch (error) {
       Alert.alert('Duplicar treino', toUserMessage(error));
     }
+  };
+
+  const openExerciseProgress = (exerciseName: string) => {
+    navigation.navigate('ExerciseProgress', {exerciseName});
   };
 
   return (
@@ -62,7 +83,9 @@ export const DashboardScreen = () => {
         end={{x: 1, y: 1}}
         style={styles.hero}>
         <Text style={styles.heroEyebrow}>BEM-VINDO DE VOLTA</Text>
-        <Text style={styles.heroTitle}>{session?.user.givenName || session?.user.name}</Text>
+        <Text style={styles.heroTitle}>
+          {session?.user.givenName || session?.user.name}
+        </Text>
         <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
       </LinearGradient>
 
@@ -71,11 +94,13 @@ export const DashboardScreen = () => {
           label="Semana"
           value={String(dashboard?.weeklySessions ?? 0)}
           helper="sessoes registradas"
+          onPress={() => navigation.navigate('History')}
         />
         <StatCard
           label="Sets"
           value={formatCompactNumber(dashboard?.totalTrackedSets ?? 0)}
           helper="series salvas"
+          onPress={() => navigation.navigate('History')}
         />
       </View>
 
@@ -84,23 +109,36 @@ export const DashboardScreen = () => {
           label="Templates"
           value={String(dashboard?.totalTemplates ?? 0)}
           helper="treinos ativos"
+          onPress={() => navigation.navigate('Workouts')}
         />
         <StatCard
           label="Historico"
           value={String(dashboard?.totalSessions ?? 0)}
           helper="execucoes totais"
+          onPress={() => navigation.navigate('History')}
         />
       </View>
 
-      <SectionHeader
-        title="Treinos em foco"
-        subtitle="Seus templates prontos para uso rapido"
-        actionLabel="Novo"
-        onPressAction={() => navigation.navigate('WorkoutForm')}
+      <TextField
+        label="Pesquisar treinos"
+        placeholder="Nome, foco ou anotacao"
+        value={search}
+        onChangeText={setSearch}
       />
 
-      {dashboard?.suggestedTemplates.length ? (
-        dashboard.suggestedTemplates.map((workout, index) => (
+      <SectionHeader
+        title={workoutSectionTitle}
+        subtitle={workoutSectionSubtitle}
+        actionLabel={normalized ? 'Treinos' : 'Novo'}
+        onPressAction={() =>
+          normalized
+            ? navigation.navigate('Workouts')
+            : navigation.navigate('WorkoutForm')
+        }
+      />
+
+      {highlightedWorkouts.length ? (
+        highlightedWorkouts.map((workout, index) => (
           <Animated.View
             key={workout.id}
             entering={FadeInDown.delay(40 * index).duration(320)}>
@@ -116,8 +154,12 @@ export const DashboardScreen = () => {
         ))
       ) : (
         <EmptyState
-          title="Nenhum treino criado ainda"
-          description="Crie seu primeiro template para registrar cargas e progresso."
+          title="Nenhum treino encontrado"
+          description={
+            normalized
+              ? 'Tente outro termo ou abra a aba de treinos para criar um novo.'
+              : 'Crie seu primeiro template para registrar cargas e progresso.'
+          }
         />
       )}
 
@@ -129,10 +171,14 @@ export const DashboardScreen = () => {
       <View style={styles.recordList}>
         {dashboard?.personalRecords.length ? (
           dashboard.personalRecords.map(record => (
-            <View key={record.exerciseName} style={styles.recordCard}>
+            <Pressable
+              key={record.exerciseName}
+              accessibilityRole="button"
+              onPress={() => openExerciseProgress(record.exerciseName)}
+              style={({pressed}) => [styles.recordCard, pressed ? styles.cardPressed : null]}>
               <Text style={styles.recordLabel}>{record.exerciseName}</Text>
               <Text style={styles.recordValue}>{formatLoad(record.maxLoad)}</Text>
-            </View>
+            </Pressable>
           ))
         ) : (
           <EmptyState
@@ -150,7 +196,11 @@ export const DashboardScreen = () => {
       <View style={styles.exerciseList}>
         {dashboard?.recentExercises.length ? (
           dashboard.recentExercises.map(item => (
-            <View key={item.exerciseName} style={styles.exerciseCard}>
+            <Pressable
+              key={item.exerciseName}
+              accessibilityRole="button"
+              onPress={() => openExerciseProgress(item.exerciseName)}
+              style={({pressed}) => [styles.exerciseCard, pressed ? styles.cardPressed : null]}>
               <View style={styles.exerciseCardHeader}>
                 <Text style={styles.exerciseTitle}>{item.exerciseName}</Text>
                 <TagChip label={formatLoad(item.maxLoad)} active />
@@ -158,7 +208,7 @@ export const DashboardScreen = () => {
               <Text style={styles.exerciseMeta}>
                 {item.totalSets} series - {formatSessionDate(item.lastPerformedAt)}
               </Text>
-            </View>
+            </Pressable>
           ))
         ) : (
           <EmptyState
@@ -243,5 +293,9 @@ const styles = StyleSheet.create({
   exerciseMeta: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
+  },
+  cardPressed: {
+    opacity: 0.94,
+    transform: [{scale: 0.99}],
   },
 });
