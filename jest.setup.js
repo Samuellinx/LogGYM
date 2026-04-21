@@ -1,0 +1,7 @@
+/* eslint-env jest */
+
+jest.mock('react-native-config', () => ({
+  LOGGYM_GOOGLE_WEB_CLIENT_ID: '',
+  LOGGYM_GOOGLE_IOS_CLIENT_ID: '',
+  LOGGYM_ENABLE_DEV_LOGIN: 'true',
+}));
