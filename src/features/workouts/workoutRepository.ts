@@ -32,6 +32,7 @@ type WorkoutExerciseRow = {
   workout_id: string;
   name: string;
   muscle_group: string;
+  base_load: string;
   target_reps: string;
   note: string;
   order_index: number;
@@ -241,6 +242,7 @@ export const getWorkoutDetail = async (
       workout_id,
       name,
       muscle_group,
+      base_load,
       target_reps,
       note,
       order_index
@@ -257,6 +259,7 @@ export const getWorkoutDetail = async (
       workoutId: row.workout_id,
       name: row.name,
       muscleGroup: row.muscle_group,
+      baseLoad: row.base_load,
       targetReps: row.target_reps,
       note: row.note,
       orderIndex: Number(row.order_index),
@@ -317,13 +320,14 @@ export const saveWorkout = async (
     for (const [index, exercise] of input.exercises.entries()) {
       await tx.executeAsync(
         `INSERT INTO workout_exercises (
-          id, workout_id, name, muscle_group, target_reps, note, order_index, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          id, workout_id, name, muscle_group, base_load, target_reps, note, order_index, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           exercise.id ?? createId(),
           resolvedWorkoutId,
           exercise.name,
           exercise.muscleGroup,
+          exercise.baseLoad,
           exercise.targetReps,
           exercise.note,
           index,
@@ -353,6 +357,7 @@ export const duplicateWorkout = async (userId: string, workoutId: string) => {
     exercises: workout.exercises.map(exercise => ({
       name: exercise.name,
       muscleGroup: exercise.muscleGroup,
+      baseLoad: exercise.baseLoad,
       targetReps: exercise.targetReps,
       note: exercise.note,
     })),
@@ -439,6 +444,30 @@ export const saveTrainingSession = async (
   });
 
   return sessionId;
+};
+
+export const deleteTrainingSession = async (
+  userId: string,
+  sessionId: string,
+) => {
+  const db = getDatabase();
+
+  await db.transaction(async tx => {
+    await tx.executeAsync(
+      `DELETE FROM session_sets
+       WHERE session_id IN (
+         SELECT id
+         FROM workout_sessions
+         WHERE id = ? AND user_id = ?
+       );`,
+      [sessionId, userId],
+    );
+
+    await tx.executeAsync(
+      'DELETE FROM workout_sessions WHERE id = ? AND user_id = ?;',
+      [sessionId, userId],
+    );
+  });
 };
 
 export const listHistory = async (userId: string) => {

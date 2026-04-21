@@ -28,6 +28,7 @@ type BackupWorkoutExerciseRow = {
   workout_id: string;
   name: string;
   muscle_group: string;
+  base_load: string;
   target_reps: string;
   note: string;
   order_index: number;
@@ -143,6 +144,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
         we.workout_id,
         we.name,
         we.muscle_group,
+        we.base_load,
         we.target_reps,
         we.note,
         we.order_index,
@@ -221,6 +223,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
         workoutId: item.workout_id,
         name: item.name,
         muscleGroup: item.muscle_group,
+        baseLoad: item.base_load,
         targetReps: item.target_reps,
         note: item.note,
         orderIndex: Number(item.order_index),
@@ -406,13 +409,14 @@ export const importBackupForCurrentUser = async (
       for (const exercise of payload.data.workoutExercises) {
         await tx.executeAsync(
           `INSERT INTO workout_exercises (
-            id, workout_id, name, muscle_group, target_reps, note, order_index, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            id, workout_id, name, muscle_group, base_load, target_reps, note, order_index, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
             exercise.id,
             exercise.workoutId,
             exercise.name,
             exercise.muscleGroup,
+            exercise.baseLoad,
             exercise.targetReps,
             exercise.note,
             exercise.orderIndex,

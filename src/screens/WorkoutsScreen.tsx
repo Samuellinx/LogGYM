@@ -4,8 +4,10 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
-import {CalendarDays, X} from 'lucide-react-native';
+import {CalendarDays, ClipboardPlus, X} from 'lucide-react-native';
+import LinearGradient from 'react-native-linear-gradient';
 
+import {Button} from '@/components/Button';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
@@ -104,13 +106,34 @@ export const WorkoutsScreen = () => {
       <SectionHeader
         title="Treinos"
         subtitle="Templates editaveis para sua rotina"
-        actionLabel="Criar"
-        onPressAction={() => navigation.navigate('WorkoutForm')}
       />
+
+      <LinearGradient
+        colors={['#121D27', '#122A1A', '#0F131A']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={styles.createCard}>
+        <View style={styles.createCardHeader}>
+          <View style={styles.createIconWrap}>
+            <ClipboardPlus color="#04110A" size={20} />
+          </View>
+          <View style={styles.createCopy}>
+            <Text style={styles.createTitle}>Criar novo treino</Text>
+            <Text style={styles.createSubtitle}>
+              Monte um template em poucos toques e deixe a rotina pronta para o treino.
+            </Text>
+          </View>
+        </View>
+
+        <Button
+          label="Comecar agora"
+          onPress={() => navigation.navigate('WorkoutForm')}
+        />
+      </LinearGradient>
 
       <TextField
         label="Buscar treino"
-        placeholder="Push, pernas, upper..."
+        placeholder="Peito, pernas, upper..."
         value={search}
         onChangeText={setSearch}
       />
@@ -193,6 +216,38 @@ export const WorkoutsScreen = () => {
 const styles = StyleSheet.create({
   list: {
     gap: theme.spacing.md,
+  },
+  createCard: {
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.md,
+  },
+  createCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  createIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accent,
+  },
+  createCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  createTitle: {
+    ...theme.typography.title,
+    color: theme.colors.text,
+  },
+  createSubtitle: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
   },
   filterActions: {
     flexDirection: 'row',

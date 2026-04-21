@@ -4,16 +4,21 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Repeat2, Trash2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
+import {ConfirmModal} from '@/components/ConfirmModal';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TagChip} from '@/components/TagChip';
-import {deleteWorkout, duplicateWorkout, getWorkoutDetail} from '@/features/workouts/workoutRepository';
+import {
+  deleteWorkout,
+  duplicateWorkout,
+  getWorkoutDetail,
+} from '@/features/workouts/workoutRepository';
 import {RootStackParamList} from '@/navigation/types';
-import {theme} from '@/theme';
-import {formatSessionDate} from '@/utils/formatters';
-import {toUserMessage} from '@/utils/errors';
 import {useAppStore} from '@/store/useAppStore';
+import {theme} from '@/theme';
+import {toUserMessage} from '@/utils/errors';
+import {formatSessionDate} from '@/utils/formatters';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutDetail'>;
 
@@ -22,6 +27,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
   const refreshData = useAppStore(state => state.refreshData);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getWorkoutDetail>>>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -59,31 +65,19 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
     };
   }, [navigation, route.params.workoutId, session]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!session || !detail) {
       return;
     }
 
-    Alert.alert(
-      'Excluir treino',
-      'O template sera removido. O historico ja salvo continua preservado.',
-      [
-        {text: 'Cancelar', style: 'cancel'},
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteWorkout(session.user.id, detail.id);
-              await refreshData();
-              navigation.goBack();
-            } catch (error) {
-              Alert.alert('Excluir treino', toUserMessage(error));
-            }
-          },
-        },
-      ],
-    );
+    try {
+      await deleteWorkout(session.user.id, detail.id);
+      await refreshData();
+      setShowDeleteModal(false);
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Excluir treino', toUserMessage(error));
+    }
   };
 
   const handleDuplicate = async () => {
@@ -111,14 +105,10 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
         />
       ) : (
         <>
-          <View
-            style={[
-              styles.hero,
-              {borderLeftColor: detail.accentColor},
-            ]}>
+          <View style={[styles.hero, {borderLeftColor: detail.accentColor}]}>
             <Text style={styles.heroTitle}>{detail.name}</Text>
             <Text style={styles.heroSubtitle}>
-              {detail.focus} · {detail.exerciseCount} exercicios · ultima vez{' '}
+              {detail.focus} - {detail.exerciseCount} exercicios - ultima vez{' '}
               {formatSessionDate(detail.lastPerformedAt)}
             </Text>
             <Text style={styles.heroNotes}>
@@ -156,7 +146,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
               variant="danger"
               label="Excluir"
               icon={<Trash2 color="#FFE8EC" size={16} />}
-              onPress={handleDelete}
+              onPress={() => setShowDeleteModal(true)}
             />
           </View>
 
@@ -173,13 +163,19 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
                   <View style={styles.exerciseCopy}>
                     <Text style={styles.exerciseName}>{exercise.name}</Text>
                     <Text style={styles.exerciseMeta}>
-                      {exercise.muscleGroup} · alvo {exercise.targetReps}
+                      {exercise.muscleGroup} - alvo {exercise.targetReps}
                     </Text>
                   </View>
                 </View>
+
+                {exercise.baseLoad ? (
+                  <Text style={styles.exerciseLoad}>Carga sugerida: {exercise.baseLoad}</Text>
+                ) : null}
+
                 {exercise.note ? (
                   <Text style={styles.exerciseNote}>{exercise.note}</Text>
                 ) : null}
+
                 <TagChip
                   label="Ver evolucao"
                   active
@@ -195,6 +191,17 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
           </View>
         </>
       )}
+
+      <ConfirmModal
+        visible={showDeleteModal}
+        title="Excluir treino?"
+        description="Esse treino sera removido da sua lista. O historico ja salvo continua preservado."
+        confirmLabel="Excluir treino"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </Screen>
   );
 };
@@ -275,6 +282,10 @@ const styles = StyleSheet.create({
   exerciseMeta: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
+  },
+  exerciseLoad: {
+    ...theme.typography.caption,
+    color: theme.colors.accent,
   },
   exerciseNote: {
     ...theme.typography.body,

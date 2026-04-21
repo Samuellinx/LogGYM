@@ -14,6 +14,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Plus, Trash2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
+import {ConfirmModal} from '@/components/ConfirmModal';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {TextField} from '@/components/TextField';
@@ -40,10 +41,16 @@ type DraftExercise = {
   workoutExerciseId: string;
   exerciseName: string;
   muscleGroup: string;
+  baseLoad: string;
   targetReps: string;
   hint: string;
   sets: DraftSet[];
 };
+
+type PendingSetDeletion = {
+  exerciseIndex: number;
+  setIndex: number;
+} | null;
 
 const createBlankSet = (): DraftSet => ({
   load: '',
@@ -56,6 +63,7 @@ const createDraftFromWorkout = (workout: WorkoutDetail): DraftExercise[] =>
     workoutExerciseId: exercise.id,
     exerciseName: exercise.name,
     muscleGroup: exercise.muscleGroup,
+    baseLoad: exercise.baseLoad,
     targetReps: exercise.targetReps,
     hint: exercise.note,
     sets: [createBlankSet()],
@@ -73,6 +81,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [setToDelete, setSetToDelete] = useState<PendingSetDeletion>(null);
 
   useEffect(() => {
     let active = true;
@@ -207,6 +216,15 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     }
   };
 
+  const confirmSetDeletion = () => {
+    if (!setToDelete) {
+      return;
+    }
+
+    removeSet(setToDelete.exerciseIndex, setToDelete.setIndex);
+    setSetToDelete(null);
+  };
+
   return (
     <Screen>
       {isLoading ? (
@@ -271,11 +289,25 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   <Text style={styles.exerciseHint}>{exercise.hint}</Text>
                 ) : null}
 
+                {exercise.baseLoad ? (
+                  <Text style={styles.exerciseLoadHint}>
+                    Carga sugerida: {exercise.baseLoad}
+                  </Text>
+                ) : null}
+
                 {exercise.sets.map((set, setIndex) => (
                   <View key={`${exercise.workoutExerciseId}-${setIndex}`} style={styles.setCard}>
                     <View style={styles.setHeader}>
                       <Text style={styles.setTitle}>Serie {setIndex + 1}</Text>
-                      <Pressable onPress={() => removeSet(exerciseIndex, setIndex)}>
+                      <Pressable
+                        hitSlop={10}
+                        style={styles.deleteIconButton}
+                        onPress={() =>
+                          setSetToDelete({
+                            exerciseIndex,
+                            setIndex,
+                          })
+                        }>
                         <Trash2 color={theme.colors.textMuted} size={16} />
                       </Pressable>
                     </View>
@@ -331,6 +363,17 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           />
         </>
       )}
+
+      <ConfirmModal
+        visible={setToDelete !== null}
+        title="Excluir serie?"
+        description="Essa serie sera removida do treino atual."
+        confirmLabel="Excluir serie"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={confirmSetDeletion}
+        onCancel={() => setSetToDelete(null)}
+      />
     </Screen>
   );
 };
@@ -391,6 +434,10 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textSoft,
   },
+  exerciseLoadHint: {
+    ...theme.typography.caption,
+    color: theme.colors.accent,
+  },
   setCard: {
     padding: theme.spacing.md,
     borderRadius: theme.radius.md,
@@ -401,6 +448,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  deleteIconButton: {
+    padding: 4,
+    borderRadius: theme.radius.sm,
   },
   setTitle: {
     ...theme.typography.subtitle,

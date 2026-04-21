@@ -21,6 +21,7 @@ export interface WorkoutExerciseDraft {
   id?: string;
   name: string;
   muscleGroup: string;
+  baseLoad: string;
   targetReps: string;
   note: string;
 }
@@ -39,6 +40,7 @@ export interface WorkoutExercise {
   workoutId: string;
   name: string;
   muscleGroup: string;
+  baseLoad: string;
   targetReps: string;
   note: string;
   orderIndex: number;

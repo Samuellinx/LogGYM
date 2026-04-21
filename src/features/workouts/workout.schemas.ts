@@ -3,7 +3,8 @@ import {z} from 'zod';
 export const workoutExerciseSchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2, 'Informe o nome do exercicio.').max(60),
-  muscleGroup: z.string().trim().min(2, 'Escolha o grupo muscular.').max(40),
+  muscleGroup: z.string().trim().min(2, 'Escolha o tipo de serie.').max(40),
+  baseLoad: z.string().trim().max(60),
   targetReps: z.string().trim().min(1, 'Informe a faixa de repeticoes.').max(20),
   note: z.string().trim().max(220),
 });
