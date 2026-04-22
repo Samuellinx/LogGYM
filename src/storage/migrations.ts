@@ -80,4 +80,11 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_sets_exercise ON session_sets(exercise_name, performed_at DESC);`,
     ],
   },
+  {
+    id: '002_workout_exercise_base_load',
+    statements: [
+      `ALTER TABLE workout_exercises ADD COLUMN base_load TEXT NOT NULL DEFAULT '';`,
+      `UPDATE workout_exercises SET base_load = '' WHERE base_load IS NULL;`,
+    ],
+  },
 ];

@@ -1,4 +1,4 @@
-import {StyleSheet, Text, View} from 'react-native';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 
 import {cardShadow, theme} from '@/theme';
 
@@ -6,15 +6,31 @@ interface StatCardProps {
   label: string;
   value: string;
   helper: string;
+  onPress?: () => void;
 }
 
-export const StatCard = ({label, value, helper}: StatCardProps) => (
-  <View style={styles.card}>
-    <Text style={styles.label}>{label}</Text>
-    <Text style={styles.value}>{value}</Text>
-    <Text style={styles.helper}>{helper}</Text>
-  </View>
-);
+export const StatCard = ({label, value, helper, onPress}: StatCardProps) => {
+  const content = (
+    <>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.helper}>{helper}</Text>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.card}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({pressed}) => [styles.card, pressed ? styles.pressed : null]}>
+      {content}
+    </Pressable>
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
@@ -41,5 +57,9 @@ const styles = StyleSheet.create({
   helper: {
     ...theme.typography.caption,
     color: theme.colors.textSoft,
+  },
+  pressed: {
+    opacity: 0.92,
+    transform: [{scale: 0.985}],
   },
 });

@@ -14,16 +14,24 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Plus, Trash2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
+import {ConfirmModal} from '@/components/ConfirmModal';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {TextField} from '@/components/TextField';
-import {getWorkoutDetail, saveTrainingSession} from '@/features/workouts/workoutRepository';
-import type {WorkoutDetail} from '@/types/domain';
+import {
+  WorkoutCompletionModal,
+  type WorkoutCompletionSummary,
+} from '@/components/WorkoutCompletionModal';
+import {
+  getWorkoutDetail,
+  saveTrainingSession,
+} from '@/features/workouts/workoutRepository';
 import {RootStackParamList} from '@/navigation/types';
-import {theme} from '@/theme';
-import {formatDateLong} from '@/utils/formatters';
-import {toUserMessage} from '@/utils/errors';
 import {useAppStore} from '@/store/useAppStore';
+import {theme} from '@/theme';
+import type {WorkoutDetail} from '@/types/domain';
+import {toUserMessage} from '@/utils/errors';
+import {formatDateLong} from '@/utils/formatters';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainingSession'>;
 
@@ -37,10 +45,16 @@ type DraftExercise = {
   workoutExerciseId: string;
   exerciseName: string;
   muscleGroup: string;
+  baseLoad: string;
   targetReps: string;
   hint: string;
   sets: DraftSet[];
 };
+
+type PendingSetDeletion = {
+  exerciseIndex: number;
+  setIndex: number;
+} | null;
 
 const createBlankSet = (): DraftSet => ({
   load: '',
@@ -53,13 +67,121 @@ const createDraftFromWorkout = (workout: WorkoutDetail): DraftExercise[] =>
     workoutExerciseId: exercise.id,
     exerciseName: exercise.name,
     muscleGroup: exercise.muscleGroup,
+    baseLoad: exercise.baseLoad,
     targetReps: exercise.targetReps,
     hint: exercise.note,
     sets: [createBlankSet()],
   }));
 
-const parseNumber = (value: string) =>
-  Number(value.replace(',', '.').trim());
+const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
+
+const normalizeToken = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const muscleGroupDictionary = [
+  {
+    label: 'Peito',
+    keywords: ['supino', 'crucifixo', 'crossover', 'voador', 'peck deck', 'peito'],
+  },
+  {
+    label: 'Costas',
+    keywords: ['remada', 'puxada', 'barra fixa', 'pull down', 'pulldown', 'costas'],
+  },
+  {
+    label: 'Ombro',
+    keywords: ['desenvolvimento', 'elevacao lateral', 'elevacao frontal', 'ombro'],
+  },
+  {
+    label: 'Pernas',
+    keywords: ['agachamento', 'leg press', 'extensora', 'flexora', 'panturrilha', 'stiff', 'afundo', 'perna'],
+  },
+  {
+    label: 'Biceps',
+    keywords: ['rosca', 'biceps'],
+  },
+  {
+    label: 'Triceps',
+    keywords: ['triceps', 'frances', 'testa', 'corda', 'mergulho'],
+  },
+  {
+    label: 'Gluteos',
+    keywords: ['gluteo', 'hip thrust', 'coice', 'abducao'],
+  },
+  {
+    label: 'Core',
+    keywords: ['abdominal', 'prancha', 'core'],
+  },
+];
+
+const resolveMuscleGroupLabel = (exerciseName: string, workoutFocus: string) => {
+  const normalizedExercise = normalizeToken(exerciseName);
+
+  for (const entry of muscleGroupDictionary) {
+    if (entry.keywords.some(keyword => normalizedExercise.includes(normalizeToken(keyword)))) {
+      return entry.label;
+    }
+  }
+
+  const normalizedFocus = normalizeToken(workoutFocus);
+
+  for (const entry of muscleGroupDictionary) {
+    if (entry.keywords.some(keyword => normalizedFocus.includes(normalizeToken(keyword)))) {
+      return entry.label;
+    }
+  }
+
+  return 'Outros';
+};
+
+const buildCompletionSummary = (
+  workoutName: string,
+  workoutFocus: string,
+  exercises: DraftExercise[],
+): WorkoutCompletionSummary => {
+  const validSets = exercises.flatMap(exercise =>
+    exercise.sets
+      .map(set => ({
+        exerciseName: exercise.exerciseName,
+        load: parseNumber(set.load),
+        reps: parseNumber(set.reps),
+        groupLabel: resolveMuscleGroupLabel(exercise.exerciseName, workoutFocus),
+      }))
+      .filter(
+        set =>
+          Number.isFinite(set.load) &&
+          Number.isFinite(set.reps) &&
+          set.load > 0 &&
+          set.reps > 0,
+      ),
+  );
+
+  if (validSets.length === 0) {
+    throw new Error('Adicione pelo menos uma serie valida antes de salvar.');
+  }
+
+  const loadValues = validSets.map(set => set.load);
+  const repsValues = validSets.map(set => set.reps);
+  const groupCounters = new Map<string, number>();
+
+  validSets.forEach(set => {
+    groupCounters.set(set.groupLabel, (groupCounters.get(set.groupLabel) ?? 0) + 1);
+  });
+
+  return {
+    workoutName,
+    totalSets: validSets.length,
+    seriesByGroup: Array.from(groupCounters.entries())
+      .map(([label, count]) => ({label, count}))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+    maxLoad: Math.max(...loadValues),
+    minLoad: Math.min(...loadValues),
+    maxReps: Math.max(...repsValues),
+    minReps: Math.min(...repsValues),
+  };
+};
 
 export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
@@ -71,6 +193,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [setToDelete, setSetToDelete] = useState<PendingSetDeletion>(null);
+  const [completionSummary, setCompletionSummary] =
+    useState<WorkoutCompletionSummary | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -149,7 +274,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         const nextSets =
           exercise.sets.length === 1
             ? [createBlankSet()]
-            : exercise.sets.filter((_, currentSetIndex) => currentSetIndex !== setIndex);
+            : exercise.sets.filter(
+                (_, currentSetIndex) => currentSetIndex !== setIndex,
+              );
 
         return {
           ...exercise,
@@ -174,6 +301,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
     try {
       setIsSaving(true);
+      const summary = buildCompletionSummary(workout.name, workout.focus, drafts);
 
       await saveTrainingSession(session.user.id, {
         workoutId: workout.id,
@@ -194,13 +322,26 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
       });
 
       await refreshData();
-      Alert.alert('Treino salvo', 'Historico e indicadores atualizados com sucesso.');
-      navigation.goBack();
+      setCompletionSummary(summary);
     } catch (error) {
       Alert.alert('Salvar execucao', toUserMessage(error));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCloseCompletionModal = () => {
+    setCompletionSummary(null);
+    navigation.goBack();
+  };
+
+  const confirmSetDeletion = () => {
+    if (!setToDelete) {
+      return;
+    }
+
+    removeSet(setToDelete.exerciseIndex, setToDelete.setIndex);
+    setSetToDelete(null);
   };
 
   return (
@@ -217,7 +358,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           <View style={styles.hero}>
             <Text style={styles.title}>{workout.name}</Text>
             <Text style={styles.subtitle}>
-              {workout.focus} · {workout.exerciseCount} exercicios
+              {workout.focus} - {workout.exerciseCount} exercicios
             </Text>
             <Button
               fullWidth={false}
@@ -251,7 +392,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   <View style={styles.exerciseHeaderCopy}>
                     <Text style={styles.exerciseName}>{exercise.exerciseName}</Text>
                     <Text style={styles.exerciseMeta}>
-                      {exercise.muscleGroup} · alvo {exercise.targetReps}
+                      {exercise.muscleGroup} - alvo {exercise.targetReps}
                     </Text>
                   </View>
                   <Button
@@ -267,11 +408,25 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   <Text style={styles.exerciseHint}>{exercise.hint}</Text>
                 ) : null}
 
+                {exercise.baseLoad ? (
+                  <Text style={styles.exerciseLoadHint}>
+                    Carga sugerida: {exercise.baseLoad}
+                  </Text>
+                ) : null}
+
                 {exercise.sets.map((set, setIndex) => (
                   <View key={`${exercise.workoutExerciseId}-${setIndex}`} style={styles.setCard}>
                     <View style={styles.setHeader}>
                       <Text style={styles.setTitle}>Serie {setIndex + 1}</Text>
-                      <Pressable onPress={() => removeSet(exerciseIndex, setIndex)}>
+                      <Pressable
+                        hitSlop={10}
+                        style={styles.deleteIconButton}
+                        onPress={() =>
+                          setSetToDelete({
+                            exerciseIndex,
+                            setIndex,
+                          })
+                        }>
                         <Trash2 color={theme.colors.textMuted} size={16} />
                       </Pressable>
                     </View>
@@ -327,6 +482,23 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           />
         </>
       )}
+
+      <ConfirmModal
+        visible={setToDelete !== null}
+        title="Excluir serie?"
+        description="Essa serie sera removida do treino atual."
+        confirmLabel="Excluir serie"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={confirmSetDeletion}
+        onCancel={() => setSetToDelete(null)}
+      />
+
+      <WorkoutCompletionModal
+        visible={completionSummary !== null}
+        summary={completionSummary}
+        onClose={handleCloseCompletionModal}
+      />
     </Screen>
   );
 };
@@ -387,6 +559,10 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textSoft,
   },
+  exerciseLoadHint: {
+    ...theme.typography.caption,
+    color: theme.colors.accent,
+  },
   setCard: {
     padding: theme.spacing.md,
     borderRadius: theme.radius.md,
@@ -397,6 +573,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  deleteIconButton: {
+    padding: 4,
+    borderRadius: theme.radius.sm,
   },
   setTitle: {
     ...theme.typography.subtitle,

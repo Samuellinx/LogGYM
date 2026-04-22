@@ -1,14 +1,19 @@
 import {useDeferredValue, useState} from 'react';
-import {RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
+import {Trash2} from 'lucide-react-native';
 
+import {ConfirmModal} from '@/components/ConfirmModal';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TagChip} from '@/components/TagChip';
 import {TextField} from '@/components/TextField';
+import {deleteTrainingSession} from '@/features/workouts/workoutRepository';
 import {MainTabParamList, RootStackParamList} from '@/navigation/types';
+import type {WorkoutHistoryItem} from '@/types/domain';
 import {theme} from '@/theme';
+import {toUserMessage} from '@/utils/errors';
 import {formatLoad, formatSessionDate, formatVolume} from '@/utils/formatters';
 import {useAppStore} from '@/store/useAppStore';
 
@@ -16,10 +21,15 @@ type AppNavigation = NavigationProp<MainTabParamList & RootStackParamList>;
 
 export const HistoryScreen = () => {
   const navigation = useNavigation<AppNavigation>();
+  const session = useAppStore(state => state.session);
   const history = useAppStore(state => state.history);
   const refreshData = useAppStore(state => state.refreshData);
   const isRefreshing = useAppStore(state => state.isRefreshing);
   const [search, setSearch] = useState('');
+  const [sessionToDelete, setSessionToDelete] = useState<WorkoutHistoryItem | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const normalized = deferredSearch.trim().toLowerCase();
@@ -35,6 +45,26 @@ export const HistoryScreen = () => {
     (sum, item) => sum + item.totalVolume,
     0,
   );
+
+  const handleDeleteSession = async () => {
+    if (!session || !sessionToDelete || isDeleting) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      await deleteTrainingSession(session.user.id, sessionToDelete.id);
+      setSessionToDelete(null);
+      await refreshData();
+    } catch (error) {
+      Alert.alert(
+        'Excluir execucao',
+        toUserMessage(error, 'Nao foi possivel excluir a execucao agora.'),
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Screen
@@ -59,7 +89,7 @@ export const HistoryScreen = () => {
 
       <View style={styles.summary}>
         <Text style={styles.summaryText}>
-          {filteredHistory.length} sessoes · {formatVolume(totalVolume)} de volume total
+          {filteredHistory.length} sessoes - {formatVolume(totalVolume)} de volume total
         </Text>
       </View>
 
@@ -71,14 +101,26 @@ export const HistoryScreen = () => {
                 <View style={styles.cardCopy}>
                   <Text style={styles.cardTitle}>{item.workoutName}</Text>
                   <Text style={styles.cardMeta}>
-                    {item.focus} · {formatSessionDate(item.performedAt)}
+                    {item.focus} - {formatSessionDate(item.performedAt)}
                   </Text>
                 </View>
-                <Text style={styles.cardLoad}>{formatLoad(item.topLoad)}</Text>
+                <View style={styles.cardActions}>
+                  <Text style={styles.cardLoad}>{formatLoad(item.topLoad)}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    hitSlop={10}
+                    onPress={() => setSessionToDelete(item)}
+                    style={({pressed}) => [
+                      styles.deleteButton,
+                      pressed ? styles.pressed : null,
+                    ]}>
+                    <Trash2 color={theme.colors.danger} size={16} />
+                  </Pressable>
+                </View>
               </View>
 
               <Text style={styles.cardStats}>
-                {item.totalSets} series · {formatVolume(item.totalVolume)}
+                {item.totalSets} series - {formatVolume(item.totalVolume)}
               </Text>
 
               {item.overallNotes ? (
@@ -108,6 +150,23 @@ export const HistoryScreen = () => {
           />
         )}
       </View>
+
+      <ConfirmModal
+        visible={sessionToDelete !== null}
+        title="Excluir execucao?"
+        description={
+          sessionToDelete
+            ? `A sessao ${sessionToDelete.workoutName} de ${formatSessionDate(
+                sessionToDelete.performedAt,
+              )} sera removida do historico e das metricas associadas.`
+            : ''
+        }
+        confirmLabel={isDeleting ? 'Excluindo...' : 'Excluir execucao'}
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={handleDeleteSession}
+        onCancel={() => (isDeleting ? undefined : setSessionToDelete(null))}
+      />
     </Screen>
   );
 };
@@ -153,9 +212,23 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
   },
+  cardActions: {
+    alignItems: 'flex-end',
+    gap: theme.spacing.sm,
+  },
   cardLoad: {
     ...theme.typography.subtitle,
     color: theme.colors.accent,
+  },
+  deleteButton: {
+    width: 34,
+    height: 34,
+    borderRadius: theme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,111,125,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,111,125,0.18)',
   },
   cardStats: {
     ...theme.typography.caption,
@@ -169,5 +242,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.spacing.sm,
+  },
+  pressed: {
+    opacity: 0.9,
+    transform: [{scale: 0.98}],
   },
 });

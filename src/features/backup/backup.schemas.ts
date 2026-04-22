@@ -27,6 +27,7 @@ const backupWorkoutExerciseSchema = z.object({
   workoutId: idSchema,
   name: z.string().trim().min(2).max(60),
   muscleGroup: z.string().trim().min(2).max(40),
+  baseLoad: z.string().trim().max(60).default(''),
   targetReps: z.string().trim().min(1).max(20),
   note: z.string().trim().max(220),
   orderIndex: z.number().int().min(0).max(999),
@@ -65,7 +66,7 @@ export const backupFileSchema = z.object({
   user: z.object({
     email: z.string().trim().email().max(254),
     name: z.string().trim().min(1).max(120),
-    provider: z.enum(['google', 'dev-local']),
+    provider: z.enum(['google', 'dev-local', 'credentials']),
   }),
   stats: z.object({
     workouts: z.number().int().min(0).max(500),

@@ -1,6 +1,6 @@
 # LogGYM
 
-Aplicativo React Native Android-first para registrar treinos de musculacao, cargas, repeticoes e anotacoes com fluxo offline-first, login Google e foco em usabilidade durante o treino.
+Aplicativo React Native Android-first para registrar treinos de musculacao, cargas, repeticoes e anotacoes com fluxo offline-first, login com Google ou conta local por e-mail e foco em usabilidade durante o treino.
 
 ## Stack
 
@@ -18,14 +18,21 @@ Aplicativo React Native Android-first para registrar treinos de musculacao, carg
 ## O que o app entrega
 
 - Login com Google configuravel por `.env`
+- Conta local por e-mail e senha com criacao de conta
+- Recuperacao de senha por codigo de recuperacao
 - Sessao persistida com Keychain/Keystore
-- Fallback de login local apenas em `__DEV__`
+- Uso offline depois do primeiro acesso valido neste aparelho
+- Dashboard com cards clicaveis, busca rapida e atalhos para os fluxos principais
 - Templates de treino editaveis
+- Duplicacao de treino existente
 - Registro de execucoes com series, carga, repeticoes e notas
+- Resumo visual ao finalizar treino com estatisticas da sessao
 - Historico local completo
+- Busca e exclusao de execucoes no historico
 - Evolucao de carga por exercicio
+- Filtro de treinos por data
 - Exportacao e importacao de backup local em JSON
-- Seed inicial para facilitar testes
+- Importacao de treinos externos por `.txt`, `.csv`, `.xls` e `.xlsx`
 - Build Android debug validado com `.apk`
 
 ## Estrutura principal
@@ -82,6 +89,7 @@ Importante:
 - Nao coloque secrets reais sensiveis no `.env`
 - O app usa `.env` apenas para IDs publicos de configuracao
 - No fluxo Android atual, `LOGGYM_GOOGLE_WEB_CLIENT_ID` e opcional
+- `LOGGYM_ENABLE_DEV_LOGIN` fica reservado para fallback interno de desenvolvimento
 - Credenciais de assinatura Android devem ficar em `~/.gradle/gradle.properties` ou ambiente local, nao no repositorio
 
 ## Configurar Google Sign-In no Android
@@ -110,8 +118,8 @@ Observacao:
 - Em release, o SHA-1 muda. Se ele nao estiver cadastrado no client OAuth Android, o login Google da APK release falha com `DEVELOPER_ERROR`
 - Se voce informar `webClientId`, ele precisa ser um client ID do tipo `Web`; um valor incorreto tambem pode causar erro de configuracao
 - `google-services.json` nao e necessario para este fluxo atual, a menos que voce integre Firebase Auth
-- Em ambiente de desenvolvimento, o app tambem oferece login local controlado por `LOGGYM_ENABLE_DEV_LOGIN=true`
-- O login local e apenas para teste e nao aparece como solucao de producao
+- O app tambem oferece conta local por e-mail e senha, armazenada com seguranca no proprio aparelho
+- O fallback controlado por `LOGGYM_ENABLE_DEV_LOGIN=true` continua reservado ao ambiente de desenvolvimento
 
 Comando util para obter o SHA-1 da keystore release local:
 
@@ -203,6 +211,67 @@ O app agora permite:
 - importar esse backup no mesmo email/provedor autenticado
 - restaurar treinos, exercicios, sessoes e series sem depender de backend
 
+## Importacao de treinos externos
+
+Na aba Perfil o app tambem permite:
+
+- importar arquivos `.txt`, `.csv`, `.xls` e `.xlsx`
+- transformar o conteudo em templates de treino do app
+- reconhecer colunas como `Treino`, `Exercicio`, `Carga`, `Repeticoes`, `Dia`, `Cor` e `Observacoes`
+- ignorar blocos vazios ou incompletos sem quebrar a importacao inteira
+- salvar os treinos importados sem apagar os que ja existem
+
+Observacoes:
+
+- essa importacao e aditiva, diferente da restauracao de backup
+- o parser aceita tanto planilhas tabulares quanto `.txt` estruturado por blocos
+- os dados passam por validacao antes de entrar no SQLite
+
+## Fluxos principais por tela
+
+### Login
+
+- entrar com Google quando houver internet e OAuth configurado
+- entrar com conta local por e-mail e senha
+- criar conta local com nome, e-mail, senha e codigo de recuperacao
+- redefinir senha com e-mail + codigo de recuperacao
+
+### Dashboard
+
+- visualizar cards de resumo clicaveis para `Treinos` e `Historico`
+- pesquisar treinos por nome, foco ou anotacoes
+- abrir treino, iniciar execucao ou duplicar template
+- consultar recordes pessoais e exercicios recentes com navegação para evolucao
+
+### Treinos
+
+- criar novo treino com nome, dia sugerido, cor e exercicios
+- editar templates existentes
+- duplicar treino para criar variacoes rapidas
+- filtrar a lista por busca textual e por data usando calendario
+- abrir detalhe do treino e iniciar execucao
+
+### Execucao do treino
+
+- registrar series com carga, repeticoes e anotacoes
+- salvar apenas series validas no historico
+- exibir modal final com check visual e estatisticas da sessao
+- mostrar numero total de series, series por grupo muscular, maior e menor carga e maior e menor numero de repeticoes
+
+### Historico
+
+- pesquisar execucoes por treino, foco, exercicios e anotacoes
+- visualizar volume total, top load e lista de exercicios por sessao
+- excluir execucoes com confirmacao
+- abrir a evolucao de um exercicio tocando nos chips do historico
+
+### Perfil
+
+- exportar backup manual
+- restaurar backup da mesma conta autenticada
+- importar treinos externos de `.txt` ou planilha
+- atualizar dados locais e encerrar sessao
+
 Regras de seguranca do backup:
 
 - o arquivo importado passa por validacao estrutural com `zod`
@@ -240,6 +309,9 @@ O historico guarda snapshots de nome de treino e exercicio para preservar os reg
 - Sessao salva com `react-native-keychain`
 - Sem AsyncStorage para informacao sensivel
 - Sem persistencia de tokens Google em texto puro
+- Conta local protegida com Keychain/Keystore e `accessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY`
+- Senha local derivada com `PBKDF2-SHA256`
+- Codigo de recuperacao salvo apenas em formato derivado e nunca em texto puro
 - Queries SQLite parametrizadas
 - `.env` separado de variaveis de assinatura
 - `allowBackup=false` no AndroidManifest
@@ -248,7 +320,7 @@ O historico guarda snapshots de nome de treino e exercicio para preservar os reg
 - `assembleRelease` bloqueado sem keystore real configurada
 - `build_config_package` protegido no Proguard para `react-native-config`
 - Telas autenticadas protegidas pela raiz de navegacao
-- Login de desenvolvimento restrito a `__DEV__`
+- Importacao externa validada antes de persistir no banco local
 - Backup validado, limitado por tamanho e restrito a mesma conta autenticada
 
 ## Riscos residuais
@@ -258,48 +330,78 @@ O historico guarda snapshots de nome de treino e exercicio para preservar os reg
 - Algumas dependencias Android exibem warnings de APIs deprecated do ecossistema, mas o build debug validado passou
 - O fluxo offline atual e local-only; sincronizacao com backend ficou preparada apenas estruturalmente
 - O backup e manual; ainda nao existe sincronizacao automatica ou criptografia ponta a ponta para exportacao
+- A conta local por e-mail e senha e deste aparelho; o backup atual exporta treinos e historico, nao as credenciais locais
 
 ## Fluxo do app
 
 ```mermaid
 flowchart TD
     A[Inicializacao do app] --> B[Bootstrap do SQLite]
-    B --> C[Leitura da sessao segura no Keychain/Keystore]
-    C --> D{Sessao existe?}
-    D -- Nao --> E[Tela de login]
-    E --> F{Google configurado e online?}
-    F -- Sim --> G[Entrar com Google]
-    F -- Nao --> H[Login local DEV somente em __DEV__]
-    G --> I[Persistir sessao segura]
-    H --> I
-    D -- Sim --> J[Carregar dashboard, treinos e historico]
-    I --> J
-    J --> K[Dashboard]
-    K --> L[Lista de treinos]
-    L --> M[Criar ou editar treino]
-    M --> N[Salvar template no SQLite]
-    L --> O[Detalhe do treino]
-    O --> P[Iniciar execucao]
-    P --> Q[Registrar series, cargas, reps e notas]
-    Q --> R[Salvar sessao e series no SQLite]
-    R --> S[Atualizar historico e recordes]
-    S --> T[Historico]
-    T --> U[Detalhe de exercicio com evolucao]
-    K --> T
-    K --> V[Perfil e configuracoes]
-    V --> W[Logout]
-    W --> X[Apagar sessao segura]
-    X --> E
+    B --> C[Leitura da sessao segura no Keychain ou Keystore]
+    C --> D{Sessao restaurada?}
+    D -- Sim --> E[Carregar dashboard, treinos e historico locais]
+    D -- Nao --> F[Tela de login]
+
+    F --> G{Metodo de entrada}
+    G --> H[Entrar com Google]
+    G --> I[Entrar com conta local]
+    G --> J[Criar conta local]
+    G --> K[Esqueci a senha]
+
+    H --> L[Validar OAuth Android]
+    L --> M[Persistir sessao segura]
+    I --> N[Validar email e senha locais]
+    J --> O[Salvar credenciais locais seguras e criar usuario]
+    K --> P[Validar codigo de recuperacao e redefinir senha]
+    N --> M
+    O --> M
+    P --> F
+
+    E --> Q[Dashboard]
+    M --> Q
+
+    Q --> R[Pesquisar treino]
+    Q --> S[Abrir Treinos]
+    Q --> T[Abrir Historico]
+    Q --> U[Abrir Perfil]
+    Q --> V[Abrir progresso de exercicio]
+
+    S --> W[Criar ou editar treino]
+    W --> X[Salvar template no SQLite]
+    S --> Y[Filtrar por data]
+    S --> Z[Duplicar treino]
+    S --> AA[Detalhe do treino]
+    Z --> AA
+    X --> AA
+
+    AA --> AB[Iniciar execucao]
+    AB --> AC[Registrar series, cargas, repeticoes e notas]
+    AC --> AD[Salvar sessao e series validas]
+    AD --> AE[Atualizar dashboard e historico]
+    AE --> AF[Mostrar check e estatisticas finais]
+    AF --> T
+
+    T --> AG[Buscar execucoes]
+    T --> AH[Excluir execucao com confirmacao]
+    T --> AI[Abrir evolucao do exercicio]
+
+    U --> AJ[Exportar backup]
+    U --> AK[Importar backup da mesma conta]
+    U --> AL[Importar treino externo txt csv xls xlsx]
+    U --> AM[Atualizar dados]
+    U --> AN[Logout]
+    AN --> AO[Limpar sessao segura]
+    AO --> F
 ```
 
 Resumo do fluxo:
 
 - o app inicia, carrega SQLite e tenta restaurar a sessao segura
-- sem sessao, cai no login
-- com sessao, abre dashboard e carrega dados locais
-- templates alimentam a execucao de treino
-- cada execucao salva historico e progresso por exercicio
-- logout limpa apenas a sessao, mantendo os dados locais da conta ja registrada
+- sem sessao, o usuario pode entrar com Google, entrar com conta local, criar conta local ou redefinir senha
+- com sessao valida, o app abre dashboard, treinos, historico e perfil usando os dados locais
+- os templates alimentam a execucao e cada treino salvo gera historico, progresso por exercicio e um resumo final com estatisticas
+- o perfil concentra backup, restauracao, importacao de treino externo, atualizacao manual e logout
+- o logout limpa apenas a sessao, mantendo os dados locais da conta ja registrada
 
 ## Validacao executada neste workspace
 

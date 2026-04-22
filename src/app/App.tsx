@@ -57,7 +57,11 @@ const App = () => {
         />
         <View style={styles.root}>
           <OfflineBanner visible={!isOnline && Boolean(session)} />
-          {error && session ? <Text style={styles.errorLabel}>{error}</Text> : null}
+          {error && session ? (
+            <Text style={styles.errorLabel}>
+              Algumas informacoes nao foram atualizadas agora. Tente novamente em instantes.
+            </Text>
+          ) : null}
           <View style={styles.navigatorWrap}>
             <RootNavigator />
           </View>

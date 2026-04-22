@@ -24,7 +24,9 @@ export const SplashScreen = ({error, onRetry}: SplashScreenProps) => (
     {error ? (
       <View style={styles.errorCard}>
         <ShieldCheck color={theme.colors.warning} size={20} />
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorText}>
+          Nao foi possivel abrir o app agora. Tente novamente.
+        </Text>
       </View>
     ) : (
       <ActivityIndicator color={theme.colors.accent} size="large" />

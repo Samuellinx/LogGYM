@@ -1,23 +1,7 @@
-export const focusOptions = [
-  'Push',
-  'Pull',
-  'Legs',
-  'Upper',
-  'Lower',
-  'Full Body',
-];
-
-export const muscleGroupOptions = [
-  'Peito',
-  'Costas',
-  'Ombros',
-  'Biceps',
-  'Triceps',
-  'Quadriceps',
-  'Posterior',
-  'Gluteos',
-  'Panturrilhas',
-  'Core',
+export const setTypeOptions = [
+  'Serie de aquecimento',
+  'Serie preparatoria',
+  'Serie de trabalho',
 ];
 
 export const weekdayOptions = [
@@ -30,13 +14,14 @@ export const weekdayOptions = [
   'Domingo',
 ];
 
-export const accentOptions = [
-  '#7CFF4F',
-  '#54F0C2',
-  '#52C6FF',
-  '#FF8F4E',
-  '#FF6B9B',
-  '#B38CFF',
+export const accentSpectrum = [
+  '#FF3B30',
+  '#FF9500',
+  '#FFD60A',
+  '#34C759',
+  '#0A84FF',
+  '#5856D6',
+  '#AF52DE',
 ];
 
 export const securityHighlights = [
