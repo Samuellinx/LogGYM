@@ -10,13 +10,16 @@ import {
   exportBackupForCurrentUser,
   importBackupForCurrentUser,
 } from '@/features/backup/backupService';
+import {importTrainingFileForCurrentUser} from '@/features/imports/trainingImportService';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import {toUserMessage} from '@/utils/errors';
 import {formatSessionDate} from '@/utils/formatters';
 
 export const ProfileScreen = () => {
-  const [backupAction, setBackupAction] = useState<'export' | 'import' | null>(null);
+  const [activeAction, setActiveAction] = useState<
+    'export' | 'backup-import' | 'training-import' | null
+  >(null);
   const session = useAppStore(state => state.session);
   const dashboard = useAppStore(state => state.dashboard);
   const workouts = useAppStore(state => state.workouts);
@@ -24,7 +27,7 @@ export const ProfileScreen = () => {
   const isOnline = useAppStore(state => state.isOnline);
   const refreshData = useAppStore(state => state.refreshData);
   const signOut = useAppStore(state => state.signOut);
-  const isBackupBusy = backupAction !== null;
+  const isBusy = activeAction !== null;
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja realmente sair do LogGYM?', [
@@ -46,7 +49,7 @@ export const ProfileScreen = () => {
       return;
     }
 
-    setBackupAction('export');
+    setActiveAction('export');
 
     try {
       const result = await exportBackupForCurrentUser(session.user);
@@ -68,7 +71,7 @@ export const ProfileScreen = () => {
         toUserMessage(error, 'Nao foi possivel exportar seus treinos agora.'),
       );
     } finally {
-      setBackupAction(null);
+      setActiveAction(null);
     }
   };
 
@@ -77,7 +80,7 @@ export const ProfileScreen = () => {
       return;
     }
 
-    setBackupAction('import');
+    setActiveAction('backup-import');
 
     try {
       const result = await importBackupForCurrentUser(session.user);
@@ -101,7 +104,7 @@ export const ProfileScreen = () => {
         toUserMessage(error, 'Nao foi possivel restaurar seus treinos agora.'),
       );
     } finally {
-      setBackupAction(null);
+      setActiveAction(null);
     }
   };
 
@@ -120,6 +123,44 @@ export const ProfileScreen = () => {
         },
       ],
     );
+  };
+
+  const handleImportTrainingFile = async () => {
+    if (!session?.user) {
+      return;
+    }
+
+    setActiveAction('training-import');
+
+    try {
+      const result = await importTrainingFileForCurrentUser(session.user);
+
+      if (!result) {
+        return;
+      }
+
+      await refreshData();
+
+      Alert.alert(
+        'Treinos importados',
+        [
+          `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercicios prontos para uso.`,
+          result.skippedWorkouts > 0
+            ? `${result.skippedWorkouts} treino(s) incompleto(s) foram ignorados.`
+            : 'Tudo que foi reconhecido ja esta salvo na sua conta.',
+        ].join(' '),
+      );
+    } catch (error) {
+      Alert.alert(
+        'Nao foi possivel importar o arquivo',
+        toUserMessage(
+          error,
+          'Nao foi possivel converter esse arquivo em estrutura de treino agora.',
+        ),
+      );
+    } finally {
+      setActiveAction(null);
+    }
   };
 
   return (
@@ -152,7 +193,11 @@ export const ProfileScreen = () => {
         />
         <TagChip
           label={
-            session?.provider === 'google' ? 'Conta conectada' : 'Conta de teste'
+            session?.provider === 'google'
+              ? 'Conta Google'
+              : session?.provider === 'credentials'
+                ? 'Conta pessoal'
+                : 'Conta de teste'
           }
           active
           accentColor={theme.colors.accentSecondary}
@@ -200,15 +245,45 @@ export const ProfileScreen = () => {
 
       <Button
         variant="secondary"
-        label={backupAction === 'export' ? 'Salvando copia...' : 'Exportar copia'}
+        label={activeAction === 'export' ? 'Salvando copia...' : 'Exportar copia'}
         onPress={handleExportBackup}
-        disabled={!session || isBackupBusy}
+        disabled={!session || isBusy}
       />
       <Button
         variant="secondary"
-        label={backupAction === 'import' ? 'Restaurando copia...' : 'Importar copia'}
+        label={
+          activeAction === 'backup-import' ? 'Restaurando copia...' : 'Importar copia'
+        }
         onPress={handleImportBackup}
-        disabled={!session || isBackupBusy}
+        disabled={!session || isBusy}
+      />
+
+      <SectionHeader
+        title="Importar treino externo"
+        subtitle="Converta texto ou planilha em treinos prontos no app"
+      />
+
+      <View style={styles.backupCard}>
+        <Text style={styles.backupTitle}>Arquivos aceitos</Text>
+        <Text style={styles.backupText}>
+          Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino,
+          Exercicio, Carga, Repeticoes, Dia e Cor.
+        </Text>
+        <Text style={styles.backupHint}>
+          O app organiza o conteudo em estrutura de treino e ignora blocos vazios
+          ou incompletos.
+        </Text>
+      </View>
+
+      <Button
+        variant="secondary"
+        label={
+          activeAction === 'training-import'
+            ? 'Importando treino...'
+            : 'Importar treino de arquivo'
+        }
+        onPress={handleImportTrainingFile}
+        disabled={!session || isBusy}
       />
 
       <Button variant="secondary" label="Atualizar dados" onPress={refreshData} />

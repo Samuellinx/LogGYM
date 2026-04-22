@@ -1,5 +1,7 @@
 import {useState} from 'react';
 import {Alert, StyleSheet, Text, View} from 'react-native';
+import {Controller, useForm} from 'react-hook-form';
+import {zodResolver} from '@hookform/resolvers/zod';
 import LinearGradient from 'react-native-linear-gradient';
 import {CloudOff, Wifi} from 'lucide-react-native';
 import Animated, {FadeInDown, FadeInUp} from 'react-native-reanimated';
@@ -8,14 +10,71 @@ import {BrandMark} from '@/components/BrandMark';
 import {Button} from '@/components/Button';
 import {Screen} from '@/components/Screen';
 import {TagChip} from '@/components/TagChip';
+import {TextField} from '@/components/TextField';
+import {
+  credentialResetSchema,
+  credentialSignInSchema,
+  credentialSignUpSchema,
+  type CredentialResetValues,
+  type CredentialSignInValues,
+  type CredentialSignUpValues,
+} from '@/features/auth/auth.schemas';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import {toUserMessage} from '@/utils/errors';
 
+type AuthMode = 'signin' | 'signup' | 'forgot';
+type PendingAction = 'google' | 'signin' | 'signup' | 'forgot' | null;
+
+const modeLabels: Record<AuthMode, string> = {
+  signin: 'Entrar',
+  signup: 'Criar conta',
+  forgot: 'Esqueci a senha',
+};
+
+const signInDefaults: CredentialSignInValues = {
+  email: '',
+  password: '',
+};
+
+const signUpDefaults: CredentialSignUpValues = {
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  recoveryCode: '',
+};
+
+const resetDefaults: CredentialResetValues = {
+  email: '',
+  recoveryCode: '',
+  newPassword: '',
+  confirmNewPassword: '',
+};
+
 export const LoginScreen = () => {
   const signInWithGoogle = useAppStore(state => state.signInWithGoogle);
+  const signInWithCredentials = useAppStore(state => state.signInWithCredentials);
+  const signUpWithCredentials = useAppStore(state => state.signUpWithCredentials);
+  const resetPasswordWithRecovery = useAppStore(
+    state => state.resetPasswordWithRecovery,
+  );
   const isOnline = useAppStore(state => state.isOnline);
-  const [pending, setPending] = useState<'google' | null>(null);
+  const [mode, setMode] = useState<AuthMode>('signin');
+  const [pending, setPending] = useState<PendingAction>(null);
+
+  const signInForm = useForm<CredentialSignInValues>({
+    resolver: zodResolver(credentialSignInSchema),
+    defaultValues: signInDefaults,
+  });
+  const signUpForm = useForm<CredentialSignUpValues>({
+    resolver: zodResolver(credentialSignUpSchema),
+    defaultValues: signUpDefaults,
+  });
+  const resetForm = useForm<CredentialResetValues>({
+    resolver: zodResolver(credentialResetSchema),
+    defaultValues: resetDefaults,
+  });
 
   const handleGoogle = async () => {
     try {
@@ -28,8 +87,314 @@ export const LoginScreen = () => {
     }
   };
 
+  const handleCredentialSignIn = signInForm.handleSubmit(async values => {
+    try {
+      setPending('signin');
+      await signInWithCredentials(values.email, values.password);
+    } catch (error) {
+      Alert.alert('Entrar', toUserMessage(error));
+    } finally {
+      setPending(null);
+    }
+  });
+
+  const handleCredentialSignUp = signUpForm.handleSubmit(async values => {
+    try {
+      setPending('signup');
+      await signUpWithCredentials(
+        values.name,
+        values.email,
+        values.password,
+        values.recoveryCode,
+      );
+    } catch (error) {
+      Alert.alert('Criar conta', toUserMessage(error));
+    } finally {
+      setPending(null);
+    }
+  });
+
+  const handlePasswordReset = resetForm.handleSubmit(async values => {
+    try {
+      setPending('forgot');
+      await resetPasswordWithRecovery(
+        values.email,
+        values.recoveryCode,
+        values.newPassword,
+      );
+
+      signInForm.reset({
+        email: values.email,
+        password: '',
+      });
+      resetForm.reset(resetDefaults);
+      setMode('signin');
+
+      Alert.alert(
+        'Senha atualizada',
+        'Sua senha foi redefinida. Agora voce pode entrar com a nova senha.',
+      );
+    } catch (error) {
+      Alert.alert('Redefinir senha', toUserMessage(error));
+    } finally {
+      setPending(null);
+    }
+  });
+
+  const renderModeForm = () => {
+    if (mode === 'signup') {
+      const {
+        control,
+        formState: {errors},
+      } = signUpForm;
+
+      return (
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Conta pessoal</Text>
+          <Text style={styles.formDescription}>
+            Crie um acesso por e-mail e senha. O codigo de recuperacao permite trocar a senha neste aparelho.
+          </Text>
+
+          <Controller
+            control={control}
+            name="name"
+            render={({field}) => (
+              <TextField
+                label="Nome"
+                placeholder="Seu nome"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.name?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="email"
+            render={({field}) => (
+              <TextField
+                label="E-mail"
+                placeholder="voce@exemplo.com"
+                value={field.value}
+                onChangeText={field.onChange}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.email?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="password"
+            render={({field}) => (
+              <TextField
+                label="Senha"
+                placeholder="Minimo de 8 caracteres"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.password?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({field}) => (
+              <TextField
+                label="Confirmar senha"
+                placeholder="Repita sua senha"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.confirmPassword?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="recoveryCode"
+            render={({field}) => (
+              <TextField
+                label="Codigo de recuperacao"
+                placeholder="Ex: FORCA2026"
+                value={field.value}
+                onChangeText={field.onChange}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                error={errors.recoveryCode?.message}
+              />
+            )}
+          />
+
+          <Text style={styles.formHint}>
+            Guarde esse codigo em um lugar seguro. Ele sera exigido para redefinir sua senha.
+          </Text>
+
+          <Button
+            label={pending === 'signup' ? 'Criando conta...' : 'Criar conta'}
+            onPress={handleCredentialSignUp}
+            disabled={pending !== null}
+          />
+        </View>
+      );
+    }
+
+    if (mode === 'forgot') {
+      const {
+        control,
+        formState: {errors},
+      } = resetForm;
+
+      return (
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Recuperar acesso</Text>
+          <Text style={styles.formDescription}>
+            Informe seu e-mail, o codigo de recuperacao e a nova senha.
+          </Text>
+
+          <Controller
+            control={control}
+            name="email"
+            render={({field}) => (
+              <TextField
+                label="E-mail"
+                placeholder="voce@exemplo.com"
+                value={field.value}
+                onChangeText={field.onChange}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.email?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="recoveryCode"
+            render={({field}) => (
+              <TextField
+                label="Codigo de recuperacao"
+                placeholder="Digite o codigo salvo"
+                value={field.value}
+                onChangeText={field.onChange}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                error={errors.recoveryCode?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="newPassword"
+            render={({field}) => (
+              <TextField
+                label="Nova senha"
+                placeholder="Minimo de 8 caracteres"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.newPassword?.message}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="confirmNewPassword"
+            render={({field}) => (
+              <TextField
+                label="Confirmar nova senha"
+                placeholder="Repita a nova senha"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.confirmNewPassword?.message}
+              />
+            )}
+          />
+
+          <Button
+            label={pending === 'forgot' ? 'Atualizando senha...' : 'Redefinir senha'}
+            onPress={handlePasswordReset}
+            disabled={pending !== null}
+          />
+        </View>
+      );
+    }
+
+    const {
+      control,
+      formState: {errors},
+    } = signInForm;
+
+    return (
+      <View style={styles.formCard}>
+        <Text style={styles.formTitle}>Entrar com conta pessoal</Text>
+        <Text style={styles.formDescription}>
+          Use seu e-mail e senha para acessar seus treinos mesmo sem Google.
+        </Text>
+
+        <Controller
+          control={control}
+          name="email"
+          render={({field}) => (
+            <TextField
+              label="E-mail"
+              placeholder="voce@exemplo.com"
+              value={field.value}
+              onChangeText={field.onChange}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              error={errors.email?.message}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="password"
+          render={({field}) => (
+            <TextField
+              label="Senha"
+              placeholder="Digite sua senha"
+              value={field.value}
+              onChangeText={field.onChange}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              error={errors.password?.message}
+            />
+          )}
+        />
+
+        <Button
+          label={pending === 'signin' ? 'Entrando...' : 'Entrar'}
+          onPress={handleCredentialSignIn}
+          disabled={pending !== null}
+        />
+      </View>
+    );
+  };
+
   return (
-    <Screen scroll={false} contentContainerStyle={styles.content}>
+    <Screen contentContainerStyle={styles.content}>
       <View style={styles.backgroundOrbTop} />
       <View style={styles.backgroundOrbBottom} />
 
@@ -53,6 +418,7 @@ export const LoginScreen = () => {
               accentColor={isOnline ? theme.colors.success : theme.colors.warning}
             />
             <TagChip label="Uso rapido" active />
+            <TagChip label="Conta local" active accentColor={theme.colors.accentSecondary} />
           </View>
         </LinearGradient>
       </Animated.View>
@@ -67,17 +433,38 @@ export const LoginScreen = () => {
         )}
         <Text style={styles.summaryText}>
           {isOnline
-            ? 'Depois da primeira entrada, seus treinos continuam com voce mesmo sem internet.'
-            : 'Conecte-se para entrar com Google. Depois disso voce pode seguir usando o app normalmente.'}
+            ? 'Voce pode entrar com Google ou criar uma conta local para continuar usando o app offline neste aparelho.'
+            : 'Sem internet agora. Se voce ja tiver uma conta local, pode entrar normalmente e seguir treinando.'}
         </Text>
       </Animated.View>
 
-      <View style={styles.actions}>
+      <View style={styles.googleCard}>
+        <Text style={styles.googleTitle}>Entrada com Google</Text>
+        <Text style={styles.googleText}>
+          Ideal para quem quer usar a conta Google na primeira entrada e manter a sessao salva.
+        </Text>
         <Button
           label={pending === 'google' ? 'Conectando...' : 'Entrar com Google'}
           onPress={handleGoogle}
           disabled={pending !== null || !isOnline}
         />
+      </View>
+
+      <View style={styles.localAuthSection}>
+        <Text style={styles.localAuthTitle}>Conta por e-mail</Text>
+        <View style={styles.modeRow}>
+          {(Object.keys(modeLabels) as AuthMode[]).map(option => (
+            <TagChip
+              key={option}
+              label={modeLabels[option]}
+              active={mode === option}
+              onPress={() => setMode(option)}
+              accentColor={mode === option ? theme.colors.accent : undefined}
+            />
+          ))}
+        </View>
+
+        {renderModeForm()}
       </View>
     </Screen>
   );
@@ -85,9 +472,8 @@ export const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   content: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingTop: theme.spacing.xxl,
+    flexGrow: 1,
+    paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.xxl,
     overflow: 'hidden',
   },
@@ -156,8 +542,52 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textMuted,
   },
-  actions: {
-    alignItems: 'center',
+  googleCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     gap: theme.spacing.sm,
+  },
+  googleTitle: {
+    ...theme.typography.subtitle,
+    color: theme.colors.text,
+  },
+  googleText: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
+  },
+  localAuthSection: {
+    gap: theme.spacing.md,
+  },
+  localAuthTitle: {
+    ...theme.typography.title,
+    color: theme.colors.text,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  formCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.md,
+  },
+  formTitle: {
+    ...theme.typography.subtitle,
+    color: theme.colors.text,
+  },
+  formDescription: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
+  },
+  formHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textSoft,
   },
 });

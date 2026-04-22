@@ -19,6 +19,10 @@ import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {TextField} from '@/components/TextField';
 import {
+  WorkoutCompletionModal,
+  type WorkoutCompletionSummary,
+} from '@/components/WorkoutCompletionModal';
+import {
   getWorkoutDetail,
   saveTrainingSession,
 } from '@/features/workouts/workoutRepository';
@@ -71,6 +75,114 @@ const createDraftFromWorkout = (workout: WorkoutDetail): DraftExercise[] =>
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 
+const normalizeToken = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const muscleGroupDictionary = [
+  {
+    label: 'Peito',
+    keywords: ['supino', 'crucifixo', 'crossover', 'voador', 'peck deck', 'peito'],
+  },
+  {
+    label: 'Costas',
+    keywords: ['remada', 'puxada', 'barra fixa', 'pull down', 'pulldown', 'costas'],
+  },
+  {
+    label: 'Ombro',
+    keywords: ['desenvolvimento', 'elevacao lateral', 'elevacao frontal', 'ombro'],
+  },
+  {
+    label: 'Pernas',
+    keywords: ['agachamento', 'leg press', 'extensora', 'flexora', 'panturrilha', 'stiff', 'afundo', 'perna'],
+  },
+  {
+    label: 'Biceps',
+    keywords: ['rosca', 'biceps'],
+  },
+  {
+    label: 'Triceps',
+    keywords: ['triceps', 'frances', 'testa', 'corda', 'mergulho'],
+  },
+  {
+    label: 'Gluteos',
+    keywords: ['gluteo', 'hip thrust', 'coice', 'abducao'],
+  },
+  {
+    label: 'Core',
+    keywords: ['abdominal', 'prancha', 'core'],
+  },
+];
+
+const resolveMuscleGroupLabel = (exerciseName: string, workoutFocus: string) => {
+  const normalizedExercise = normalizeToken(exerciseName);
+
+  for (const entry of muscleGroupDictionary) {
+    if (entry.keywords.some(keyword => normalizedExercise.includes(normalizeToken(keyword)))) {
+      return entry.label;
+    }
+  }
+
+  const normalizedFocus = normalizeToken(workoutFocus);
+
+  for (const entry of muscleGroupDictionary) {
+    if (entry.keywords.some(keyword => normalizedFocus.includes(normalizeToken(keyword)))) {
+      return entry.label;
+    }
+  }
+
+  return 'Outros';
+};
+
+const buildCompletionSummary = (
+  workoutName: string,
+  workoutFocus: string,
+  exercises: DraftExercise[],
+): WorkoutCompletionSummary => {
+  const validSets = exercises.flatMap(exercise =>
+    exercise.sets
+      .map(set => ({
+        exerciseName: exercise.exerciseName,
+        load: parseNumber(set.load),
+        reps: parseNumber(set.reps),
+        groupLabel: resolveMuscleGroupLabel(exercise.exerciseName, workoutFocus),
+      }))
+      .filter(
+        set =>
+          Number.isFinite(set.load) &&
+          Number.isFinite(set.reps) &&
+          set.load > 0 &&
+          set.reps > 0,
+      ),
+  );
+
+  if (validSets.length === 0) {
+    throw new Error('Adicione pelo menos uma serie valida antes de salvar.');
+  }
+
+  const loadValues = validSets.map(set => set.load);
+  const repsValues = validSets.map(set => set.reps);
+  const groupCounters = new Map<string, number>();
+
+  validSets.forEach(set => {
+    groupCounters.set(set.groupLabel, (groupCounters.get(set.groupLabel) ?? 0) + 1);
+  });
+
+  return {
+    workoutName,
+    totalSets: validSets.length,
+    seriesByGroup: Array.from(groupCounters.entries())
+      .map(([label, count]) => ({label, count}))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+    maxLoad: Math.max(...loadValues),
+    minLoad: Math.min(...loadValues),
+    maxReps: Math.max(...repsValues),
+    minReps: Math.min(...repsValues),
+  };
+};
+
 export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
   const refreshData = useAppStore(state => state.refreshData);
@@ -82,6 +194,8 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [setToDelete, setSetToDelete] = useState<PendingSetDeletion>(null);
+  const [completionSummary, setCompletionSummary] =
+    useState<WorkoutCompletionSummary | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +301,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
     try {
       setIsSaving(true);
+      const summary = buildCompletionSummary(workout.name, workout.focus, drafts);
 
       await saveTrainingSession(session.user.id, {
         workoutId: workout.id,
@@ -207,13 +322,17 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
       });
 
       await refreshData();
-      Alert.alert('Treino salvo', 'Historico e indicadores atualizados com sucesso.');
-      navigation.goBack();
+      setCompletionSummary(summary);
     } catch (error) {
       Alert.alert('Salvar execucao', toUserMessage(error));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCloseCompletionModal = () => {
+    setCompletionSummary(null);
+    navigation.goBack();
   };
 
   const confirmSetDeletion = () => {
@@ -373,6 +492,12 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         confirmVariant="danger"
         onConfirm={confirmSetDeletion}
         onCancel={() => setSetToDelete(null)}
+      />
+
+      <WorkoutCompletionModal
+        visible={completionSummary !== null}
+        summary={completionSummary}
+        onClose={handleCloseCompletionModal}
       />
     </Screen>
   );

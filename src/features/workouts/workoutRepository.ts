@@ -15,6 +15,17 @@ import {createId} from '@/utils/ids';
 
 type NumberRow = {total: number | null};
 
+type UserRow = {
+  id: string;
+  email: string;
+  name: string;
+  photo: string | null;
+  given_name: string | null;
+  family_name: string | null;
+  provider: SessionUser['provider'];
+  last_login_at: string;
+};
+
 type WorkoutSummaryRow = {
   id: string;
   name: string;
@@ -79,6 +90,19 @@ type NamedSessionRow = {workout_name: string};
 const legacySeedWorkoutNames = ['Lower Power', 'Pull Volume', 'Upper Strength'];
 const legacySeedSessionNames = ['Lower Power', 'Upper Strength'];
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const mapSessionUser = (row: UserRow): SessionUser => ({
+  id: row.id,
+  email: row.email,
+  name: row.name,
+  photo: row.photo,
+  givenName: row.given_name,
+  familyName: row.family_name,
+  provider: row.provider,
+  lastLoginAt: row.last_login_at,
+});
+
 const mapWorkoutSummary = (row: WorkoutSummaryRow): WorkoutSummary => ({
   id: row.id,
   name: row.name,
@@ -109,6 +133,7 @@ const mapWorkoutHistory = (row: WorkoutHistoryRow): WorkoutHistoryItem => ({
 export const ensureUserRecord = async (user: SessionUser) => {
   const db = getDatabase();
   const now = new Date().toISOString();
+  const normalizedEmail = normalizeEmail(user.email);
 
   await db.executeAsync(
     `INSERT INTO users (
@@ -124,7 +149,7 @@ export const ensureUserRecord = async (user: SessionUser) => {
       last_login_at = excluded.last_login_at;`,
     [
       user.id,
-      user.email,
+      normalizedEmail,
       user.name,
       user.photo,
       user.givenName,
@@ -134,6 +159,30 @@ export const ensureUserRecord = async (user: SessionUser) => {
       user.lastLoginAt,
     ],
   );
+};
+
+export const findUserByEmail = async (email: string) => {
+  const db = getDatabase();
+  const normalizedEmail = normalizeEmail(email);
+  const result = await db.executeAsync<UserRow>(
+    `SELECT
+      id,
+      email,
+      name,
+      photo,
+      given_name,
+      family_name,
+      provider,
+      last_login_at
+    FROM users
+    WHERE LOWER(email) = ?
+    LIMIT 1;`,
+    [normalizedEmail],
+  );
+
+  const row = result.rows.item(0);
+
+  return row ? mapSessionUser(row) : null;
 };
 
 export const purgeLegacySeedData = async (userId: string) => {
@@ -339,6 +388,61 @@ export const saveWorkout = async (
   });
 
   return resolvedWorkoutId;
+};
+
+export const importWorkouts = async (
+  userId: string,
+  inputs: WorkoutInput[],
+) => {
+  if (inputs.length === 0) {
+    throw new Error('Nenhum treino valido foi encontrado para importar.');
+  }
+
+  const db = getDatabase();
+
+  await db.transaction(async tx => {
+    for (const input of inputs) {
+      const now = new Date().toISOString();
+      const importedWorkoutId = createId();
+
+      await tx.executeAsync(
+        `INSERT INTO workouts (
+          id, user_id, name, focus, notes, accent_color, scheduled_day, created_at, updated_at, archived_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL);`,
+        [
+          importedWorkoutId,
+          userId,
+          input.name,
+          input.focus,
+          input.notes,
+          input.accentColor,
+          input.scheduledDay ?? null,
+          now,
+          now,
+        ],
+      );
+
+      for (const [index, exercise] of input.exercises.entries()) {
+        await tx.executeAsync(
+          `INSERT INTO workout_exercises (
+            id, workout_id, name, muscle_group, base_load, target_reps, note, order_index, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          [
+            createId(),
+            importedWorkoutId,
+            exercise.name,
+            exercise.muscleGroup,
+            exercise.baseLoad,
+            exercise.targetReps,
+            exercise.note,
+            index,
+            now,
+            now,
+          ],
+        );
+      }
+    }
+  });
 };
 
 export const duplicateWorkout = async (userId: string, workoutId: string) => {

@@ -4,6 +4,11 @@ import type {DashboardData, StoredSession, WorkoutHistoryItem, WorkoutSummary} f
 import {initializeDatabase} from '@/storage/database';
 import {clearStoredSession, loadStoredSession, persistStoredSession} from '@/features/auth/sessionStorage';
 import {getAuthCapabilities, signInWithDevelopmentAccount, signInWithGoogleAccount, signOutFromProvider, trySilentGoogleSession} from '@/features/auth/authService';
+import {
+  resetCredentialPassword,
+  signInWithCredentialAccount,
+  signUpWithCredentialAccount,
+} from '@/features/auth/localAuthService';
 import {ensureUserRecord, getDashboardData, listHistory, listWorkouts, purgeLegacySeedData} from '@/features/workouts/workoutRepository';
 import {toUserMessage} from '@/utils/errors';
 
@@ -20,6 +25,18 @@ interface AppStoreState {
   refreshData: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithDev: () => Promise<void>;
+  signInWithCredentials: (email: string, password: string) => Promise<void>;
+  signUpWithCredentials: (
+    name: string,
+    email: string,
+    password: string,
+    recoveryCode: string,
+  ) => Promise<void>;
+  resetPasswordWithRecovery: (
+    email: string,
+    recoveryCode: string,
+    newPassword: string,
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
   setOnline: (isOnline: boolean) => void;
@@ -165,6 +182,72 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       });
     } catch (error) {
       const message = toUserMessage(error, 'Falha ao abrir a sessao de desenvolvimento.');
+      set({error: message});
+      throw new Error(message);
+    }
+  },
+
+  signInWithCredentials: async (email, password) => {
+    try {
+      const user = await signInWithCredentialAccount({email, password});
+      const session = createSession(user);
+
+      await ensureUserRecord(user);
+      await purgeLegacySeedData(user.id);
+      await persistStoredSession(session);
+
+      const data = await loadAllData(user.id);
+
+      set({
+        ...data,
+        session,
+        error: null,
+      });
+    } catch (error) {
+      const message = toUserMessage(error, 'Falha ao entrar com sua conta.');
+      set({error: message});
+      throw new Error(message);
+    }
+  },
+
+  signUpWithCredentials: async (name, email, password, recoveryCode) => {
+    try {
+      const user = await signUpWithCredentialAccount({
+        name,
+        email,
+        password,
+        recoveryCode,
+      });
+      const session = createSession(user);
+
+      await ensureUserRecord(user);
+      await persistStoredSession(session);
+
+      const data = await loadAllData(user.id);
+
+      set({
+        ...data,
+        session,
+        error: null,
+      });
+    } catch (error) {
+      const message = toUserMessage(error, 'Falha ao criar sua conta.');
+      set({error: message});
+      throw new Error(message);
+    }
+  },
+
+  resetPasswordWithRecovery: async (email, recoveryCode, newPassword) => {
+    try {
+      await resetCredentialPassword({
+        email,
+        recoveryCode,
+        newPassword,
+      });
+
+      set({error: null});
+    } catch (error) {
+      const message = toUserMessage(error, 'Falha ao redefinir sua senha.');
       set({error: message});
       throw new Error(message);
     }
