@@ -7,7 +7,7 @@ import {
 import {FileSystem} from 'react-native-file-access';
 import {read, utils} from 'xlsx';
 
-import {workoutFormSchema} from '@/features/workouts/workout.schemas';
+import {workoutInputSchema} from '@/features/workouts/workout.schemas';
 import {importWorkouts} from '@/features/workouts/workoutRepository';
 import type {SessionUser, WorkoutInput} from '@/types/domain';
 import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
@@ -903,7 +903,7 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
       exercises,
     };
 
-    const parsed = workoutFormSchema.safeParse(candidate);
+    const parsed = workoutInputSchema.safeParse(candidate);
 
     if (!parsed.success) {
       skippedWorkouts += 1;

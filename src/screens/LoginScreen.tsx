@@ -149,7 +149,7 @@ export const LoginScreen = () => {
       } = signUpForm;
 
       return (
-        <View style={styles.formCard}>
+        <View key="signup" style={styles.formCard}>
           <Text style={styles.formTitle}>Conta pessoal</Text>
           <Text style={styles.formDescription}>
             Crie um acesso por e-mail e senha. O codigo de recuperacao permite trocar a senha neste aparelho.
@@ -162,8 +162,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Nome"
                 placeholder="Seu nome"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 error={errors.name?.message}
               />
             )}
@@ -176,8 +177,9 @@ export const LoginScreen = () => {
               <TextField
                 label="E-mail"
                 placeholder="voce@exemplo.com"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -193,8 +195,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Senha"
                 placeholder="Minimo de 8 caracteres"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -210,8 +213,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Confirmar senha"
                 placeholder="Repita sua senha"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -227,8 +231,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Codigo de recuperacao"
                 placeholder="Ex: FORCA2026"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 error={errors.recoveryCode?.message}
@@ -256,7 +261,7 @@ export const LoginScreen = () => {
       } = resetForm;
 
       return (
-        <View style={styles.formCard}>
+        <View key="forgot" style={styles.formCard}>
           <Text style={styles.formTitle}>Recuperar acesso</Text>
           <Text style={styles.formDescription}>
             Informe seu e-mail, o codigo de recuperacao e a nova senha.
@@ -269,8 +274,9 @@ export const LoginScreen = () => {
               <TextField
                 label="E-mail"
                 placeholder="voce@exemplo.com"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -286,8 +292,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Codigo de recuperacao"
                 placeholder="Digite o codigo salvo"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 error={errors.recoveryCode?.message}
@@ -302,8 +309,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Nova senha"
                 placeholder="Minimo de 8 caracteres"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -319,8 +327,9 @@ export const LoginScreen = () => {
               <TextField
                 label="Confirmar nova senha"
                 placeholder="Repita a nova senha"
-                value={field.value}
-                onChangeText={field.onChange}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                onChangeText={value => field.onChange(value)}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -344,7 +353,7 @@ export const LoginScreen = () => {
     } = signInForm;
 
     return (
-      <View style={styles.formCard}>
+      <View key="signin" style={styles.formCard}>
         <Text style={styles.formTitle}>Entrar com conta pessoal</Text>
         <Text style={styles.formDescription}>
           Use seu e-mail e senha para acessar seus treinos mesmo sem Google.
@@ -357,8 +366,9 @@ export const LoginScreen = () => {
             <TextField
               label="E-mail"
               placeholder="voce@exemplo.com"
-              value={field.value}
-              onChangeText={field.onChange}
+              value={field.value ?? ''}
+              onBlur={field.onBlur}
+              onChangeText={value => field.onChange(value)}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -374,8 +384,9 @@ export const LoginScreen = () => {
             <TextField
               label="Senha"
               placeholder="Digite sua senha"
-              value={field.value}
-              onChangeText={field.onChange}
+              value={field.value ?? ''}
+              onBlur={field.onBlur}
+              onChangeText={value => field.onChange(value)}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}

@@ -30,6 +30,7 @@ import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import type {WorkoutDetail} from '@/types/domain';
+import {formatBaseLoadLabel} from '@/utils/baseLoad';
 import {toUserMessage} from '@/utils/errors';
 import {formatDateLong} from '@/utils/formatters';
 
@@ -410,7 +411,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
                 {exercise.baseLoad ? (
                   <Text style={styles.exerciseLoadHint}>
-                    Carga sugerida: {exercise.baseLoad}
+                    Carga sugerida: {formatBaseLoadLabel(exercise.baseLoad)}
                   </Text>
                 ) : null}
 

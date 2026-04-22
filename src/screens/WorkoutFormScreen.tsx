@@ -26,6 +26,7 @@ import {
 import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
+import {composeBaseLoad, formatBaseLoadLabel, parseBaseLoad} from '@/utils/baseLoad';
 import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
 import {toUserMessage} from '@/utils/errors';
 
@@ -37,7 +38,9 @@ const MAX_BATCH_SIZE = 6;
 const createExerciseDraft = (): WorkoutFormValues['exercises'][number] => ({
   name: '',
   muscleGroup: setTypeOptions[2],
-  baseLoad: '',
+  baseLoadKg: '',
+  baseLoadPlates: '',
+  baseLoadLegacy: '',
   targetReps: '8-10',
   note: '',
 });
@@ -103,14 +106,20 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
           notes: detail.notes,
           accentColor: detail.accentColor,
           scheduledDay: detail.scheduledDay,
-          exercises: detail.exercises.map(exercise => ({
-            id: exercise.id,
-            name: exercise.name,
-            muscleGroup: exercise.muscleGroup,
-            baseLoad: exercise.baseLoad,
-            targetReps: exercise.targetReps,
-            note: exercise.note,
-          })),
+          exercises: detail.exercises.map(exercise => {
+            const parsedLoad = parseBaseLoad(exercise.baseLoad);
+
+            return {
+              id: exercise.id,
+              name: exercise.name,
+              muscleGroup: exercise.muscleGroup,
+              baseLoadKg: parsedLoad.kg,
+              baseLoadPlates: parsedLoad.plates,
+              baseLoadLegacy: parsedLoad.fallback,
+              targetReps: exercise.targetReps,
+              note: exercise.note,
+            };
+          }),
         });
       } catch (error) {
         if (active) {
@@ -157,6 +166,18 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
         {
           ...values,
           focus: resolvedFocus,
+          exercises: values.exercises.map(exercise => ({
+            id: exercise.id,
+            name: exercise.name,
+            muscleGroup: exercise.muscleGroup,
+            baseLoad: composeBaseLoad({
+              kg: exercise.baseLoadKg,
+              plates: exercise.baseLoadPlates,
+              fallback: exercise.baseLoadLegacy,
+            }),
+            targetReps: exercise.targetReps,
+            note: exercise.note,
+          })),
         },
         route.params?.workoutId,
       );
@@ -417,17 +438,51 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
 
               <Controller
                 control={control}
-                name={`exercises.${index}.baseLoad`}
+                name={`exercises.${index}.baseLoadKg`}
                 render={({field}) => (
                   <TextField
-                    label="Carga"
-                    placeholder="Ex: 20 kg, barra + 10, livre"
+                    label="Carga em Kg"
+                    placeholder="Ex: 20"
                     value={field.value}
                     onChangeText={field.onChange}
-                    error={errors.exercises?.[index]?.baseLoad?.message}
+                    keyboardType="decimal-pad"
+                    error={errors.exercises?.[index]?.baseLoadKg?.message}
                   />
                 )}
               />
+
+              <Controller
+                control={control}
+                name={`exercises.${index}.baseLoadPlates`}
+                render={({field}) => (
+                  <TextField
+                    label="Carga em Plates"
+                    placeholder="Ex: 2"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    keyboardType="decimal-pad"
+                    error={errors.exercises?.[index]?.baseLoadPlates?.message}
+                  />
+                )}
+              />
+
+              <View style={styles.loadPreviewCard}>
+                <Text style={styles.loadPreviewLabel}>Vai aparecer no treino como</Text>
+                <Text style={styles.loadPreviewValue}>
+                  {formatBaseLoadLabel(
+                    composeBaseLoad({
+                      kg: watch(`exercises.${index}.baseLoadKg`) ?? '',
+                      plates: watch(`exercises.${index}.baseLoadPlates`) ?? '',
+                      fallback: watch(`exercises.${index}.baseLoadLegacy`) ?? '',
+                    }),
+                  ) || 'Sem carga sugerida'}
+                </Text>
+                {watch(`exercises.${index}.baseLoadLegacy`) ? (
+                  <Text style={styles.loadPreviewHint}>
+                    A carga antiga foi mantida como referencia ate voce substituir por Kg e Plates.
+                  </Text>
+                ) : null}
+              </View>
 
               <Controller
                 control={control}
@@ -648,6 +703,28 @@ const styles = StyleSheet.create({
   exerciseCardTitle: {
     ...theme.typography.subtitle,
     color: theme.colors.text,
+  },
+  loadPreviewCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.xs,
+  },
+  loadPreviewLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  loadPreviewValue: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+  },
+  loadPreviewHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textSoft,
   },
   deleteIconButton: {
     width: 36,

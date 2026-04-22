@@ -1,4 +1,11 @@
-import {Modal, StyleSheet, Text, View} from 'react-native';
+import {
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import {Check} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
@@ -37,84 +44,117 @@ export const WorkoutCompletionModal = ({
   visible,
   summary,
   onClose,
-}: WorkoutCompletionModalProps) => (
-  <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-    <View style={styles.overlay}>
-      <View style={styles.modalCard}>
-        <View style={styles.heroBadge}>
-          <Check color="#06210E" size={30} strokeWidth={3} />
-        </View>
+}: WorkoutCompletionModalProps) => {
+  const {height} = useWindowDimensions();
+  const modalMaxHeight = Math.min(height * 0.82, 680);
 
-        <View style={styles.copyBlock}>
-          <Text style={styles.title}>Treino finalizado</Text>
-          <Text style={styles.subtitle}>
-            Parabens. Seu treino foi salvo e o historico ja foi atualizado.
-          </Text>
-          {summary ? (
-            <Text style={styles.workoutName}>{summary.workoutName}</Text>
-          ) : null}
-        </View>
-
-        {summary ? (
-          <>
-            <View style={styles.highlightCard}>
-              <Text style={styles.highlightLabel}>Series registradas</Text>
-              <Text style={styles.highlightValue}>{summary.totalSets}</Text>
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={[styles.modalCard, {maxHeight: modalMaxHeight}]}>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}>
+            <View style={styles.heroBadge}>
+              <Check color="#06210E" size={30} strokeWidth={3} />
             </View>
 
-            <View style={styles.metricsGrid}>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Maior carga</Text>
-                <Text style={styles.metricValue}>{formatMetric(summary.maxLoad, ' kg')}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Menor carga</Text>
-                <Text style={styles.metricValue}>{formatMetric(summary.minLoad, ' kg')}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Maior repeticao</Text>
-                <Text style={styles.metricValue}>{formatMetric(summary.maxReps)}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Menor repeticao</Text>
-                <Text style={styles.metricValue}>{formatMetric(summary.minReps)}</Text>
-              </View>
+            <View style={styles.copyBlock}>
+              <Text style={styles.title}>Treino finalizado</Text>
+              <Text style={styles.subtitle}>
+                Parabens. Seu treino foi salvo e o historico ja foi atualizado.
+              </Text>
+              {summary ? <Text style={styles.workoutName}>{summary.workoutName}</Text> : null}
             </View>
 
-            <View style={styles.groupCard}>
-              <Text style={styles.groupTitle}>Series por grupo muscular</Text>
-              <View style={styles.groupList}>
-                {summary.seriesByGroup.map(group => (
-                  <View key={group.label} style={styles.groupPill}>
-                    <Text style={styles.groupLabel}>{group.label}</Text>
-                    <Text style={styles.groupValue}>{group.count}</Text>
+            {summary ? (
+              <>
+                <View style={styles.highlightCard}>
+                  <Text style={styles.highlightLabel}>Series registradas</Text>
+                  <Text style={styles.highlightValue}>{summary.totalSets}</Text>
+                </View>
+
+                <View style={styles.metricsGrid}>
+                  <View style={styles.metricCard}>
+                    <Text style={styles.metricLabel}>Maior carga</Text>
+                    <Text style={styles.metricValue}>
+                      {formatMetric(summary.maxLoad, ' kg')}
+                    </Text>
                   </View>
-                ))}
-              </View>
-            </View>
-          </>
-        ) : null}
+                  <View style={styles.metricCard}>
+                    <Text style={styles.metricLabel}>Menor carga</Text>
+                    <Text style={styles.metricValue}>
+                      {formatMetric(summary.minLoad, ' kg')}
+                    </Text>
+                  </View>
+                  <View style={styles.metricCard}>
+                    <Text style={styles.metricLabel}>Maior repeticao</Text>
+                    <Text style={styles.metricValue}>{formatMetric(summary.maxReps)}</Text>
+                  </View>
+                  <View style={styles.metricCard}>
+                    <Text style={styles.metricLabel}>Menor repeticao</Text>
+                    <Text style={styles.metricValue}>{formatMetric(summary.minReps)}</Text>
+                  </View>
+                </View>
 
-        <Button label="Continuar" onPress={onClose} />
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Series por grupo muscular</Text>
+                  <View style={styles.groupList}>
+                    {summary.seriesByGroup.map(group => (
+                      <View key={group.label} style={styles.groupPill}>
+                        <Text style={styles.groupLabel}>{group.label}</Text>
+                        <Text style={styles.groupValue}>{group.count}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </>
+            ) : null}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Button label="Continuar" onPress={onClose} />
+          </View>
+        </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.xl,
+    alignItems: 'center',
     backgroundColor: theme.colors.overlay,
   },
   modalCard: {
+    width: '100%',
+    maxWidth: 420,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  scrollContent: {
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  footer: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   heroBadge: {
     width: 72,

@@ -17,6 +17,7 @@ import {
 import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
+import {formatBaseLoadLabel} from '@/utils/baseLoad';
 import {toUserMessage} from '@/utils/errors';
 import {formatSessionDate} from '@/utils/formatters';
 
@@ -169,7 +170,9 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
                 </View>
 
                 {exercise.baseLoad ? (
-                  <Text style={styles.exerciseLoad}>Carga sugerida: {exercise.baseLoad}</Text>
+                  <Text style={styles.exerciseLoad}>
+                    Carga sugerida: {formatBaseLoadLabel(exercise.baseLoad)}
+                  </Text>
                 ) : null}
 
                 {exercise.note ? (
