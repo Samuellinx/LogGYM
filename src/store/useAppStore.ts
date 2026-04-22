@@ -31,7 +31,7 @@ interface AppStoreState {
     email: string,
     password: string,
     recoveryCode: string,
-  ) => Promise<void>;
+  ) => Promise<{name: string; email: string}>;
   resetPasswordWithRecovery: (
     email: string,
     recoveryCode: string,
@@ -218,18 +218,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         password,
         recoveryCode,
       });
-      const session = createSession(user);
+      set({error: null});
 
-      await ensureUserRecord(user);
-      await persistStoredSession(session);
-
-      const data = await loadAllData(user.id);
-
-      set({
-        ...data,
-        session,
-        error: null,
-      });
+      return {
+        name: user.name,
+        email: user.email,
+      };
     } catch (error) {
       const message = toUserMessage(error, 'Falha ao criar sua conta.');
       set({error: message});

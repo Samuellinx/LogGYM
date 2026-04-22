@@ -1,5 +1,12 @@
-import {useState} from 'react';
-import {Alert, StyleSheet, Text, View} from 'react-native';
+import {useEffect, useState} from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {Controller, useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import LinearGradient from 'react-native-linear-gradient';
@@ -75,6 +82,48 @@ export const LoginScreen = () => {
     resolver: zodResolver(credentialResetSchema),
     defaultValues: resetDefaults,
   });
+  const isCreatingAccount = pending === 'signup';
+
+  useEffect(() => {
+    if (!__DEV__) {
+      return;
+    }
+
+    const debugGlobal = globalThis as typeof globalThis & {
+      __LOGGYM_SIGNUP_PROBE_DONE?: boolean;
+    };
+
+    if (debugGlobal.__LOGGYM_SIGNUP_PROBE_DONE) {
+      return;
+    }
+
+    debugGlobal.__LOGGYM_SIGNUP_PROBE_DONE = true;
+
+    const probeEmail = `probe.${Date.now()}@example.com`;
+
+    const runProbe = async () => {
+      const startedAt = Date.now();
+
+      try {
+        console.log(`[signup-probe] start ${probeEmail}`);
+        const createdAccount = await signUpWithCredentials(
+          'Probe Runtime',
+          probeEmail,
+          'Treino1234',
+          'PROBE99',
+        );
+        console.log(
+          `[signup-probe] success ${createdAccount.email} ${Date.now() - startedAt}ms`,
+        );
+      } catch (error) {
+        console.log(
+          `[signup-probe] error ${toUserMessage(error)} ${Date.now() - startedAt}ms`,
+        );
+      }
+    };
+
+    runProbe();
+  }, [signUpWithCredentials]);
 
   const handleGoogle = async () => {
     try {
@@ -101,11 +150,22 @@ export const LoginScreen = () => {
   const handleCredentialSignUp = signUpForm.handleSubmit(async values => {
     try {
       setPending('signup');
-      await signUpWithCredentials(
+      const createdAccount = await signUpWithCredentials(
         values.name,
         values.email,
         values.password,
         values.recoveryCode,
+      );
+      signUpForm.reset(signUpDefaults);
+      signInForm.reset({
+        email: createdAccount.email,
+        password: '',
+      });
+      setMode('signin');
+
+      Alert.alert(
+        'Conta criada',
+        'Sua conta foi criada com sucesso. Agora entre com e-mail e senha.',
       );
     } catch (error) {
       Alert.alert('Criar conta', toUserMessage(error));
@@ -406,6 +466,23 @@ export const LoginScreen = () => {
 
   return (
     <Screen contentContainerStyle={styles.content}>
+      <Modal
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        visible={isCreatingAccount}
+        onRequestClose={() => undefined}>
+        <View style={styles.progressOverlay}>
+          <View style={styles.progressCard}>
+            <ActivityIndicator size="large" color={theme.colors.accent} />
+            <Text style={styles.progressTitle}>Criando sua conta</Text>
+            <Text style={styles.progressText}>
+              Estamos preparando seu acesso com seguranca. Aguarde.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.backgroundOrbTop} />
       <View style={styles.backgroundOrbBottom} />
 
@@ -600,5 +677,34 @@ const styles = StyleSheet.create({
   formHint: {
     ...theme.typography.caption,
     color: theme.colors.textSoft,
+  },
+  progressOverlay: {
+    flex: 1,
+    backgroundColor: theme.colors.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  progressCard: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: theme.radius.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.xl,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  progressTitle: {
+    ...theme.typography.subtitle,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  progressText: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
   },
 });
