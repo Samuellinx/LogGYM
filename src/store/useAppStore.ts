@@ -1,15 +1,31 @@
 import {create} from 'zustand';
 
-import type {DashboardData, StoredSession, WorkoutHistoryItem, WorkoutSummary} from '@/types/domain';
+import type {
+  DashboardData,
+  StoredSession,
+  WorkoutHistoryItem,
+  WorkoutSummary,
+} from '@/types/domain';
 import {initializeDatabase} from '@/storage/database';
-import {clearStoredSession, loadStoredSession, persistStoredSession} from '@/features/auth/sessionStorage';
-import {getAuthCapabilities, signInWithDevelopmentAccount, signInWithGoogleAccount, signOutFromProvider, trySilentGoogleSession} from '@/features/auth/authService';
 import {
-  resetCredentialPassword,
-  signInWithCredentialAccount,
-  signUpWithCredentialAccount,
-} from '@/features/auth/localAuthService';
-import {ensureUserRecord, getDashboardData, listHistory, listWorkouts, purgeLegacySeedData} from '@/features/workouts/workoutRepository';
+  getAuthCapabilities,
+  restoreFirebaseSession,
+  sendPasswordResetForEmail,
+  signInWithDevelopmentAccount,
+  signInWithEmailAccount,
+  signInWithGoogleAccount,
+  signOutFromProvider,
+  signUpWithEmailAccount,
+} from '@/features/auth/authService';
+import {syncFirebaseUserData} from '@/features/sync/firebaseSyncService';
+import {
+  ensureUserRecord,
+  getDashboardData,
+  listHistory,
+  listWorkouts,
+  migrateLegacyUserToSession,
+  purgeLegacySeedData,
+} from '@/features/workouts/workoutRepository';
 import {toUserMessage} from '@/utils/errors';
 
 interface AppStoreState {
@@ -30,13 +46,8 @@ interface AppStoreState {
     name: string,
     email: string,
     password: string,
-    recoveryCode: string,
   ) => Promise<{name: string; email: string}>;
-  resetPasswordWithRecovery: (
-    email: string,
-    recoveryCode: string,
-    newPassword: string,
-  ) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
   setOnline: (isOnline: boolean) => void;
@@ -58,6 +69,19 @@ const createSession = (user: NonNullable<StoredSession['user']>): StoredSession 
   user,
 });
 
+const shouldSyncRemote = (
+  isOnline: boolean,
+  user: NonNullable<StoredSession['user']>,
+) => isOnline && user.provider !== 'dev-local';
+
+const prepareLocalSessionData = async (
+  user: NonNullable<StoredSession['user']>,
+) => {
+  await migrateLegacyUserToSession(user);
+  await ensureUserRecord(user);
+  await purgeLegacySeedData(user.id);
+};
+
 export const useAppStore = create<AppStoreState>((set, get) => ({
   isBootstrapping: true,
   isRefreshing: false,
@@ -74,37 +98,42 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       await initializeDatabase();
 
-      let storedSession = await loadStoredSession();
+      const restoredUser = await restoreFirebaseSession();
 
-      if (!storedSession) {
-        const restoredGoogleUser = await trySilentGoogleSession();
-
-        if (restoredGoogleUser) {
-          storedSession = createSession(restoredGoogleUser);
-          await persistStoredSession(storedSession);
-        }
-      }
-
-      if (!storedSession) {
+      if (!restoredUser) {
         set({
           isBootstrapping: false,
           session: null,
           dashboard: null,
           workouts: [],
           history: [],
+          error: null,
         });
         return;
       }
 
-      await ensureUserRecord(storedSession.user);
-      await purgeLegacySeedData(storedSession.user.id);
+      await prepareLocalSessionData(restoredUser);
 
-      const data = await loadAllData(storedSession.user.id);
+      let syncError: string | null = null;
+
+      if (shouldSyncRemote(get().isOnline, restoredUser)) {
+        try {
+          await syncFirebaseUserData(restoredUser);
+        } catch (error) {
+          syncError = toUserMessage(
+            error,
+            'Nao foi possivel sincronizar os treinos com a nuvem agora.',
+          );
+        }
+      }
+
+      const data = await loadAllData(restoredUser.id);
 
       set({
         ...data,
-        session: storedSession,
+        session: createSession(restoredUser),
         isBootstrapping: false,
+        error: syncError,
       });
     } catch (error) {
       set({
@@ -123,9 +152,24 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     set({isRefreshing: true, error: null});
 
+    let syncError: string | null = null;
+
     try {
+      await prepareLocalSessionData(session.user);
+
+      if (shouldSyncRemote(get().isOnline, session.user)) {
+        try {
+          await syncFirebaseUserData(session.user);
+        } catch (error) {
+          syncError = toUserMessage(
+            error,
+            'Nao foi possivel sincronizar os treinos com a nuvem agora.',
+          );
+        }
+      }
+
       const data = await loadAllData(session.user.id);
-      set({...data, isRefreshing: false});
+      set({...data, isRefreshing: false, error: syncError});
     } catch (error) {
       set({
         isRefreshing: false,
@@ -138,18 +182,27 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   signInWithGoogle: async () => {
     try {
       const user = await signInWithGoogleAccount();
-      const session = createSession(user);
+      await prepareLocalSessionData(user);
 
-      await ensureUserRecord(user);
-      await purgeLegacySeedData(user.id);
-      await persistStoredSession(session);
+      let syncError: string | null = null;
+
+      if (shouldSyncRemote(get().isOnline, user)) {
+        try {
+          await syncFirebaseUserData(user);
+        } catch (error) {
+          syncError = toUserMessage(
+            error,
+            'Entrou na conta, mas a sincronizacao ainda nao aconteceu.',
+          );
+        }
+      }
 
       const data = await loadAllData(user.id);
 
       set({
         ...data,
-        session,
-        error: null,
+        session: createSession(user),
+        error: syncError,
       });
     } catch (error) {
       const message = toUserMessage(error, 'Falha ao entrar com Google.');
@@ -167,21 +220,20 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       }
 
       const user = await signInWithDevelopmentAccount();
-      const session = createSession(user);
-
-      await ensureUserRecord(user);
-      await purgeLegacySeedData(user.id);
-      await persistStoredSession(session);
+      await prepareLocalSessionData(user);
 
       const data = await loadAllData(user.id);
 
       set({
         ...data,
-        session,
+        session: createSession(user),
         error: null,
       });
     } catch (error) {
-      const message = toUserMessage(error, 'Falha ao abrir a sessao de desenvolvimento.');
+      const message = toUserMessage(
+        error,
+        'Falha ao abrir a sessao de desenvolvimento.',
+      );
       set({error: message});
       throw new Error(message);
     }
@@ -189,19 +241,28 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   signInWithCredentials: async (email, password) => {
     try {
-      const user = await signInWithCredentialAccount({email, password});
-      const session = createSession(user);
+      const user = await signInWithEmailAccount({email, password});
+      await prepareLocalSessionData(user);
 
-      await ensureUserRecord(user);
-      await purgeLegacySeedData(user.id);
-      await persistStoredSession(session);
+      let syncError: string | null = null;
+
+      if (shouldSyncRemote(get().isOnline, user)) {
+        try {
+          await syncFirebaseUserData(user);
+        } catch (error) {
+          syncError = toUserMessage(
+            error,
+            'Entrou na conta, mas a sincronizacao ainda nao aconteceu.',
+          );
+        }
+      }
 
       const data = await loadAllData(user.id);
 
       set({
         ...data,
-        session,
-        error: null,
+        session: createSession(user),
+        error: syncError,
       });
     } catch (error) {
       const message = toUserMessage(error, 'Falha ao entrar com sua conta.');
@@ -210,20 +271,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
 
-  signUpWithCredentials: async (name, email, password, recoveryCode) => {
+  signUpWithCredentials: async (name, email, password) => {
     try {
-      const user = await signUpWithCredentialAccount({
+      const result = await signUpWithEmailAccount({
         name,
         email,
         password,
-        recoveryCode,
       });
-      set({error: null});
 
-      return {
-        name: user.name,
-        email: user.email,
-      };
+      set({error: null});
+      return result;
     } catch (error) {
       const message = toUserMessage(error, 'Falha ao criar sua conta.');
       set({error: message});
@@ -231,17 +288,15 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
 
-  resetPasswordWithRecovery: async (email, recoveryCode, newPassword) => {
+  sendPasswordReset: async email => {
     try {
-      await resetCredentialPassword({
-        email,
-        recoveryCode,
-        newPassword,
-      });
-
+      await sendPasswordResetForEmail(email);
       set({error: null});
     } catch (error) {
-      const message = toUserMessage(error, 'Falha ao redefinir sua senha.');
+      const message = toUserMessage(
+        error,
+        'Falha ao enviar o e-mail de redefinicao.',
+      );
       set({error: message});
       throw new Error(message);
     }
@@ -253,8 +308,6 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     if (session) {
       await signOutFromProvider(session.provider);
     }
-
-    await clearStoredSession();
 
     set({
       session: null,

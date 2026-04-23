@@ -1,0 +1,529 @@
+:root {
+  font-family: Inter, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #f4f7fb;
+  background:
+    radial-gradient(circle at top left, rgba(124, 255, 79, 0.12), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(0, 194, 255, 0.12), transparent 32%),
+    #071015;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.panel-shell {
+  display: grid;
+  grid-template-columns: 420px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.marketing-panel {
+  padding: 48px 36px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(10, 17, 23, 0.94), rgba(7, 13, 17, 0.98)),
+    rgba(7, 13, 17, 0.92);
+}
+
+.workspace-panel {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.brand-lockup,
+.workspace-header,
+.panel-head,
+.exercise-head,
+.workout-card-top,
+.card-actions,
+.header-actions,
+.auth-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-badge,
+.metric-card,
+.hero-card,
+.soft-chip,
+.tab-chip,
+.ghost-button,
+.primary-button,
+.secondary-button,
+.danger-button,
+.search-box,
+.workout-card,
+.session-card,
+.empty-card,
+.feedback,
+.column-panel,
+.auth-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #7cff4f, #00c2ff);
+  color: #04110a;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 247, 251, 0.55);
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.1rem, 4vw, 3.4rem);
+  line-height: 1.05;
+}
+
+h2 {
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+}
+
+h3 {
+  font-size: 1.2rem;
+}
+
+h4 {
+  font-size: 1rem;
+}
+
+.hero-copy,
+.support-copy,
+.hero-footer,
+.workout-notes,
+.session-card p,
+label small,
+.feedback,
+.soft-chip,
+.metric-card span {
+  color: rgba(244, 247, 251, 0.72);
+}
+
+.hero-copy {
+  margin-top: 24px;
+  max-width: 28rem;
+  font-size: 1.05rem;
+}
+
+.hero-grid,
+.workspace-metrics,
+.workspace-grid,
+.editor-grid,
+.exercise-stack,
+.workout-list,
+.session-list,
+.chip-row,
+.accent-palette,
+.auth-form,
+.column-panel,
+.auth-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.hero-grid {
+  margin-top: 32px;
+}
+
+.hero-card,
+.metric-card,
+.workout-card,
+.session-card,
+.column-panel,
+.auth-panel,
+.empty-card,
+.feedback {
+  border-radius: 22px;
+  background: rgba(15, 23, 30, 0.86);
+  backdrop-filter: blur(18px);
+}
+
+.hero-card,
+.metric-card,
+.workout-card,
+.session-card,
+.empty-card,
+.feedback {
+  padding: 18px;
+}
+
+.hero-card {
+  gap: 8px;
+  display: grid;
+}
+
+.hero-card strong,
+.metric-card strong,
+.workout-card strong,
+.session-card strong {
+  color: #f4f7fb;
+}
+
+.hero-footer {
+  margin-top: auto;
+  padding-top: 32px;
+  display: grid;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+code {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.workspace-header {
+  align-items: flex-start;
+}
+
+.header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.metric-card {
+  min-height: 112px;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+
+.metric-card strong {
+  font-size: 2rem;
+}
+
+.workspace-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-grid {
+  grid-template-columns: minmax(340px, 460px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.column-panel,
+.auth-panel {
+  padding: 22px;
+}
+
+.column-panel.editor {
+  gap: 20px;
+}
+
+.panel-head.secondary {
+  margin-top: 8px;
+}
+
+.search-box {
+  min-width: 270px;
+  padding: 12px 14px;
+  border-radius: 999px;
+  background: rgba(8, 15, 20, 0.92);
+}
+
+.search-box input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #f4f7fb;
+  outline: none;
+}
+
+.search-box svg {
+  color: rgba(244, 247, 251, 0.55);
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: rgba(244, 247, 251, 0.86);
+}
+
+label span {
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(244, 247, 251, 0.56);
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 13, 17, 0.92);
+  color: #f4f7fb;
+  border-radius: 16px;
+  padding: 14px 16px;
+  outline: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(124, 255, 79, 0.56);
+  box-shadow: 0 0 0 3px rgba(124, 255, 79, 0.12);
+}
+
+.stacked-field {
+  display: grid;
+}
+
+.accent-palette {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.color-swatch {
+  width: 100%;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+
+.color-swatch.active {
+  border-color: #f4f7fb;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+.exercise-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(7, 13, 17, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  gap: 14px;
+}
+
+.exercise-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.accent-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.soft-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+}
+
+.workout-card,
+.session-card {
+  display: grid;
+  gap: 14px;
+}
+
+.card-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.danger-button,
+.tab-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: transparent;
+  color: #f4f7fb;
+  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #7cff4f, #43dd6c);
+  color: #04110a;
+  border-color: rgba(124, 255, 79, 0.18);
+  font-weight: 700;
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ghost-button {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.danger-button {
+  background: rgba(255, 87, 104, 0.12);
+  color: #ff8d9c;
+}
+
+.danger-button.subtle {
+  padding: 10px 14px;
+}
+
+.tab-chip.active {
+  background: rgba(124, 255, 79, 0.14);
+  border-color: rgba(124, 255, 79, 0.38);
+  color: #c8ffb5;
+}
+
+.wide {
+  width: 100%;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.ghost-button:hover,
+.danger-button:hover,
+.tab-chip:hover,
+.color-swatch:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.ghost-button:disabled,
+.danger-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.auth-panel {
+  margin: auto;
+  width: min(560px, 100%);
+}
+
+.auth-head {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.feedback.error {
+  background: rgba(255, 87, 104, 0.12);
+  color: #ffb0ba;
+}
+
+.feedback.success {
+  background: rgba(124, 255, 79, 0.12);
+  color: #d6ffc5;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) {
+  .panel-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-panel {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .workspace-grid,
+  .workspace-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-panel,
+  .marketing-panel {
+    padding: 20px;
+  }
+
+  .workspace-header,
+  .panel-head,
+  .exercise-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-box {
+    min-width: 100%;
+  }
+
+  .editor-grid,
+  .auth-tabs,
+  .accent-palette {
+    grid-template-columns: 1fr;
+  }
+}

@@ -26,6 +26,9 @@ npm run adb:fix
 # Alternativa direta do React Native CLI
 npm run android
 
+# Painel web React
+npm run web:dev
+
 ==================================================
 3. Validacao de codigo
 ==================================================
@@ -45,6 +48,9 @@ npm run verify
 # Jest
 npm test
 
+# Lint do painel web
+npm run web:lint
+
 ==================================================
 4. Build APK para testes
 ==================================================
@@ -57,6 +63,9 @@ npm run apk:release
 
 # Validar se a assinatura release esta pronta antes do build
 npm run release:check
+
+# Validar se o Firebase esta configurado para mobile + web
+npm run firebase:doctor
 
 # Instalar manualmente o APK debug no dispositivo
 C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb install -r .\android\app\build\outputs\apk\debug\app-debug.apk
@@ -125,17 +134,26 @@ npm run start:reset
 npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output .\.tmp-bundle\index.android.bundle --assets-dest .\.tmp-bundle\assets
 
 ==================================================
-8. Login Google - comandos uteis
+8. Firebase / login compartilhado
 ==================================================
 
-# Ver o SHA-1 da debug keystore desta maquina
-keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\debug.keystore" -storepass android -keypass android
+# Gerar SHA-1 e SHA-256 debug/release do Android
+npm run android:signingReport
 
 # Ver o SHA-1 da keystore release local
 keytool -list -v -keystore ".\android\keystores\loggym-upload.jks" -alias loggym-upload
 
-# Depois de alterar o .env, reinicie o Metro
+# Validar a presenca dos arquivos/configs do Firebase
+npm run firebase:doctor
+
+# Depois de alterar o .env do mobile, reinicie o Metro
 npm run start:reset
+
+# Rodar o painel web
+npm run web:dev
+
+# Gerar build web
+npm run web:build
 
 ==================================================
 9. Ordem recomendada no dia a dia
@@ -156,6 +174,9 @@ npm run start:reset
 # 5. Rodar app no Android
 npm run android:dev
 
+# 6. Se estiver usando o painel web no mesmo dia
+npm run web:dev
+
 ==================================================
 10. Caminhos importantes
 ==================================================
@@ -166,8 +187,14 @@ npm run android:dev
 # Arquivo de ambiente:
 .\.env
 
+# Arquivo de ambiente do painel web:
+.\web\.env
+
 # Config Android principal:
 .\android\app\build.gradle
+
+# Regras do Firestore:
+.\firestore.rules
 
 # Modelo de propriedades da release:
 .\android\release-signing.example.properties

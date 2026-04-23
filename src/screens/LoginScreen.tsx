@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +10,7 @@ import {
 import {Controller, useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import LinearGradient from 'react-native-linear-gradient';
-import {CloudOff, Wifi} from 'lucide-react-native';
+import {CloudOff, CloudSync} from 'lucide-react-native';
 import Animated, {FadeInDown, FadeInUp} from 'react-native-reanimated';
 
 import {BrandMark} from '@/components/BrandMark';
@@ -49,23 +49,17 @@ const signUpDefaults: CredentialSignUpValues = {
   email: '',
   password: '',
   confirmPassword: '',
-  recoveryCode: '',
 };
 
 const resetDefaults: CredentialResetValues = {
   email: '',
-  recoveryCode: '',
-  newPassword: '',
-  confirmNewPassword: '',
 };
 
 export const LoginScreen = () => {
   const signInWithGoogle = useAppStore(state => state.signInWithGoogle);
   const signInWithCredentials = useAppStore(state => state.signInWithCredentials);
   const signUpWithCredentials = useAppStore(state => state.signUpWithCredentials);
-  const resetPasswordWithRecovery = useAppStore(
-    state => state.resetPasswordWithRecovery,
-  );
+  const sendPasswordReset = useAppStore(state => state.sendPasswordReset);
   const isOnline = useAppStore(state => state.isOnline);
   const [mode, setMode] = useState<AuthMode>('signin');
   const [pending, setPending] = useState<PendingAction>(null);
@@ -82,48 +76,8 @@ export const LoginScreen = () => {
     resolver: zodResolver(credentialResetSchema),
     defaultValues: resetDefaults,
   });
+
   const isCreatingAccount = pending === 'signup';
-
-  useEffect(() => {
-    if (!__DEV__) {
-      return;
-    }
-
-    const debugGlobal = globalThis as typeof globalThis & {
-      __LOGGYM_SIGNUP_PROBE_DONE?: boolean;
-    };
-
-    if (debugGlobal.__LOGGYM_SIGNUP_PROBE_DONE) {
-      return;
-    }
-
-    debugGlobal.__LOGGYM_SIGNUP_PROBE_DONE = true;
-
-    const probeEmail = `probe.${Date.now()}@example.com`;
-
-    const runProbe = async () => {
-      const startedAt = Date.now();
-
-      try {
-        console.log(`[signup-probe] start ${probeEmail}`);
-        const createdAccount = await signUpWithCredentials(
-          'Probe Runtime',
-          probeEmail,
-          'Treino1234',
-          'PROBE99',
-        );
-        console.log(
-          `[signup-probe] success ${createdAccount.email} ${Date.now() - startedAt}ms`,
-        );
-      } catch (error) {
-        console.log(
-          `[signup-probe] error ${toUserMessage(error)} ${Date.now() - startedAt}ms`,
-        );
-      }
-    };
-
-    runProbe();
-  }, [signUpWithCredentials]);
 
   const handleGoogle = async () => {
     try {
@@ -154,8 +108,8 @@ export const LoginScreen = () => {
         values.name,
         values.email,
         values.password,
-        values.recoveryCode,
       );
+
       signUpForm.reset(signUpDefaults);
       signInForm.reset({
         email: createdAccount.email,
@@ -165,7 +119,7 @@ export const LoginScreen = () => {
 
       Alert.alert(
         'Conta criada',
-        'Sua conta foi criada com sucesso. Agora entre com e-mail e senha.',
+        'Sua conta foi criada. Agora entre com e-mail e senha para sincronizar seus treinos.',
       );
     } catch (error) {
       Alert.alert('Criar conta', toUserMessage(error));
@@ -177,25 +131,16 @@ export const LoginScreen = () => {
   const handlePasswordReset = resetForm.handleSubmit(async values => {
     try {
       setPending('forgot');
-      await resetPasswordWithRecovery(
-        values.email,
-        values.recoveryCode,
-        values.newPassword,
-      );
-
-      signInForm.reset({
-        email: values.email,
-        password: '',
-      });
+      await sendPasswordReset(values.email);
       resetForm.reset(resetDefaults);
       setMode('signin');
 
       Alert.alert(
-        'Senha atualizada',
-        'Sua senha foi redefinida. Agora voce pode entrar com a nova senha.',
+        'E-mail enviado',
+        'Se existir uma conta com esse e-mail, voce recebera um link para redefinir a senha.',
       );
     } catch (error) {
-      Alert.alert('Redefinir senha', toUserMessage(error));
+      Alert.alert('Esqueci a senha', toUserMessage(error));
     } finally {
       setPending(null);
     }
@@ -210,9 +155,9 @@ export const LoginScreen = () => {
 
       return (
         <View key="signup" style={styles.formCard}>
-          <Text style={styles.formTitle}>Conta pessoal</Text>
+          <Text style={styles.formTitle}>Conta sincronizada</Text>
           <Text style={styles.formDescription}>
-            Crie um acesso por e-mail e senha. O codigo de recuperacao permite trocar a senha neste aparelho.
+            Crie um acesso com e-mail e senha para usar o app e o site com a mesma conta.
           </Text>
 
           <Controller
@@ -224,7 +169,7 @@ export const LoginScreen = () => {
                 placeholder="Seu nome"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
+                onChangeText={field.onChange}
                 error={errors.name?.message}
               />
             )}
@@ -239,7 +184,7 @@ export const LoginScreen = () => {
                 placeholder="voce@exemplo.com"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
+                onChangeText={field.onChange}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -257,7 +202,7 @@ export const LoginScreen = () => {
                 placeholder="Minimo de 8 caracteres"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
+                onChangeText={field.onChange}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -275,7 +220,7 @@ export const LoginScreen = () => {
                 placeholder="Repita sua senha"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
+                onChangeText={field.onChange}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -284,31 +229,14 @@ export const LoginScreen = () => {
             )}
           />
 
-          <Controller
-            control={control}
-            name="recoveryCode"
-            render={({field}) => (
-              <TextField
-                label="Codigo de recuperacao"
-                placeholder="Ex: FORCA2026"
-                value={field.value ?? ''}
-                onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                error={errors.recoveryCode?.message}
-              />
-            )}
-          />
-
           <Text style={styles.formHint}>
-            Guarde esse codigo em um lugar seguro. Ele sera exigido para redefinir sua senha.
+            Depois do primeiro acesso online, seus treinos continuam disponiveis no aparelho mesmo sem internet.
           </Text>
 
           <Button
             label={pending === 'signup' ? 'Criando conta...' : 'Criar conta'}
             onPress={handleCredentialSignUp}
-            disabled={pending !== null}
+            disabled={pending !== null || !isOnline}
           />
         </View>
       );
@@ -322,9 +250,9 @@ export const LoginScreen = () => {
 
       return (
         <View key="forgot" style={styles.formCard}>
-          <Text style={styles.formTitle}>Recuperar acesso</Text>
+          <Text style={styles.formTitle}>Recuperar senha</Text>
           <Text style={styles.formDescription}>
-            Informe seu e-mail, o codigo de recuperacao e a nova senha.
+            Informe seu e-mail para receber um link oficial de redefinicao.
           </Text>
 
           <Controller
@@ -336,7 +264,7 @@ export const LoginScreen = () => {
                 placeholder="voce@exemplo.com"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
+                onChangeText={field.onChange}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -345,63 +273,14 @@ export const LoginScreen = () => {
             )}
           />
 
-          <Controller
-            control={control}
-            name="recoveryCode"
-            render={({field}) => (
-              <TextField
-                label="Codigo de recuperacao"
-                placeholder="Digite o codigo salvo"
-                value={field.value ?? ''}
-                onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                error={errors.recoveryCode?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="newPassword"
-            render={({field}) => (
-              <TextField
-                label="Nova senha"
-                placeholder="Minimo de 8 caracteres"
-                value={field.value ?? ''}
-                onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                error={errors.newPassword?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="confirmNewPassword"
-            render={({field}) => (
-              <TextField
-                label="Confirmar nova senha"
-                placeholder="Repita a nova senha"
-                value={field.value ?? ''}
-                onBlur={field.onBlur}
-                onChangeText={value => field.onChange(value)}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                error={errors.confirmNewPassword?.message}
-              />
-            )}
-          />
-
           <Button
-            label={pending === 'forgot' ? 'Atualizando senha...' : 'Redefinir senha'}
+            label={
+              pending === 'forgot'
+                ? 'Enviando e-mail...'
+                : 'Enviar e-mail de redefinicao'
+            }
             onPress={handlePasswordReset}
-            disabled={pending !== null}
+            disabled={pending !== null || !isOnline}
           />
         </View>
       );
@@ -414,9 +293,9 @@ export const LoginScreen = () => {
 
     return (
       <View key="signin" style={styles.formCard}>
-        <Text style={styles.formTitle}>Entrar com conta pessoal</Text>
+        <Text style={styles.formTitle}>Entrar com e-mail</Text>
         <Text style={styles.formDescription}>
-          Use seu e-mail e senha para acessar seus treinos mesmo sem Google.
+          Use a mesma conta no app e no painel web para manter tudo sincronizado por usuario.
         </Text>
 
         <Controller
@@ -428,7 +307,7 @@ export const LoginScreen = () => {
               placeholder="voce@exemplo.com"
               value={field.value ?? ''}
               onBlur={field.onBlur}
-              onChangeText={value => field.onChange(value)}
+              onChangeText={field.onChange}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -446,7 +325,7 @@ export const LoginScreen = () => {
               placeholder="Digite sua senha"
               value={field.value ?? ''}
               onBlur={field.onBlur}
-              onChangeText={value => field.onChange(value)}
+              onChangeText={field.onChange}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
@@ -477,7 +356,7 @@ export const LoginScreen = () => {
             <ActivityIndicator size="large" color={theme.colors.accent} />
             <Text style={styles.progressTitle}>Criando sua conta</Text>
             <Text style={styles.progressText}>
-              Estamos preparando seu acesso com seguranca. Aguarde.
+              Estamos preparando seu acesso e vinculando a sincronizacao segura.
             </Text>
           </View>
         </View>
@@ -494,9 +373,9 @@ export const LoginScreen = () => {
           style={styles.hero}>
           <BrandMark size={108} />
           <Text style={styles.title}>LogGYM</Text>
-          <Text style={styles.headline}>Treine. Registre. Evolua.</Text>
+          <Text style={styles.headline}>Treine. Registre. Sincronize.</Text>
           <Text style={styles.description}>
-            Seus treinos, cargas e anotacoes no mesmo lugar.
+            Seus treinos, cargas e historico ficam alinhados entre app e web.
           </Text>
 
           <View style={styles.badges}>
@@ -505,8 +384,12 @@ export const LoginScreen = () => {
               active
               accentColor={isOnline ? theme.colors.success : theme.colors.warning}
             />
-            <TagChip label="Uso rapido" active />
-            <TagChip label="Conta local" active accentColor={theme.colors.accentSecondary} />
+            <TagChip label="Offline first" active />
+            <TagChip
+              label="Sync por usuario"
+              active
+              accentColor={theme.colors.accentSecondary}
+            />
           </View>
         </LinearGradient>
       </Animated.View>
@@ -515,21 +398,21 @@ export const LoginScreen = () => {
         entering={FadeInDown.delay(70).duration(360)}
         style={styles.summaryCard}>
         {isOnline ? (
-          <Wifi color={theme.colors.success} size={18} />
+          <CloudSync color={theme.colors.success} size={18} />
         ) : (
           <CloudOff color={theme.colors.warning} size={18} />
         )}
         <Text style={styles.summaryText}>
           {isOnline
-            ? 'Voce pode entrar com Google ou criar uma conta local para continuar usando o app offline neste aparelho.'
-            : 'Sem internet agora. Se voce ja tiver uma conta local, pode entrar normalmente e seguir treinando.'}
+            ? 'Acesse com Google ou e-mail para sincronizar seus treinos entre celular e painel web.'
+            : 'Sem internet agora. Se voce ja entrou antes, o app continua abrindo com os dados salvos neste aparelho.'}
         </Text>
       </Animated.View>
 
       <View style={styles.googleCard}>
         <Text style={styles.googleTitle}>Entrada com Google</Text>
         <Text style={styles.googleText}>
-          Ideal para quem quer usar a conta Google na primeira entrada e manter a sessao salva.
+          Ideal para acessar rapido e usar a mesma conta em todos os dispositivos.
         </Text>
         <Button
           label={pending === 'google' ? 'Conectando...' : 'Entrar com Google'}
@@ -539,7 +422,7 @@ export const LoginScreen = () => {
       </View>
 
       <View style={styles.localAuthSection}>
-        <Text style={styles.localAuthTitle}>Conta por e-mail</Text>
+        <Text style={styles.localAuthTitle}>Acesso com e-mail</Text>
         <View style={styles.modeRow}>
           {(Object.keys(modeLabels) as AuthMode[]).map(option => (
             <TagChip

@@ -66,7 +66,7 @@ export const backupFileSchema = z.object({
   user: z.object({
     email: z.string().trim().email().max(254),
     name: z.string().trim().min(1).max(120),
-    provider: z.enum(['google', 'dev-local', 'credentials']),
+    provider: z.enum(['google', 'dev-local', 'password']),
   }),
   stats: z.object({
     workouts: z.number().int().min(0).max(500),

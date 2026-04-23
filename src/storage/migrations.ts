@@ -87,4 +87,21 @@ export const migrations: Migration[] = [
       `UPDATE workout_exercises SET base_load = '' WHERE base_load IS NULL;`,
     ],
   },
+  {
+    id: '003_sync_queue',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS sync_queue (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        payload TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_sync_queue_user_created ON sync_queue(user_id, created_at ASC);`,
+      `CREATE INDEX IF NOT EXISTS idx_sync_queue_user_entity ON sync_queue(user_id, entity_type, entity_id);`,
+    ],
+  },
 ];

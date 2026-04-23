@@ -10,6 +10,15 @@ import type {
   WorkoutInput,
   WorkoutSummary,
 } from '@/types/domain';
+import type {
+  FirebaseWorkoutDocument,
+  FirebaseWorkoutExerciseDocument,
+  FirebaseWorkoutSessionDocument,
+  FirebaseUserProfileDocument,
+  SyncQueueEntityType,
+  SyncQueueItem,
+  SyncQueueOperation,
+} from '@/features/sync/firebaseTypes';
 import {getDatabase} from '@/storage/database';
 import {createId} from '@/utils/ids';
 
@@ -49,6 +58,18 @@ type WorkoutExerciseRow = {
   order_index: number;
 };
 
+type WorkoutSyncRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  focus: string;
+  notes: string;
+  accent_color: string;
+  scheduled_day: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type WorkoutHistoryRow = {
   id: string;
   workout_id: string | null;
@@ -81,6 +102,37 @@ type ProgressRow = {
   load: number;
   reps: number;
   note: string;
+};
+
+type WorkoutSessionSyncRow = {
+  id: string;
+  user_id: string;
+  workout_id: string | null;
+  workout_name: string;
+  focus: string;
+  performed_at: string;
+  overall_notes: string;
+  created_at: string;
+};
+
+type SessionSetSyncRow = {
+  template_exercise_id: string | null;
+  exercise_name: string;
+  muscle_group: string;
+  set_index: number;
+  load: number;
+  reps: number;
+  note: string;
+};
+
+type SyncQueueRow = {
+  id: string;
+  user_id: string;
+  entity_type: SyncQueueEntityType;
+  entity_id: string;
+  operation: SyncQueueOperation;
+  payload: string | null;
+  created_at: string;
 };
 
 type MetadataRow = {value: string};
@@ -128,6 +180,28 @@ const mapWorkoutHistory = (row: WorkoutHistoryRow): WorkoutHistoryItem => ({
   exercises: row.exercises
     ? row.exercises.split(',').map(item => item.trim()).filter(Boolean)
     : [],
+});
+
+const mapWorkoutExerciseDocument = (
+  row: WorkoutExerciseRow,
+): FirebaseWorkoutExerciseDocument => ({
+  id: row.id,
+  name: row.name,
+  muscleGroup: row.muscle_group,
+  baseLoad: row.base_load,
+  targetReps: row.target_reps,
+  note: row.note,
+  orderIndex: Number(row.order_index),
+});
+
+const mapSyncQueueItem = (row: SyncQueueRow): SyncQueueItem => ({
+  id: row.id,
+  userId: row.user_id,
+  entityType: row.entity_type,
+  entityId: row.entity_id,
+  operation: row.operation,
+  payload: row.payload,
+  createdAt: row.created_at,
 });
 
 export const ensureUserRecord = async (user: SessionUser) => {
@@ -185,6 +259,173 @@ export const findUserByEmail = async (email: string) => {
   return row ? mapSessionUser(row) : null;
 };
 
+export const buildFirebaseUserProfileDocument = (
+  user: SessionUser,
+): FirebaseUserProfileDocument => {
+  const now = new Date().toISOString();
+
+  return {
+    uid: user.id,
+    email: normalizeEmail(user.email),
+    name: user.name.trim(),
+    photo: user.photo,
+    givenName: user.givenName,
+    familyName: user.familyName,
+    provider: user.provider,
+    createdAt: now,
+    updatedAt: now,
+    lastLoginAt: user.lastLoginAt,
+  };
+};
+
+export const migrateLegacyUserToSession = async (user: SessionUser) => {
+  const existingUser = await findUserByEmail(user.email);
+
+  if (!existingUser || existingUser.id === user.id) {
+    return false;
+  }
+
+  const db = getDatabase();
+  const normalizedEmail = normalizeEmail(user.email);
+  const now = new Date().toISOString();
+  const legacyEmail = `${normalizedEmail}.legacy.${existingUser.id.slice(0, 8)}`;
+
+  await db.transaction(async tx => {
+    await tx.executeAsync('UPDATE users SET email = ? WHERE id = ?;', [
+      legacyEmail,
+      existingUser.id,
+    ]);
+
+    await tx.executeAsync(
+      `INSERT INTO users (
+        id, email, name, photo, given_name, family_name, provider, created_at, last_login_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        email = excluded.email,
+        name = excluded.name,
+        photo = excluded.photo,
+        given_name = excluded.given_name,
+        family_name = excluded.family_name,
+        provider = excluded.provider,
+        last_login_at = excluded.last_login_at;`,
+      [
+        user.id,
+        normalizedEmail,
+        user.name,
+        user.photo,
+        user.givenName,
+        user.familyName,
+        user.provider,
+        now,
+        user.lastLoginAt,
+      ],
+    );
+
+    await tx.executeAsync('UPDATE workouts SET user_id = ? WHERE user_id = ?;', [
+      user.id,
+      existingUser.id,
+    ]);
+    await tx.executeAsync(
+      'UPDATE workout_sessions SET user_id = ? WHERE user_id = ?;',
+      [user.id, existingUser.id],
+    );
+    await tx.executeAsync('UPDATE sync_queue SET user_id = ? WHERE user_id = ?;', [
+      user.id,
+      existingUser.id,
+    ]);
+    await tx.executeAsync('UPDATE metadata SET key = ? WHERE key = ?;', [
+      `seeded:${user.id}`,
+      `seeded:${existingUser.id}`,
+    ]);
+    await tx.executeAsync('UPDATE metadata SET key = ? WHERE key = ?;', [
+      `firebase.sync.seeded:${user.id}`,
+      `firebase.sync.seeded:${existingUser.id}`,
+    ]);
+    await tx.executeAsync('DELETE FROM users WHERE id = ?;', [existingUser.id]);
+  });
+
+  return true;
+};
+
+export const listSyncQueue = async (userId: string) => {
+  const db = getDatabase();
+  const result = await db.executeAsync<SyncQueueRow>(
+    `SELECT
+      id,
+      user_id,
+      entity_type,
+      entity_id,
+      operation,
+      payload,
+      created_at
+    FROM sync_queue
+    WHERE user_id = ?
+    ORDER BY created_at ASC;`,
+    [userId],
+  );
+
+  return result.rows._array.map(mapSyncQueueItem);
+};
+
+export const clearSyncQueueItems = async (itemIds: string[]) => {
+  if (itemIds.length === 0) {
+    return;
+  }
+
+  const db = getDatabase();
+
+  await db.transaction(async tx => {
+    for (const itemId of itemIds) {
+      await tx.executeAsync('DELETE FROM sync_queue WHERE id = ?;', [itemId]);
+    }
+  });
+};
+
+const enqueueSyncOperation = async ({
+  userId,
+  entityType,
+  entityId,
+  operation,
+  payload,
+}: {
+  userId: string;
+  entityType: SyncQueueEntityType;
+  entityId: string;
+  operation: SyncQueueOperation;
+  payload: string | null;
+}) => {
+  const db = getDatabase();
+
+  await db.transaction(async tx => {
+    await tx.executeAsync(
+      `DELETE FROM sync_queue
+       WHERE user_id = ? AND entity_type = ? AND entity_id = ?;`,
+      [userId, entityType, entityId],
+    );
+
+    await tx.executeAsync(
+      `INSERT INTO sync_queue (
+        id,
+        user_id,
+        entity_type,
+        entity_id,
+        operation,
+        payload,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
+      [
+        createId(),
+        userId,
+        entityType,
+        entityId,
+        operation,
+        payload,
+        new Date().toISOString(),
+      ],
+    );
+  });
+};
+
 export const purgeLegacySeedData = async (userId: string) => {
   const db = getDatabase();
   const metadataKey = `seeded:${userId}`;
@@ -227,6 +468,361 @@ export const purgeLegacySeedData = async (userId: string) => {
   });
 
   return matchesLegacySeed;
+};
+
+export const getWorkoutDocumentForSync = async (
+  userId: string,
+  workoutId: string,
+): Promise<FirebaseWorkoutDocument | null> => {
+  const db = getDatabase();
+  const workoutResult = await db.executeAsync<WorkoutSyncRow>(
+    `SELECT
+      id,
+      user_id,
+      name,
+      focus,
+      notes,
+      accent_color,
+      scheduled_day,
+      created_at,
+      updated_at
+    FROM workouts
+    WHERE id = ? AND user_id = ? AND archived_at IS NULL
+    LIMIT 1;`,
+    [workoutId, userId],
+  );
+
+  const workoutRow = workoutResult.rows.item(0);
+
+  if (!workoutRow) {
+    return null;
+  }
+
+  const exercisesResult = await db.executeAsync<WorkoutExerciseRow>(
+    `SELECT
+      id,
+      workout_id,
+      name,
+      muscle_group,
+      base_load,
+      target_reps,
+      note,
+      order_index
+    FROM workout_exercises
+    WHERE workout_id = ?
+    ORDER BY order_index ASC;`,
+    [workoutId],
+  );
+
+  return {
+    id: workoutRow.id,
+    userId: workoutRow.user_id,
+    name: workoutRow.name,
+    focus: workoutRow.focus,
+    notes: workoutRow.notes,
+    accentColor: workoutRow.accent_color,
+    scheduledDay: workoutRow.scheduled_day,
+    exercises: exercisesResult.rows._array.map(mapWorkoutExerciseDocument),
+    createdAt: workoutRow.created_at,
+    updatedAt: workoutRow.updated_at,
+  };
+};
+
+const mapSessionDocument = (
+  sessionRow: WorkoutSessionSyncRow,
+  setRows: SessionSetSyncRow[],
+): FirebaseWorkoutSessionDocument => {
+  const exerciseMap = new Map<
+    string,
+    FirebaseWorkoutSessionDocument['exercises'][number]
+  >();
+  const exercises: FirebaseWorkoutSessionDocument['exercises'] = [];
+  let totalVolume = 0;
+  let topLoad = 0;
+
+  for (const row of setRows.sort((left, right) => left.set_index - right.set_index)) {
+    const key = [
+      row.template_exercise_id ?? 'free',
+      row.exercise_name,
+      row.muscle_group,
+    ].join('::');
+
+    let currentExercise = exerciseMap.get(key);
+
+    if (!currentExercise) {
+      currentExercise = {
+        workoutExerciseId: row.template_exercise_id ?? '',
+        exerciseName: row.exercise_name,
+        muscleGroup: row.muscle_group,
+        sets: [],
+      };
+
+      exerciseMap.set(key, currentExercise);
+      exercises.push(currentExercise);
+    }
+
+    currentExercise.sets.push({
+      load: Number(row.load),
+      reps: Number(row.reps),
+      note: row.note,
+    });
+
+    totalVolume += Number(row.load) * Number(row.reps);
+    topLoad = Math.max(topLoad, Number(row.load));
+  }
+
+  return {
+    id: sessionRow.id,
+    userId: sessionRow.user_id,
+    workoutId: sessionRow.workout_id,
+    workoutName: sessionRow.workout_name,
+    focus: sessionRow.focus,
+    overallNotes: sessionRow.overall_notes,
+    performedAt: sessionRow.performed_at,
+    createdAt: sessionRow.created_at,
+    exercises,
+    totalSets: setRows.length,
+    totalVolume,
+    topLoad,
+  };
+};
+
+export const getSessionDocumentForSync = async (
+  userId: string,
+  sessionId: string,
+): Promise<FirebaseWorkoutSessionDocument | null> => {
+  const db = getDatabase();
+  const sessionResult = await db.executeAsync<WorkoutSessionSyncRow>(
+    `SELECT
+      id,
+      user_id,
+      workout_id,
+      workout_name,
+      focus,
+      performed_at,
+      overall_notes,
+      created_at
+    FROM workout_sessions
+    WHERE id = ? AND user_id = ?
+    LIMIT 1;`,
+    [sessionId, userId],
+  );
+
+  const sessionRow = sessionResult.rows.item(0);
+
+  if (!sessionRow) {
+    return null;
+  }
+
+  const setResult = await db.executeAsync<SessionSetSyncRow>(
+    `SELECT
+      template_exercise_id,
+      exercise_name,
+      muscle_group,
+      set_index,
+      load,
+      reps,
+      note
+    FROM session_sets
+    WHERE session_id = ?
+    ORDER BY set_index ASC;`,
+    [sessionId],
+  );
+
+  return mapSessionDocument(sessionRow, setResult.rows._array);
+};
+
+export const getAllWorkoutDocumentsForSync = async (userId: string) => {
+  const db = getDatabase();
+  const result = await db.executeAsync<{id: string}>(
+    `SELECT id
+     FROM workouts
+     WHERE user_id = ? AND archived_at IS NULL
+     ORDER BY updated_at ASC;`,
+    [userId],
+  );
+
+  const documents: FirebaseWorkoutDocument[] = [];
+
+  for (const row of result.rows._array) {
+    const document = await getWorkoutDocumentForSync(userId, row.id);
+
+    if (document) {
+      documents.push(document);
+    }
+  }
+
+  return documents;
+};
+
+export const getAllSessionDocumentsForSync = async (userId: string) => {
+  const db = getDatabase();
+  const result = await db.executeAsync<{id: string}>(
+    `SELECT id
+     FROM workout_sessions
+     WHERE user_id = ?
+     ORDER BY performed_at ASC;`,
+    [userId],
+  );
+
+  const documents: FirebaseWorkoutSessionDocument[] = [];
+
+  for (const row of result.rows._array) {
+    const document = await getSessionDocumentForSync(userId, row.id);
+
+    if (document) {
+      documents.push(document);
+    }
+  }
+
+  return documents;
+};
+
+export const replaceLocalDataFromRemote = async ({
+  userId,
+  workouts,
+  sessions,
+}: {
+  userId: string;
+  workouts: FirebaseWorkoutDocument[];
+  sessions: FirebaseWorkoutSessionDocument[];
+}) => {
+  const db = getDatabase();
+
+  await db.transaction(async tx => {
+    await tx.executeAsync(
+      `DELETE FROM session_sets
+       WHERE session_id IN (
+         SELECT id
+         FROM workout_sessions
+         WHERE user_id = ?
+       );`,
+      [userId],
+    );
+    await tx.executeAsync('DELETE FROM workout_sessions WHERE user_id = ?;', [userId]);
+    await tx.executeAsync('DELETE FROM workouts WHERE user_id = ?;', [userId]);
+
+    for (const workout of workouts) {
+      await tx.executeAsync(
+        `INSERT INTO workouts (
+          id,
+          user_id,
+          name,
+          focus,
+          notes,
+          accent_color,
+          scheduled_day,
+          created_at,
+          updated_at,
+          archived_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL);`,
+        [
+          workout.id,
+          userId,
+          workout.name,
+          workout.focus,
+          workout.notes,
+          workout.accentColor,
+          workout.scheduledDay,
+          workout.createdAt,
+          workout.updatedAt,
+        ],
+      );
+
+      for (const exercise of workout.exercises) {
+        await tx.executeAsync(
+          `INSERT INTO workout_exercises (
+            id,
+            workout_id,
+            name,
+            muscle_group,
+            base_load,
+            target_reps,
+            note,
+            order_index,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          [
+            exercise.id,
+            workout.id,
+            exercise.name,
+            exercise.muscleGroup,
+            exercise.baseLoad,
+            exercise.targetReps,
+            exercise.note,
+            exercise.orderIndex,
+            workout.createdAt,
+            workout.updatedAt,
+          ],
+        );
+      }
+    }
+
+    for (const session of sessions) {
+      await tx.executeAsync(
+        `INSERT INTO workout_sessions (
+          id,
+          user_id,
+          workout_id,
+          workout_name,
+          focus,
+          performed_at,
+          overall_notes,
+          duration_minutes,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          session.id,
+          userId,
+          session.workoutId,
+          session.workoutName,
+          session.focus,
+          session.performedAt,
+          session.overallNotes,
+          0,
+          session.createdAt,
+        ],
+      );
+
+      let currentIndex = 0;
+
+      for (const exercise of session.exercises) {
+        for (const set of exercise.sets) {
+          await tx.executeAsync(
+            `INSERT INTO session_sets (
+              id,
+              session_id,
+              template_exercise_id,
+              exercise_name,
+              muscle_group,
+              set_index,
+              load,
+              reps,
+              note,
+              performed_at,
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              createId(),
+              session.id,
+              exercise.workoutExerciseId || null,
+              exercise.exerciseName,
+              exercise.muscleGroup,
+              currentIndex,
+              set.load,
+              set.reps,
+              set.note,
+              session.performedAt,
+              session.createdAt,
+            ],
+          );
+
+          currentIndex += 1;
+        }
+      }
+    }
+  });
 };
 
 export const listWorkouts = async (userId: string) => {
@@ -387,6 +983,18 @@ export const saveWorkout = async (
     }
   });
 
+  const syncDocument = await getWorkoutDocumentForSync(userId, resolvedWorkoutId);
+
+  if (syncDocument) {
+    await enqueueSyncOperation({
+      userId,
+      entityType: 'workout',
+      entityId: resolvedWorkoutId,
+      operation: 'upsert_workout',
+      payload: JSON.stringify(syncDocument),
+    });
+  }
+
   return resolvedWorkoutId;
 };
 
@@ -399,11 +1007,13 @@ export const importWorkouts = async (
   }
 
   const db = getDatabase();
+  const importedWorkoutIds: string[] = [];
 
   await db.transaction(async tx => {
     for (const input of inputs) {
       const now = new Date().toISOString();
       const importedWorkoutId = createId();
+      importedWorkoutIds.push(importedWorkoutId);
 
       await tx.executeAsync(
         `INSERT INTO workouts (
@@ -443,6 +1053,20 @@ export const importWorkouts = async (
       }
     }
   });
+
+  for (const importedWorkoutId of importedWorkoutIds) {
+    const syncDocument = await getWorkoutDocumentForSync(userId, importedWorkoutId);
+
+    if (syncDocument) {
+      await enqueueSyncOperation({
+        userId,
+        entityType: 'workout',
+        entityId: importedWorkoutId,
+        operation: 'upsert_workout',
+        payload: JSON.stringify(syncDocument),
+      });
+    }
+  }
 };
 
 export const duplicateWorkout = async (userId: string, workoutId: string) => {
@@ -479,6 +1103,14 @@ export const deleteWorkout = async (userId: string, workoutId: string) => {
       'DELETE FROM workouts WHERE id = ? AND user_id = ?;',
       [workoutId, userId],
     );
+  });
+
+  await enqueueSyncOperation({
+    userId,
+    entityType: 'workout',
+    entityId: workoutId,
+    operation: 'delete_workout',
+    payload: null,
   });
 };
 
@@ -547,6 +1179,18 @@ export const saveTrainingSession = async (
     }
   });
 
+  const syncDocument = await getSessionDocumentForSync(userId, sessionId);
+
+  if (syncDocument) {
+    await enqueueSyncOperation({
+      userId,
+      entityType: 'session',
+      entityId: sessionId,
+      operation: 'upsert_session',
+      payload: JSON.stringify(syncDocument),
+    });
+  }
+
   return sessionId;
 };
 
@@ -571,6 +1215,14 @@ export const deleteTrainingSession = async (
       'DELETE FROM workout_sessions WHERE id = ? AND user_id = ?;',
       [sessionId, userId],
     );
+  });
+
+  await enqueueSyncOperation({
+    userId,
+    entityType: 'session',
+    entityId: sessionId,
+    operation: 'delete_session',
+    payload: null,
   });
 };
 

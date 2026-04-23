@@ -195,8 +195,8 @@ export const ProfileScreen = () => {
           label={
             session?.provider === 'google'
               ? 'Conta Google'
-              : session?.provider === 'credentials'
-                ? 'Conta pessoal'
+              : session?.provider === 'password'
+                ? 'Conta por e-mail'
                 : 'Conta de teste'
           }
           active
@@ -222,8 +222,8 @@ export const ProfileScreen = () => {
         )}
         <Text style={styles.networkText}>
           {isOnline
-            ? 'Tudo certo para continuar usando o app e manter seus treinos atualizados.'
-            : 'Sem internet no momento. O que ja esta salvo continua disponivel neste aparelho.'}
+            ? 'Tudo certo para continuar usando o app e manter seus treinos sincronizados.'
+            : 'Sem internet no momento. O que ja esta salvo continua disponivel neste aparelho e sera sincronizado quando a conexao voltar.'}
         </Text>
       </View>
 

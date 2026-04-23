@@ -1,0 +1,187 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isString(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    function isNullableString(value, max) {
+      return value == null || (value is string && value.size() <= max);
+    }
+
+    function isTimestampText(value) {
+      return value is string && value.size() >= 10 && value.size() <= 40;
+    }
+
+    function isAccentColor(value) {
+      return value is string && value.matches('^#[0-9A-Fa-f]{6}$');
+    }
+
+    function isWorkoutExercise(value) {
+      return value is map
+        && value.keys().hasOnly([
+          'id',
+          'name',
+          'muscleGroup',
+          'baseLoad',
+          'targetReps',
+          'note',
+          'orderIndex',
+        ])
+        && isString(value.id, 1, 120)
+        && isString(value.name, 1, 80)
+        && isString(value.muscleGroup, 1, 40)
+        && isString(value.baseLoad, 0, 60)
+        && isString(value.targetReps, 1, 20)
+        && isString(value.note, 0, 220)
+        && value.orderIndex is int
+        && value.orderIndex >= 0
+        && value.orderIndex <= 64;
+    }
+
+    function isWorkoutDocument(data, userId) {
+      return data.keys().hasOnly([
+          'id',
+          'userId',
+          'name',
+          'focus',
+          'notes',
+          'accentColor',
+          'scheduledDay',
+          'exercises',
+          'createdAt',
+          'updatedAt',
+        ])
+        && data.userId == userId
+        && isString(data.id, 1, 120)
+        && isString(data.name, 2, 80)
+        && isString(data.focus, 1, 40)
+        && isString(data.notes, 0, 400)
+        && isAccentColor(data.accentColor)
+        && isNullableString(data.scheduledDay, 20)
+        && data.exercises is list
+        && data.exercises.size() <= 24
+        && isTimestampText(data.createdAt)
+        && isTimestampText(data.updatedAt);
+    }
+
+    function isSessionSet(value) {
+      return value is map
+        && value.keys().hasOnly(['load', 'reps', 'note'])
+        && value.load is number
+        && value.load >= 0
+        && value.load <= 10000
+        && value.reps is int
+        && value.reps >= 0
+        && value.reps <= 1000
+        && isString(value.note, 0, 220);
+    }
+
+    function isSessionExercise(value) {
+      return value is map
+        && value.keys().hasOnly([
+          'workoutExerciseId',
+          'exerciseName',
+          'muscleGroup',
+          'sets',
+        ])
+        && isString(value.workoutExerciseId, 0, 120)
+        && isString(value.exerciseName, 1, 80)
+        && isString(value.muscleGroup, 1, 40)
+        && value.sets is list
+        && value.sets.size() <= 20;
+    }
+
+    function isWorkoutSessionDocument(data, userId) {
+      return data.keys().hasOnly([
+          'id',
+          'userId',
+          'workoutId',
+          'workoutName',
+          'focus',
+          'overallNotes',
+          'performedAt',
+          'createdAt',
+          'exercises',
+          'totalSets',
+          'totalVolume',
+          'topLoad',
+        ])
+        && data.userId == userId
+        && isString(data.id, 1, 120)
+        && isNullableString(data.workoutId, 120)
+        && isString(data.workoutName, 2, 80)
+        && isString(data.focus, 1, 40)
+        && isString(data.overallNotes, 0, 1200)
+        && isTimestampText(data.performedAt)
+        && isTimestampText(data.createdAt)
+        && data.exercises is list
+        && data.exercises.size() <= 24
+        && data.totalSets is int
+        && data.totalSets >= 0
+        && data.totalSets <= 400
+        && data.totalVolume is number
+        && data.totalVolume >= 0
+        && data.totalVolume <= 5000000
+        && data.topLoad is number
+        && data.topLoad >= 0
+        && data.topLoad <= 10000;
+    }
+
+    function isUserProfile(data, userId) {
+      return data.keys().hasOnly([
+          'uid',
+          'email',
+          'name',
+          'photo',
+          'givenName',
+          'familyName',
+          'provider',
+          'createdAt',
+          'updatedAt',
+          'lastLoginAt',
+        ])
+        && data.uid == userId
+        && isString(data.email, 3, 254)
+        && isString(data.name, 1, 120)
+        && isNullableString(data.photo, 500)
+        && isNullableString(data.givenName, 120)
+        && isNullableString(data.familyName, 120)
+        && (
+          data.provider == 'google'
+          || data.provider == 'password'
+          || data.provider == 'dev-local'
+        )
+        && isTimestampText(data.createdAt)
+        && isTimestampText(data.updatedAt)
+        && isTimestampText(data.lastLoginAt);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isUserProfile(request.resource.data, userId);
+      allow delete: if false;
+
+      match /workouts/{workoutId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isWorkoutDocument(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isWorkoutSessionDocument(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

@@ -60,6 +60,7 @@ react {
  */
 def enableProguardInReleaseBuilds = true
 def defaultDebugKeystore = new File(System.getProperty("user.home"), ".android/debug.keystore")
+def firebaseConfigFile = file("google-services.json")
 def resolveSecret = { String key ->
     def projectValue = project.findProperty(key)
     if (projectValue != null && projectValue.toString().trim()) {
@@ -99,6 +100,13 @@ if (isReleaseTaskRequested && hasReleaseSigning && !releaseStoreFile.exists()) {
     throw new GradleException(
         "Release bloqueado por seguranca. A keystore configurada em LOGGYM_UPLOAD_STORE_FILE nao foi encontrada: " +
         releaseStoreFile.absolutePath
+    )
+}
+
+if (!firebaseConfigFile.exists()) {
+    throw new GradleException(
+        "Firebase Android bloqueado por seguranca. Adicione android/app/google-services.json " +
+        "gerado no Firebase Console para o app com package com.loggym."
     )
 }
 
@@ -171,3 +179,5 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+apply plugin: "com.google.gms.google-services"

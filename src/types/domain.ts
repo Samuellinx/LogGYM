@@ -1,4 +1,4 @@
-export type AuthProvider = 'google' | 'dev-local' | 'credentials';
+export type AuthProvider = 'google' | 'dev-local' | 'password';
 
 export interface SessionUser {
   id: string;

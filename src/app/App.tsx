@@ -20,6 +20,7 @@ const App = () => {
   const error = useAppStore(state => state.error);
   const session = useAppStore(state => state.session);
   const setOnline = useAppStore(state => state.setOnline);
+  const refreshData = useAppStore(state => state.refreshData);
 
   useEffect(() => {
     bootstrap().catch(() => {
@@ -34,6 +35,16 @@ const App = () => {
 
     return unsubscribe;
   }, [bootstrap, setOnline]);
+
+  useEffect(() => {
+    if (!isOnline || !session) {
+      return;
+    }
+
+    refreshData().catch(() => {
+      // O erro de sincronizacao ja e refletido pelo store.
+    });
+  }, [isOnline, refreshData, session]);
 
   if (isBootstrapping || (!session && error)) {
     return (

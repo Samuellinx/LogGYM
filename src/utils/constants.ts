@@ -25,7 +25,7 @@ export const accentSpectrum = [
 ];
 
 export const securityHighlights = [
-  'Sessao protegida com Keychain/Keystore',
+  'Sessao protegida pelo Firebase Auth',
   'Dados offline salvos em SQLite parametrizado',
   'Sem tokens persistidos em texto puro',
   'Backups so restauram dados da mesma conta autenticada',

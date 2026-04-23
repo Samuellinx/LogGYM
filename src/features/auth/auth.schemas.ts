@@ -13,12 +13,6 @@ const passwordSchema = z
   .min(8, 'A senha precisa ter pelo menos 8 caracteres.')
   .max(128, 'A senha precisa ter no maximo 128 caracteres.');
 
-const recoveryCodeSchema = z
-  .string()
-  .trim()
-  .min(4, 'Crie um codigo de recuperacao com pelo menos 4 caracteres.')
-  .max(32, 'Use um codigo de recuperacao mais curto.');
-
 export const credentialSignInSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
@@ -34,24 +28,15 @@ export const credentialSignUpSchema = z
     email: emailSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
-    recoveryCode: recoveryCodeSchema,
   })
   .refine(values => values.password === values.confirmPassword, {
     message: 'As senhas nao conferem.',
     path: ['confirmPassword'],
   });
 
-export const credentialResetSchema = z
-  .object({
-    email: emailSchema,
-    recoveryCode: recoveryCodeSchema,
-    newPassword: passwordSchema,
-    confirmNewPassword: z.string(),
-  })
-  .refine(values => values.newPassword === values.confirmNewPassword, {
-    message: 'As senhas nao conferem.',
-    path: ['confirmNewPassword'],
-  });
+export const credentialResetSchema = z.object({
+  email: emailSchema,
+});
 
 export type CredentialSignInValues = z.infer<typeof credentialSignInSchema>;
 export type CredentialSignUpValues = z.infer<typeof credentialSignUpSchema>;

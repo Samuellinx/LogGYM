@@ -1,48 +1,49 @@
 # LogGYM
 
-Aplicativo React Native Android-first para registrar treinos de musculacao, cargas, repeticoes e anotacoes com fluxo offline-first, login com Google ou conta local por e-mail e foco em usabilidade durante o treino.
+LogGYM agora funciona como um produto de duas frentes no mesmo repositório:
 
-## Stack
+- app mobile React Native para registrar treinos offline no Android
+- painel web React para cadastrar e editar treinos por usuário
+- Firebase Auth + Firestore para compartilhar identidade e sincronização
+- SQLite local no app como cache offline-first
+
+## Stack principal
 
 - React Native CLI `0.85.2`
 - TypeScript `6.0.3`
 - React Navigation `7`
 - Zustand para estado global
 - SQLite local com `react-native-nitro-sqlite`
-- Keychain/Keystore com `react-native-keychain`
-- Google Sign-In com `@react-native-google-signin/google-signin`
-- Backup local com `@react-native-documents/picker` + `react-native-file-access`
+- Firebase Auth no mobile com `@react-native-firebase/auth`
+- Firestore no mobile com `@react-native-firebase/firestore`
+- Google Sign-In mobile com `@react-native-google-signin/google-signin`
+- React web com Vite `8`
+- Firebase Web SDK `12.12.1`
 - Validacao com `zod` + `react-hook-form`
-- UI com `react-native-linear-gradient`, `react-native-svg` e `lucide-react-native`
 
-## O que o app entrega
+## O que o projeto entrega
 
-- Login com Google configuravel por `.env`
-- Conta local por e-mail e senha com criacao de conta
-- Recuperacao de senha por codigo de recuperacao
-- Sessao persistida com Keychain/Keystore
-- Uso offline depois do primeiro acesso valido neste aparelho
-- Dashboard com cards clicaveis, busca rapida e atalhos para os fluxos principais
-- Templates de treino editaveis
-- Duplicacao de treino existente
-- Registro de execucoes com series, carga, repeticoes e notas
-- Resumo visual ao finalizar treino com estatisticas da sessao
-- Historico local completo
-- Busca e exclusao de execucoes no historico
-- Evolucao de carga por exercicio
-- Filtro de treinos por data
-- Exportacao e importacao de backup local em JSON
-- Importacao de treinos externos por `.txt`, `.csv`, `.xls` e `.xlsx`
-- Build Android debug validado com `.apk`
+- login compartilhado com Google ou e-mail/senha
+- sincronização por usuário entre painel web e app
+- cache local SQLite no app para continuar usando sem internet
+- fila de sincronização local para não perder alterações feitas offline
+- backup manual e importação externa de treinos continuam disponíveis no app
+- regras do Firestore no repositório
+- painel web real para criar, editar e excluir treinos
 
 ## Estrutura principal
 
 ```text
+android/
+docs/
+scripts/
 src/
   app/
   components/
   features/
     auth/
+    firebase/
+    sync/
     workouts/
   navigation/
   screens/
@@ -51,88 +52,96 @@ src/
   theme/
   types/
   utils/
-android/
+web/
+firebase.json
+firestore.rules
+firestore.indexes.json
 .env.example
+web/.env.example
 ```
 
-## Pre-requisitos
+## Pré-requisitos
 
 - Node `>= 22.11`
 - npm `>= 11`
 - JDK `17`
 - Android Studio com SDK `36`
-- ADB no PATH
+- projeto Firebase criado
 
-## Instalar dependencias
+## Instalação
 
 ```bash
 npm install
 ```
 
-## Variaveis de ambiente
+O painel web usa o próprio `package.json` em `web/`, mas os comandos da raiz já chamam o prefixo correto.
 
-O projeto inclui:
+## Variáveis de ambiente
 
-- `.env.example` para referencia
-- `.env` local com placeholders seguros para DEV
+Mobile: use `.env.example` como base para `.env`.
 
-Variaveis esperadas:
+Web: use `web/.env.example` como base para `web/.env`.
+
+Mobile:
 
 ```env
 LOGGYM_GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
 LOGGYM_GOOGLE_IOS_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
-LOGGYM_ENABLE_DEV_LOGIN=true
+LOGGYM_ENABLE_DEV_LOGIN=false
+LOGGYM_FIREBASE_USE_EMULATORS=false
+LOGGYM_FIREBASE_AUTH_EMULATOR_HOST=10.0.2.2:9099
+LOGGYM_FIREBASE_FIRESTORE_EMULATOR_HOST=10.0.2.2:8080
 ```
 
-Importante:
+Web:
 
-- Nao coloque secrets reais sensiveis no `.env`
-- O app usa `.env` apenas para IDs publicos de configuracao
-- No fluxo Android atual, `LOGGYM_GOOGLE_WEB_CLIENT_ID` e opcional
-- `LOGGYM_ENABLE_DEV_LOGIN` fica reservado para fallback interno de desenvolvimento
-- Credenciais de assinatura Android devem ficar em `~/.gradle/gradle.properties` ou ambiente local, nao no repositorio
-
-## Configurar Google Sign-In no Android
-
-1. Abra o Google Cloud Console.
-2. Acesse `APIs & Services` -> `Credentials`.
-3. Crie um OAuth Client do tipo `Android`.
-4. Use o package name `com.loggym`.
-5. Cadastre o SHA-1 da debug keystore.
-
-Comando para obter o SHA-1 da debug keystore no Windows:
-
-```powershell
-keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\debug.keystore" -storepass android -keypass android
+```env
+VITE_FIREBASE_API_KEY=your-firebase-web-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=1234567890
+VITE_FIREBASE_APP_ID=1:1234567890:web:abcdef123456
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
-6. Crie tambem um OAuth Client do tipo `Web`.
-7. Copie o client ID Web para `LOGGYM_GOOGLE_WEB_CLIENT_ID` apenas se depois voce quiser `idToken` ou `offlineAccess`.
-8. Se for usar iOS futuramente, preencha `LOGGYM_GOOGLE_IOS_CLIENT_ID`.
-9. Quando for testar a APK release assinada, adicione tambem o SHA-1 da keystore release no Google Cloud Console.
+## Setup Firebase
 
-Observacao:
+O passo a passo completo está em [docs/firebase-setup.md](docs/firebase-setup.md).
 
-- O login Google real depende dessa configuracao
-- Para este MVP Android, o cliente OAuth `Android` com package name + SHA-1 correto e a parte obrigatoria
-- Em release, o SHA-1 muda. Se ele nao estiver cadastrado no client OAuth Android, o login Google da APK release falha com `DEVELOPER_ERROR`
-- Se voce informar `webClientId`, ele precisa ser um client ID do tipo `Web`; um valor incorreto tambem pode causar erro de configuracao
-- `google-services.json` nao e necessario para este fluxo atual, a menos que voce integre Firebase Auth
-- O app tambem oferece conta local por e-mail e senha, armazenada com seguranca no proprio aparelho
-- O fallback controlado por `LOGGYM_ENABLE_DEV_LOGIN=true` continua reservado ao ambiente de desenvolvimento
+Resumo do obrigatório:
 
-Comando util para obter o SHA-1 da keystore release local:
+1. criar o projeto Firebase
+2. habilitar `Google` e `Email/Password` no Auth
+3. adicionar o app Android `com.loggym`
+4. baixar `android/app/google-services.json`
+5. cadastrar SHA-1 e SHA-256 debug/release
+6. adicionar o app Web e preencher `web/.env`
+7. publicar `firestore.rules` e `firestore.indexes.json`
+8. autorizar `localhost` no Firebase Auth para usar o painel web em DEV
 
-```powershell
-keytool -list -v -keystore ".\android\keystores\loggym-upload.jks" -alias loggym-upload
+## Doctor
+
+```bash
+npm run firebase:doctor
 ```
 
-## Rodar em DEV no Android
+O doctor atual valida:
+
+- `firebase.json`
+- `firestore.rules`
+- `.env`
+- `web/.env`
+- `android/app/google-services.json`
+
+## Rodar em DEV
+
+### App mobile
 
 Terminal 1:
 
 ```bash
-npm start
+npm run start
 ```
 
 Terminal 2:
@@ -141,159 +150,66 @@ Terminal 2:
 npm run android:dev
 ```
 
-Se preferir resetar o Metro:
+### Painel web
 
 ```bash
-npm run start:reset
+npm run web:dev
 ```
 
-## Gerar APK debug para teste
+## Build
+
+### Web
+
+```bash
+npm run web:build
+```
+
+### APK debug
 
 ```bash
 npm run apk:debug
 ```
 
-APK gerado em:
-
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-## APK release assinado
-
-O build release agora falha de forma segura se a assinatura real nao estiver configurada. Nao existe mais fallback para debug keystore no `assembleRelease`.
-
-1. Gere sua keystore de release:
-
-```powershell
-keytool -genkeypair -v -storetype PKCS12 -keystore ".\android\keystores\loggym-upload.jks" -alias loggym-upload -keyalg RSA -keysize 2048 -validity 9125
-```
-
-2. Use o modelo [`android/release-signing.example.properties`](android/release-signing.example.properties) como base e adicione as chaves `LOGGYM_*` em `%USERPROFILE%\.gradle\gradle.properties` com valores reais:
-
-```properties
-LOGGYM_UPLOAD_STORE_FILE=../keystores/loggym-upload.jks
-LOGGYM_UPLOAD_STORE_PASSWORD=your_store_password
-LOGGYM_UPLOAD_KEY_ALIAS=your_key_alias
-LOGGYM_UPLOAD_KEY_PASSWORD=your_key_password
-```
-
-3. Valide a configuracao:
+### APK release
 
 ```bash
 npm run release:check
-```
-
-4. Gere a APK release assinada:
-
-```bash
 npm run apk:release
 ```
 
-APK gerada em:
+Observação:
 
-```text
-android/app/build/outputs/apk/release/app-release.apk
-```
+- o Android agora exige `android/app/google-services.json`
+- sem esse arquivo, o Gradle bloqueia o build porque o Firebase Auth e o Firestore nativos não podem ser inicializados de forma segura
 
-Notas:
+## Fluxos principais
 
-- guarde passwords e keystore fora do repositorio
-- `LOGGYM_UPLOAD_*` pode vir de `~/.gradle/gradle.properties` ou de variaveis de ambiente
-- o script `release:check` valida keystore, alias e JDK antes do build
-- o build release publica com `usesCleartextTraffic=false`, Proguard e shrink de resources
+### Mobile
 
-## Backup local manual
+- restaura a sessão do Firebase Auth
+- migra dados locais do usuário antigo pelo e-mail, quando existir
+- usa SQLite para leitura rápida e funcionamento offline
+- envia alterações pendentes para o Firestore quando a internet volta
+- baixa o snapshot remoto e atualiza o cache local
 
-O app agora permite:
+### Web
 
-- exportar um backup JSON do usuario autenticado
-- importar esse backup no mesmo email/provedor autenticado
-- restaurar treinos, exercicios, sessoes e series sem depender de backend
+- autentica com a mesma conta Firebase do app
+- lista treinos em tempo real por usuário
+- cria, edita e exclui templates no Firestore
+- o app passa a receber essas mudanças na próxima sincronização
 
-## Importacao de treinos externos
+### Perfil do app
 
-Na aba Perfil o app tambem permite:
-
-- importar arquivos `.txt`, `.csv`, `.xls` e `.xlsx`
-- transformar o conteudo em templates de treino do app
-- reconhecer colunas como `Treino`, `Exercicio`, `Carga`, `Repeticoes`, `Dia`, `Cor` e `Observacoes`
-- ignorar blocos vazios ou incompletos sem quebrar a importacao inteira
-- salvar os treinos importados sem apagar os que ja existem
-
-Observacoes:
-
-- essa importacao e aditiva, diferente da restauracao de backup
-- o parser aceita tanto planilhas tabulares quanto `.txt` estruturado por blocos
-- os dados passam por validacao antes de entrar no SQLite
-
-## Fluxos principais por tela
-
-### Login
-
-- entrar com Google quando houver internet e OAuth configurado
-- entrar com conta local por e-mail e senha
-- criar conta local com nome, e-mail, senha e codigo de recuperacao
-- redefinir senha com e-mail + codigo de recuperacao
-
-### Dashboard
-
-- visualizar cards de resumo clicaveis para `Treinos` e `Historico`
-- pesquisar treinos por nome, foco ou anotacoes
-- abrir treino, iniciar execucao ou duplicar template
-- consultar recordes pessoais e exercicios recentes com navegação para evolucao
-
-### Treinos
-
-- criar novo treino com nome, dia sugerido, cor e exercicios
-- editar templates existentes
-- duplicar treino para criar variacoes rapidas
-- filtrar a lista por busca textual e por data usando calendario
-- abrir detalhe do treino e iniciar execucao
-
-### Execucao do treino
-
-- registrar series com carga, repeticoes e anotacoes
-- salvar apenas series validas no historico
-- exibir modal final com check visual e estatisticas da sessao
-- mostrar numero total de series, series por grupo muscular, maior e menor carga e maior e menor numero de repeticoes
-
-### Historico
-
-- pesquisar execucoes por treino, foco, exercicios e anotacoes
-- visualizar volume total, top load e lista de exercicios por sessao
-- excluir execucoes com confirmacao
-- abrir a evolucao de um exercicio tocando nos chips do historico
-
-### Perfil
-
-- exportar backup manual
-- restaurar backup da mesma conta autenticada
-- importar treinos externos de `.txt` ou planilha
-- atualizar dados locais e encerrar sessao
-
-Regras de seguranca do backup:
-
-- o arquivo importado passa por validacao estrutural com `zod`
-- backups maiores que 5 MB sao bloqueados
-- a restauracao recusa backup de outra conta
-- o arquivo temporario em cache e apagado apos exportar/importar
-
-## Scripts uteis
-
-```bash
-npm run verify
-npm run lint
-npm run lint:fix
-npm run typecheck
-npm run release:check
-npm run apk:debug
-npm run apk:release
-```
+- backup manual JSON
+- restauração do backup da mesma conta
+- importação de `.txt`, `.csv`, `.xls` e `.xlsx`
+- atualização manual dos dados
+- logout
 
 ## Modelo de dados
 
-SQLite local com as tabelas:
+### Local no app
 
 - `users`
 - `metadata`
@@ -301,117 +217,97 @@ SQLite local com as tabelas:
 - `workout_exercises`
 - `workout_sessions`
 - `session_sets`
+- `sync_queue`
 
-O historico guarda snapshots de nome de treino e exercicio para preservar os registros mesmo que o template seja alterado ou removido.
+### Cloud no Firestore
 
-## Seguranca aplicada
+- `users/{uid}`
+- `users/{uid}/workouts/{workoutId}`
+- `users/{uid}/sessions/{sessionId}`
 
-- Sessao salva com `react-native-keychain`
-- Sem AsyncStorage para informacao sensivel
-- Sem persistencia de tokens Google em texto puro
-- Conta local protegida com Keychain/Keystore e `accessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY`
-- Senha local derivada com `PBKDF2-SHA256`
-- Codigo de recuperacao salvo apenas em formato derivado e nunca em texto puro
-- Queries SQLite parametrizadas
-- `.env` separado de variaveis de assinatura
-- `allowBackup=false` no AndroidManifest
-- `usesCleartextTraffic=true` apenas no build debug e `false` no release
-- Proguard habilitado no release
-- `assembleRelease` bloqueado sem keystore real configurada
-- `build_config_package` protegido no Proguard para `react-native-config`
-- Telas autenticadas protegidas pela raiz de navegacao
-- Importacao externa validada antes de persistir no banco local
-- Backup validado, limitado por tamanho e restrito a mesma conta autenticada
+## Segurança aplicada
+
+- Firebase Auth para identidade compartilhada
+- regras do Firestore com escopo por `request.auth.uid`
+- sem AsyncStorage para sessão sensível
+- `google-services.json` e `web/.env` fora do Git
+- queries SQLite parametrizadas
+- tela autenticada protegida pela raiz de navegação
+- fila local de sincronização para não depender da rede no momento do registro
+- validação estrutural dos documentos remotos antes de gravar no SQLite
+- release Android continua exigindo keystore fora do repositório
 
 ## Riscos residuais
 
-- O login Google depende da configuracao correta de OAuth no Google Cloud
-- O build release ainda depende da guarda segura da keystore e das passwords fora do repositorio
-- Algumas dependencias Android exibem warnings de APIs deprecated do ecossistema, mas o build debug validado passou
-- O fluxo offline atual e local-only; sincronizacao com backend ficou preparada apenas estruturalmente
-- O backup e manual; ainda nao existe sincronizacao automatica ou criptografia ponta a ponta para exportacao
-- A conta local por e-mail e senha e deste aparelho; o backup atual exporta treinos e historico, nao as credenciais locais
+- o app Android ainda não pode ser compilado neste workspace sem um `google-services.json` real
+- o painel web depende de `web/.env` com as chaves do app Web do Firebase
+- a build web está funcional, mas o bundle ficou acima do aviso padrão de 500 kB do Vite
+- a sincronização atual é “pull no bootstrap/refresh e push por fila”; não há listener em tempo real no app mobile
+- regras do Firestore precisam ser publicadas antes de usar contas reais
 
-## Fluxo do app
+## Fluxograma atualizado
 
 ```mermaid
 flowchart TD
     A[Inicializacao do app] --> B[Bootstrap do SQLite]
-    B --> C[Leitura da sessao segura no Keychain ou Keystore]
-    C --> D{Sessao restaurada?}
-    D -- Sim --> E[Carregar dashboard, treinos e historico locais]
-    D -- Nao --> F[Tela de login]
+    B --> C[Restaurar sessao pelo Firebase Auth]
+    C --> D{Sessao encontrada?}
+    D -- Nao --> E[Tela de login]
+    D -- Sim --> F[Migrar dados locais antigos pelo e-mail]
+    F --> G[Sincronizar fila local com Firestore]
+    G --> H[Baixar snapshot remoto]
+    H --> I[Atualizar cache SQLite]
+    I --> J[Dashboard mobile]
 
-    F --> G{Metodo de entrada}
-    G --> H[Entrar com Google]
-    G --> I[Entrar com conta local]
-    G --> J[Criar conta local]
-    G --> K[Esqueci a senha]
-
-    H --> L[Validar OAuth Android]
-    L --> M[Persistir sessao segura]
-    I --> N[Validar email e senha locais]
-    J --> O[Salvar credenciais locais seguras e criar usuario]
-    K --> P[Validar codigo de recuperacao e redefinir senha]
-    N --> M
-    O --> M
+    E --> K{Metodo de entrada}
+    K --> L[Google]
+    K --> M[E-mail e senha]
+    K --> N[Criar conta]
+    K --> O[Esqueci a senha]
+    L --> P[Firebase Auth]
+    M --> P
+    N --> P
+    O --> Q[Enviar e-mail de redefinicao]
     P --> F
 
-    E --> Q[Dashboard]
-    M --> Q
+    J --> R[Treinos]
+    J --> S[Historico]
+    J --> T[Perfil]
+    R --> U[Criar ou editar treino]
+    U --> V[Salvar no SQLite e na sync_queue]
+    V --> G
+    R --> W[Executar treino]
+    W --> X[Salvar sessao local]
+    X --> Y[Mostrar resumo final]
+    Y --> S
+    T --> Z[Backup, importacao, refresh e logout]
 
-    Q --> R[Pesquisar treino]
-    Q --> S[Abrir Treinos]
-    Q --> T[Abrir Historico]
-    Q --> U[Abrir Perfil]
-    Q --> V[Abrir progresso de exercicio]
-
-    S --> W[Criar ou editar treino]
-    W --> X[Salvar template no SQLite]
-    S --> Y[Filtrar por data]
-    S --> Z[Duplicar treino]
-    S --> AA[Detalhe do treino]
-    Z --> AA
-    X --> AA
-
-    AA --> AB[Iniciar execucao]
-    AB --> AC[Registrar series, cargas, repeticoes e notas]
-    AC --> AD[Salvar sessao e series validas]
-    AD --> AE[Atualizar dashboard e historico]
-    AE --> AF[Mostrar check e estatisticas finais]
-    AF --> T
-
-    T --> AG[Buscar execucoes]
-    T --> AH[Excluir execucao com confirmacao]
-    T --> AI[Abrir evolucao do exercicio]
-
-    U --> AJ[Exportar backup]
-    U --> AK[Importar backup da mesma conta]
-    U --> AL[Importar treino externo txt csv xls xlsx]
-    U --> AM[Atualizar dados]
-    U --> AN[Logout]
-    AN --> AO[Limpar sessao segura]
-    AO --> F
+    AA[Painel web React] --> AB[Firebase Auth web]
+    AB --> AC[Listar treinos do usuario]
+    AC --> AD[Criar ou editar treino]
+    AD --> AE[Salvar no Firestore]
+    AE --> H
 ```
 
-Resumo do fluxo:
+Resumo curto:
 
-- o app inicia, carrega SQLite e tenta restaurar a sessao segura
-- sem sessao, o usuario pode entrar com Google, entrar com conta local, criar conta local ou redefinir senha
-- com sessao valida, o app abre dashboard, treinos, historico e perfil usando os dados locais
-- os templates alimentam a execucao e cada treino salvo gera historico, progresso por exercicio e um resumo final com estatisticas
-- o perfil concentra backup, restauracao, importacao de treino externo, atualizacao manual e logout
-- o logout limpa apenas a sessao, mantendo os dados locais da conta ja registrada
+- o login do app e do site agora é o mesmo
+- o site grava treinos direto no Firestore por usuário
+- o app continua usando SQLite para velocidade e offline
+- a fila `sync_queue` garante que edições offline do mobile possam subir depois
+- o snapshot remoto vira a base de sincronização do cache local
 
-## Validacao executada neste workspace
+## Validação executada neste workspace
 
 - `npm run typecheck`
 - `npm run lint`
-- `npm run verify`
-- `npm run apk:debug`
+- `npm run web:lint`
+- `npm run web:build`
+- `npm run firebase:doctor`
 
-APK debug validado em:
+Status atual do doctor neste workspace:
 
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
+- `web/.env` ainda ausente
+- `android/app/google-services.json` ainda ausente
+
+Esses dois itens são o bloqueio real para testar a conta Firebase de ponta a ponta aqui.

@@ -1,10 +1,12 @@
 import {Platform} from 'react-native';
 import Config from 'react-native-config';
+import auth, {type FirebaseAuthTypes} from '@react-native-firebase/auth';
 import {
   GoogleSignin,
   isErrorWithCode,
 } from '@react-native-google-signin/google-signin';
 
+import {getFirebaseAuth, initializeFirebaseServices} from '@/features/firebase/firebaseClient';
 import type {AuthProvider, SessionUser} from '@/types/domain';
 
 const googleWebClientId = Config.LOGGYM_GOOGLE_WEB_CLIENT_ID?.trim();
@@ -17,16 +19,10 @@ const configureGoogleSignin = () => {
     return;
   }
 
-  // The current app only needs basic profile data on Android.
-  // Avoid passing a web client ID here unless we actually need idToken / offlineAccess.
-  const shouldAttachWebClientId = Platform.OS !== 'android';
-
   GoogleSignin.configure({
-    webClientId:
-      shouldAttachWebClientId && googleWebClientId
-        ? googleWebClientId
-        : undefined,
-    iosClientId: googleIosClientId || undefined,
+    webClientId: googleWebClientId || undefined,
+    iosClientId:
+      Platform.OS === 'ios' ? googleIosClientId || undefined : undefined,
     offlineAccess: false,
     scopes: ['email', 'profile'],
     profileImageSize: 160,
@@ -35,91 +31,244 @@ const configureGoogleSignin = () => {
   googleConfigured = true;
 };
 
-const mapGoogleUser = (
-  user: {
-    id: string;
-    name: string | null;
-    email: string;
-    photo: string | null;
-    familyName: string | null;
-    givenName: string | null;
-  },
-  provider: AuthProvider,
-): SessionUser => ({
-  id: user.id,
-  name: user.name ?? user.email.split('@')[0] ?? 'Atleta',
-  email: user.email,
-  photo: user.photo,
-  familyName: user.familyName,
-  givenName: user.givenName,
-  provider,
-  lastLoginAt: new Date().toISOString(),
-});
+const getProviderFromFirebaseUser = (user: FirebaseAuthTypes.User): AuthProvider => {
+  const providerIds = user.providerData
+    .map(provider => provider.providerId)
+    .filter(Boolean);
 
-export const getAuthCapabilities = () => ({
-  isGoogleConfigured:
-    Platform.OS === 'android'
-      ? true
-      : Boolean(googleWebClientId || googleIosClientId),
-  hasWebClientId: Boolean(googleWebClientId),
-  allowDevLogin: __DEV__ && Config.LOGGYM_ENABLE_DEV_LOGIN !== 'false',
-});
+  if (providerIds.includes('google.com')) {
+    return 'google';
+  }
 
-const mapGoogleError = (error: unknown) => {
+  if (providerIds.includes('password')) {
+    return 'password';
+  }
+
+  return 'password';
+};
+
+const toIsoDate = (value?: string | null) => {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  const timestamp = new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return timestamp.toISOString();
+};
+
+const mapFirebaseUser = (user: FirebaseAuthTypes.User): SessionUser => {
+  const name =
+    user.displayName?.trim() ||
+    user.email?.split('@')[0]?.trim() ||
+    'Atleta';
+
+  if (!user.email) {
+    throw new Error(
+      'Nao foi possivel identificar o e-mail desta conta. Tente outro metodo de entrada.',
+    );
+  }
+
+  return {
+    id: user.uid,
+    name,
+    email: user.email.trim().toLowerCase(),
+    photo: user.photoURL,
+    givenName: user.displayName?.trim().split(/\s+/)[0] ?? null,
+    familyName:
+      user.displayName?.trim().split(/\s+/).slice(1).join(' ').trim() || null,
+    provider: getProviderFromFirebaseUser(user),
+    lastLoginAt: toIsoDate(user.metadata.lastSignInTime),
+  };
+};
+
+const extractErrorCode = (error: unknown) => {
+  if (typeof error === 'object' && error && 'code' in error) {
+    return String((error as {code?: unknown}).code ?? '');
+  }
+
+  return '';
+};
+
+const mapAuthError = (error: unknown, fallbackMessage: string) => {
   if (isErrorWithCode(error)) {
     const code = String(error.code ?? '');
-    const message = error.message ?? '';
-    const loweredMessage = message.toLowerCase();
 
-    if (code === '10' || message.includes('DEVELOPER_ERROR')) {
+    if (
+      code === '10' ||
+      code === 'DEVELOPER_ERROR' ||
+      error.message?.includes('DEVELOPER_ERROR')
+    ) {
       return new Error(
-        'Nao foi possivel concluir a entrada com Google neste aparelho. Tente novamente em instantes.',
+        'O login Google ainda nao foi liberado para esta build. Revise o SHA-1 e o arquivo google-services.json.',
       );
     }
 
-    if (loweredMessage.includes('cancel')) {
-      return new Error('Login com Google cancelado.');
+    if (code.toLowerCase().includes('cancel')) {
+      return new Error('Operacao cancelada.');
     }
+  }
+
+  const code = extractErrorCode(error);
+
+  switch (code) {
+    case 'auth/invalid-email':
+      return new Error('Use um e-mail valido.');
+    case 'auth/email-already-in-use':
+      return new Error('Ja existe uma conta cadastrada com esse e-mail.');
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return new Error('E-mail ou senha invalidos.');
+    case 'auth/weak-password':
+      return new Error('Escolha uma senha mais forte para continuar.');
+    case 'auth/network-request-failed':
+      return new Error('Sem conexao com a internet para concluir essa etapa.');
+    case 'auth/too-many-requests':
+      return new Error('Muitas tentativas seguidas. Aguarde um pouco e tente de novo.');
+    case 'auth/user-disabled':
+      return new Error('Esta conta foi desativada.');
+    case 'auth/operation-not-allowed':
+      return new Error(
+        'Esse metodo de entrada ainda nao foi habilitado no Firebase.',
+      );
+    default:
+      break;
   }
 
   if (error instanceof Error) {
-    if (error.message.toLowerCase().includes('cancel')) {
-      return new Error('Login com Google cancelado.');
+    const lowered = error.message.toLowerCase();
+
+    if (lowered.includes('cancel')) {
+      return new Error('Operacao cancelada.');
     }
   }
 
-  return new Error('Nao foi possivel entrar com Google agora.');
+  return new Error(fallbackMessage);
+};
+
+export const getAuthCapabilities = () => ({
+  isGoogleConfigured: Boolean(googleWebClientId),
+  hasWebClientId: Boolean(googleWebClientId),
+  allowDevLogin: __DEV__ && Config.LOGGYM_ENABLE_DEV_LOGIN === 'true',
+});
+
+export const restoreFirebaseSession = async () => {
+  initializeFirebaseServices();
+  const firebaseAuth = getFirebaseAuth();
+
+  if (firebaseAuth.currentUser) {
+    return mapFirebaseUser(firebaseAuth.currentUser);
+  }
+
+  const restoredUser = await new Promise<FirebaseAuthTypes.User | null>(
+    resolve => {
+      let unsubscribe: (() => void) | undefined;
+
+      unsubscribe = firebaseAuth.onAuthStateChanged(user => {
+        unsubscribe?.();
+        resolve(user);
+      });
+    },
+  );
+
+  return restoredUser ? mapFirebaseUser(restoredUser) : null;
 };
 
 export const signInWithGoogleAccount = async () => {
   try {
+    initializeFirebaseServices();
     configureGoogleSignin();
+
+    if (!googleWebClientId) {
+      throw new Error(
+        'O cliente web do Google nao foi configurado para esta build.',
+      );
+    }
+
     await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
 
     const response = await GoogleSignin.signIn();
 
-    if (response.type !== 'success') {
+    if (response.type !== 'success' || !response.data.idToken) {
       throw new Error('Login com Google cancelado.');
     }
 
-    return mapGoogleUser(response.data.user, 'google');
+    const credential = auth.GoogleAuthProvider.credential(response.data.idToken);
+    const userCredential = await getFirebaseAuth().signInWithCredential(credential);
+
+    return mapFirebaseUser(userCredential.user);
   } catch (error) {
-    throw mapGoogleError(error);
+    throw mapAuthError(error, 'Nao foi possivel entrar com Google agora.');
   }
 };
 
-export const trySilentGoogleSession = async () => {
+export const signInWithEmailAccount = async ({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}) => {
   try {
-    configureGoogleSignin();
-    const response = await GoogleSignin.signInSilently();
+    initializeFirebaseServices();
 
-    if (response.type !== 'success') {
-      return null;
-    }
+    const userCredential = await getFirebaseAuth().signInWithEmailAndPassword(
+      email.trim(),
+      password,
+    );
 
-    return mapGoogleUser(response.data.user, 'google');
-  } catch {
-    return null;
+    return mapFirebaseUser(userCredential.user);
+  } catch (error) {
+    throw mapAuthError(error, 'Nao foi possivel entrar com e-mail e senha.');
+  }
+};
+
+export const signUpWithEmailAccount = async ({
+  name,
+  email,
+  password,
+}: {
+  name: string;
+  email: string;
+  password: string;
+}) => {
+  try {
+    initializeFirebaseServices();
+
+    const userCredential = await getFirebaseAuth().createUserWithEmailAndPassword(
+      email.trim(),
+      password,
+    );
+
+    await userCredential.user.updateProfile({
+      displayName: name.trim(),
+    });
+
+    await getFirebaseAuth().signOut();
+
+    return {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+    };
+  } catch (error) {
+    throw mapAuthError(error, 'Nao foi possivel criar sua conta agora.');
+  }
+};
+
+export const sendPasswordResetForEmail = async (email: string) => {
+  try {
+    initializeFirebaseServices();
+    await getFirebaseAuth().sendPasswordResetEmail(email.trim().toLowerCase());
+  } catch (error) {
+    throw mapAuthError(
+      error,
+      'Nao foi possivel enviar o e-mail de redefinicao agora.',
+    );
   }
 };
 
@@ -143,14 +292,16 @@ export const signInWithDevelopmentAccount = async () => {
 };
 
 export const signOutFromProvider = async (provider: AuthProvider) => {
-  if (provider !== 'google') {
-    return;
+  initializeFirebaseServices();
+
+  if (provider === 'google') {
+    try {
+      configureGoogleSignin();
+      await GoogleSignin.signOut();
+    } catch {
+      // O logout local do Firebase continua suficiente para invalidar a sessao do app.
+    }
   }
 
-  try {
-    configureGoogleSignin();
-    await GoogleSignin.signOut();
-  } catch {
-    // Logout local ja atende o requisito de sessao; falha remota nao deve bloquear o app.
-  }
+  await getFirebaseAuth().signOut();
 };
