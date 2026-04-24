@@ -20,3 +20,47 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Reanimated 4.3.0 on RN 0.85 can reach the app CMake configure step before
+// its Prefab package is materialized for the current variant. When that
+// happens, app configure tasks fail trying to read
+// node_modules/react-native-reanimated/android/build/intermediates/prefab_package/... .
+// Force the app's native JSON/configure phase to wait for Reanimated's
+// variant-specific prefab package publication.
+gradle.projectsEvaluated {
+    def appProject = findProject(":app")
+    def reanimatedProject = findProject(":react-native-reanimated")
+    def gestureHandlerProject = findProject(":react-native-gesture-handler")
+
+    if (appProject == null || reanimatedProject == null) {
+        return
+    }
+
+    def debugPrefabTask = reanimatedProject.tasks.findByName("prefabDebugPackage")
+    def releasePrefabTask = reanimatedProject.tasks.findByName("prefabReleasePackage")
+
+    appProject.tasks.configureEach { task ->
+        if (!(task.name.startsWith("configureCMake") || task.name.startsWith("generateJsonModel"))) {
+            return
+        }
+
+        if (debugPrefabTask != null && task.name.contains("Debug")) {
+            task.dependsOn(debugPrefabTask)
+        }
+
+        if (releasePrefabTask != null && (task.name.contains("Release") || task.name.contains("RelWithDebInfo"))) {
+            task.dependsOn(releasePrefabTask)
+        }
+    }
+
+    if (gestureHandlerProject != null) {
+        ["compileDebugKotlin", "compileReleaseKotlin"].each { taskName ->
+            def kotlinTask = gestureHandlerProject.tasks.findByName(taskName)
+            if (kotlinTask != null) {
+                kotlinTask.doFirst {
+                    delete(new File(gestureHandlerProject.buildDir, "kotlin/${taskName}"))
+                }
+            }
+        }
+    }
+}

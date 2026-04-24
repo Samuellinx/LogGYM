@@ -10,6 +10,10 @@ import type {
   WorkoutInput,
   WorkoutSummary,
 } from '@/types/domain';
+import {
+  trainingSessionInputSchema,
+  workoutInputSchema,
+} from '@/features/workouts/workout.schemas';
 import type {
   FirebaseWorkoutDocument,
   FirebaseWorkoutExerciseDocument,
@@ -141,6 +145,8 @@ type NamedSessionRow = {workout_name: string};
 
 const legacySeedWorkoutNames = ['Lower Power', 'Pull Volume', 'Upper Strength'];
 const legacySeedSessionNames = ['Lower Power', 'Upper Strength'];
+const MAX_IMPORTED_WORKOUTS = 100;
+const MAX_IMPORTED_EXERCISES = 1200;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -917,6 +923,7 @@ export const saveWorkout = async (
   input: WorkoutInput,
   workoutId?: string,
 ) => {
+  const validatedInput = workoutInputSchema.parse(input);
   const db = getDatabase();
   const now = new Date().toISOString();
   const resolvedWorkoutId = workoutId ?? createId();
@@ -928,11 +935,11 @@ export const saveWorkout = async (
         SET name = ?, focus = ?, notes = ?, accent_color = ?, scheduled_day = ?, updated_at = ?
         WHERE id = ? AND user_id = ?;`,
         [
-          input.name,
-          input.focus,
-          input.notes,
-          input.accentColor,
-          input.scheduledDay ?? null,
+          validatedInput.name,
+          validatedInput.focus,
+          validatedInput.notes,
+          validatedInput.accentColor,
+          validatedInput.scheduledDay ?? null,
           now,
           workoutId,
           userId,
@@ -951,18 +958,18 @@ export const saveWorkout = async (
         [
           resolvedWorkoutId,
           userId,
-          input.name,
-          input.focus,
-          input.notes,
-          input.accentColor,
-          input.scheduledDay ?? null,
+          validatedInput.name,
+          validatedInput.focus,
+          validatedInput.notes,
+          validatedInput.accentColor,
+          validatedInput.scheduledDay ?? null,
           now,
           now,
         ],
       );
     }
 
-    for (const [index, exercise] of input.exercises.entries()) {
+    for (const [index, exercise] of validatedInput.exercises.entries()) {
       await tx.executeAsync(
         `INSERT INTO workout_exercises (
           id, workout_id, name, muscle_group, base_load, target_reps, note, order_index, created_at, updated_at
@@ -1006,11 +1013,29 @@ export const importWorkouts = async (
     throw new Error('Nenhum treino valido foi encontrado para importar.');
   }
 
+  const validatedInputs = inputs.map(input => workoutInputSchema.parse(input));
+  const totalExercises = validatedInputs.reduce(
+    (sum, workout) => sum + workout.exercises.length,
+    0,
+  );
+
+  if (validatedInputs.length > MAX_IMPORTED_WORKOUTS) {
+    throw new Error(
+      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importacao.`,
+    );
+  }
+
+  if (totalExercises > MAX_IMPORTED_EXERCISES) {
+    throw new Error(
+      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercicios por importacao.`,
+    );
+  }
+
   const db = getDatabase();
   const importedWorkoutIds: string[] = [];
 
   await db.transaction(async tx => {
-    for (const input of inputs) {
+    for (const input of validatedInputs) {
       const now = new Date().toISOString();
       const importedWorkoutId = createId();
       importedWorkoutIds.push(importedWorkoutId);
@@ -1118,8 +1143,9 @@ export const saveTrainingSession = async (
   userId: string,
   input: TrainingSessionInput,
 ) => {
+  const validatedInput = trainingSessionInputSchema.parse(input);
   const db = getDatabase();
-  const validExercises = input.exercises
+  const validExercises = validatedInput.exercises
     .map(exercise => ({
       ...exercise,
       sets: exercise.sets.filter(set => set.load > 0 && set.reps > 0),
@@ -1141,11 +1167,11 @@ export const saveTrainingSession = async (
       [
         sessionId,
         userId,
-        input.workoutId,
-        input.workoutName,
-        input.focus,
-        input.performedAt,
-        input.overallNotes,
+        validatedInput.workoutId,
+        validatedInput.workoutName,
+        validatedInput.focus,
+        validatedInput.performedAt,
+        validatedInput.overallNotes,
         0,
         createdAt,
       ],
@@ -1169,7 +1195,7 @@ export const saveTrainingSession = async (
             set.load,
             set.reps,
             set.note,
-            input.performedAt,
+            validatedInput.performedAt,
             createdAt,
           ],
         );

@@ -25,6 +25,9 @@ const envSchema = z.object({
 });
 
 const env = envSchema.parse(import.meta.env);
+const isLocalRuntimeHost =
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const app = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY,
@@ -44,7 +47,7 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-if (env.VITE_FIREBASE_USE_EMULATORS === 'true') {
+if (env.VITE_FIREBASE_USE_EMULATORS === 'true' && isLocalRuntimeHost) {
   if (env.VITE_FIREBASE_AUTH_EMULATOR_URL) {
     connectAuthEmulator(firebaseAuth, env.VITE_FIREBASE_AUTH_EMULATOR_URL, {
       disableWarnings: true,

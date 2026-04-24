@@ -1,25 +1,57 @@
-import {
-  errorCodes,
-  isErrorWithCode,
-  keepLocalCopy,
-  pick,
-} from '@react-native-documents/picker';
-import {FileSystem} from 'react-native-file-access';
+import type {User} from 'firebase/auth';
 import {read, utils} from 'xlsx';
+import {z} from 'zod';
 
-import {workoutInputSchema} from '@/features/workouts/workout.schemas';
-import {importWorkouts} from '@/features/workouts/workoutRepository';
-import type {SessionUser, WorkoutInput} from '@/types/domain';
-import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
+import type {WorkoutDocument} from '../types';
+import {importWorkoutsForUser} from './workouts';
 
-const TRAINING_IMPORT_TYPES = [
-  'text/plain',
-  'text/csv',
-  'text/comma-separated-values',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+const weekdayOptions = [
+  'Segunda',
+  'Terca',
+  'Quarta',
+  'Quinta',
+  'Sexta',
+  'Sabado',
+  'Domingo',
 ];
-const MAX_IMPORT_SIZE_BYTES = 10 * 1024 * 1024;
+
+const accentSpectrum = [
+  '#FF3B30',
+  '#FF9500',
+  '#FFD60A',
+  '#34C759',
+  '#0A84FF',
+  '#5856D6',
+  '#AF52DE',
+];
+
+const setTypeOptions = [
+  'Serie de aquecimento',
+  'Serie preparatoria',
+  'Serie de trabalho',
+];
+
+const workoutImportSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  focus: z.string().trim().min(1).max(30),
+  notes: z.string().trim().max(260),
+  accentColor: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/),
+  scheduledDay: z.string().trim().max(20).nullable(),
+  exercises: z
+    .array(
+      z.object({
+        name: z.string().trim().min(2).max(60),
+        muscleGroup: z.string().trim().min(1).max(40),
+        baseLoad: z.string().trim().max(60),
+        targetReps: z.string().trim().min(1).max(20),
+        note: z.string().trim().max(220),
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+
+const TRAINING_IMPORT_SIZE_BYTES = 10 * 1024 * 1024;
 const TRAINING_IMPORT_FILE_EXTENSION = /\.(txt|csv|xls|xlsx)$/iu;
 const MAX_IMPORT_SHEETS = 12;
 const MAX_IMPORT_ROWS_PER_SHEET = 2000;
@@ -70,21 +102,8 @@ export interface TrainingImportResult {
 }
 
 const fieldAliases: Record<CanonicalField, string[]> = {
-  workoutName: [
-    'treino',
-    'nomedotreino',
-    'nomeficha',
-    'workout',
-    'template',
-    'ficha',
-  ],
-  focus: [
-    'foco',
-    'divisao',
-    'agrupamento',
-    'agrupamentomuscular',
-    'grupo',
-  ],
+  workoutName: ['treino', 'nomedotreino', 'nomeficha', 'workout', 'template', 'ficha'],
+  focus: ['foco', 'divisao', 'agrupamento', 'agrupamentomuscular', 'grupo'],
   scheduledDay: ['dia', 'diasugerido', 'diadotreino', 'diasemana', 'weekday'],
   accentColor: ['cor', 'cordestaque', 'accentcolor', 'color'],
   notes: [
@@ -96,13 +115,7 @@ const fieldAliases: Record<CanonicalField, string[]> = {
     'anotacoesgerais',
     'notes',
   ],
-  exerciseName: [
-    'exercicio',
-    'nomeexercicio',
-    'movimento',
-    'exercise',
-    'exercicio1',
-  ],
+  exerciseName: ['exercicio', 'nomeexercicio', 'movimento', 'exercise', 'exercicio1'],
   baseLoad: ['carga', 'peso', 'cargabase', 'cargainicial', 'baseload'],
   targetReps: [
     'repeticoes',
@@ -120,7 +133,7 @@ const fieldAliases: Record<CanonicalField, string[]> = {
     'notaexercicio',
     'anotacoes',
   ],
-  muscleGroup: ['tipodeserie', 'serie', 'categoriadeserie', 'series'],
+  muscleGroup: ['tipodeserie', 'serie', 'categoriadeserie', 'series', 'grupomuscular'],
 };
 
 const weekdayAliasMap: Record<string, string> = {
@@ -192,14 +205,15 @@ const cleanText = (value: unknown) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const clampText = (value: string, maxLength: number) =>
-  cleanText(value).slice(0, maxLength);
+const clampText = (value: string, maxLength: number) => cleanText(value).slice(0, maxLength);
 
-const decodeFileUriToPath = (uri: string) =>
-  decodeURIComponent(uri.replace(/^file:\/\//, ''));
+const stripExtension = (fileName: string) => fileName.replace(/\.[^.]+$/u, '').trim() || 'Treino importado';
 
-const isUserCancellation = (error: unknown) =>
-  isErrorWithCode(error) && error.code === errorCodes.OPERATION_CANCELED;
+const humanizeLabel = (value: string) =>
+  cleanText(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const resolveField = (label: string): CanonicalField | null => {
   const normalized = normalizeKey(cleanText(label));
@@ -208,9 +222,7 @@ const resolveField = (label: string): CanonicalField | null => {
     return null;
   }
 
-  for (const [field, aliases] of Object.entries(fieldAliases) as Array<
-    [CanonicalField, string[]]
-  >) {
+  for (const [field, aliases] of Object.entries(fieldAliases) as Array<[CanonicalField, string[]]>) {
     if (aliases.includes(normalized)) {
       return field;
     }
@@ -219,14 +231,23 @@ const resolveField = (label: string): CanonicalField | null => {
   return null;
 };
 
-const stripExtension = (fileName: string) =>
-  fileName.replace(/\.[^.]+$/u, '').trim() || 'Treino importado';
+const appendText = (current: string | undefined, incoming: string) => {
+  const next = cleanText(incoming);
 
-const humanizeLabel = (value: string) =>
-  cleanText(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  if (!next) {
+    return current;
+  }
+
+  if (!current) {
+    return next;
+  }
+
+  if (normalizeKey(current) === normalizeKey(next)) {
+    return current;
+  }
+
+  return `${current} ${next}`.trim();
+};
 
 const normalizeRows = (rows: Array<Array<unknown>>) =>
   rows
@@ -251,15 +272,10 @@ const assertImportRowsWithinLimits = (rows: string[][], label: string) => {
 
 const findHeaderRowIndex = (rows: string[][]) => {
   for (const [index, row] of rows.entries()) {
-    const resolved = row
-      .map(cell => resolveField(cell))
-      .filter((field): field is CanonicalField => field !== null);
+    const resolved = row.map(cell => resolveField(cell)).filter((field): field is CanonicalField => field !== null);
     const unique = new Set(resolved);
 
-    if (
-      unique.size >= 2 &&
-      (unique.has('exerciseName') || unique.has('workoutName'))
-    ) {
+    if (unique.size >= 2 && (unique.has('exerciseName') || unique.has('workoutName'))) {
       return index;
     }
 
@@ -271,26 +287,7 @@ const findHeaderRowIndex = (rows: string[][]) => {
   return -1;
 };
 
-const appendText = (current: string | undefined, incoming: string) => {
-  const next = cleanText(incoming);
-
-  if (!next) {
-    return current;
-  }
-
-  if (!current) {
-    return next;
-  }
-
-  if (normalizeKey(current) === normalizeKey(next)) {
-    return current;
-  }
-
-  return `${current} ${next}`.trim();
-};
-
-const buildHeaderMap = (headerRow: string[]) =>
-  headerRow.map(cell => resolveField(cell));
+const buildHeaderMap = (headerRow: string[]) => headerRow.map(cell => resolveField(cell));
 
 const mapRowByHeader = (row: string[], headerMap: Array<CanonicalField | null>) => {
   const mapped: MappedRow = {};
@@ -496,10 +493,7 @@ const parseDelimitedLine = (line: string, delimiter: string) => {
 };
 
 const parseTableText = (text: string, fallbackName: string) => {
-  const lines = text
-    .split(/\r?\n/u)
-    .map(line => line.trim())
-    .filter(Boolean);
+  const lines = text.split(/\r?\n/u).map(line => line.trim()).filter(Boolean);
 
   if (lines.length === 0) {
     return [];
@@ -512,7 +506,6 @@ const parseTableText = (text: string, fallbackName: string) => {
   }
 
   const rows = lines.map(line => parseDelimitedLine(line, delimiter));
-
   return parseTableWorkouts(rows, fallbackName);
 };
 
@@ -755,49 +748,17 @@ const inferFocusFromName = (name: string) => {
     return 'Treino';
   }
 
-  if (normalized.includes('peito')) {
-    return 'Peito';
-  }
-
-  if (normalized.includes('costa')) {
-    return 'Costas';
-  }
-
-  if (normalized.includes('ombro')) {
-    return 'Ombro';
-  }
-
-  if (normalized.includes('perna') || normalized.includes('legs')) {
-    return 'Pernas';
-  }
-
-  if (normalized.includes('braco') || normalized.includes('biceps')) {
-    return 'Bracos';
-  }
-
-  if (normalized.includes('triceps')) {
-    return 'Triceps';
-  }
-
-  if (normalized.includes('gluteo')) {
-    return 'Gluteos';
-  }
-
-  if (normalized.includes('push')) {
-    return 'Push';
-  }
-
-  if (normalized.includes('pull')) {
-    return 'Pull';
-  }
-
-  if (normalized.includes('upper')) {
-    return 'Upper';
-  }
-
-  if (normalized.includes('lower')) {
-    return 'Lower';
-  }
+  if (normalized.includes('peito')) return 'Peito';
+  if (normalized.includes('costa')) return 'Costas';
+  if (normalized.includes('ombro')) return 'Ombro';
+  if (normalized.includes('perna') || normalized.includes('legs')) return 'Pernas';
+  if (normalized.includes('braco') || normalized.includes('biceps')) return 'Bracos';
+  if (normalized.includes('triceps')) return 'Triceps';
+  if (normalized.includes('gluteo')) return 'Gluteos';
+  if (normalized.includes('push')) return 'Push';
+  if (normalized.includes('pull')) return 'Pull';
+  if (normalized.includes('upper')) return 'Upper';
+  if (normalized.includes('lower')) return 'Lower';
 
   return clampText(name, 30) || 'Treino';
 };
@@ -829,13 +790,7 @@ const resolveAccentColor = (value?: string) => {
     return cleanValue.toUpperCase();
   }
 
-  const mappedColor = colorAliasMap[normalizeKey(cleanValue)];
-
-  if (mappedColor) {
-    return mappedColor;
-  }
-
-  return DEFAULT_ACCENT_COLOR;
+  return colorAliasMap[normalizeKey(cleanValue)] ?? DEFAULT_ACCENT_COLOR;
 };
 
 const resolveSeriesType = (value?: string) => {
@@ -845,11 +800,7 @@ const resolveSeriesType = (value?: string) => {
     return DEFAULT_SERIES_TYPE;
   }
 
-  if (
-    normalized.includes('aquec') ||
-    normalized.includes('warmup') ||
-    normalized.includes('warm')
-  ) {
+  if (normalized.includes('aquec') || normalized.includes('warmup') || normalized.includes('warm')) {
     return setTypeOptions[0];
   }
 
@@ -860,7 +811,7 @@ const resolveSeriesType = (value?: string) => {
   return setTypeOptions[2];
 };
 
-const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => {
+const sanitizeWorkoutSeeds = (user: User, workouts: WorkoutSeed[], fallbackName: string) => {
   const consolidated = new Map<string, WorkoutSeed>();
 
   for (const workout of workouts) {
@@ -889,42 +840,49 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
   }
 
   let skippedWorkouts = 0;
-  const validWorkouts: WorkoutInput[] = [];
+  const validWorkouts: WorkoutDocument[] = [];
 
   for (const workout of consolidated.values()) {
     const exercises = workout.exercises
-      .map(exercise => ({
+      .map((exercise, index) => ({
+        id: crypto.randomUUID(),
         name: clampText(exercise.name, 60),
         muscleGroup: resolveSeriesType(exercise.muscleGroup),
         baseLoad: clampText(exercise.baseLoad ?? '', 60),
         targetReps: clampText(exercise.targetReps || DEFAULT_REPS_RANGE, 20),
         note: clampText(exercise.note ?? '', 220),
+        orderIndex: index,
       }))
       .filter(exercise => exercise.name.length >= 2)
       .slice(0, 12);
 
-    if (exercises.length === 0) {
-      skippedWorkouts += 1;
-      continue;
-    }
-
-    const candidate: WorkoutInput = {
+    const now = new Date().toISOString();
+    const candidate = workoutImportSchema.safeParse({
       name: clampText(workout.name || fallbackName, 60),
       focus: clampText(workout.focus || inferFocusFromName(workout.name), 30),
       notes: clampText(workout.notes ?? '', 260),
       accentColor: resolveAccentColor(workout.accentColor),
       scheduledDay: resolveScheduledDay(workout.scheduledDay),
       exercises,
-    };
+    });
 
-    const parsed = workoutInputSchema.safeParse(candidate);
-
-    if (!parsed.success) {
+    if (!candidate.success) {
       skippedWorkouts += 1;
       continue;
     }
 
-    validWorkouts.push(parsed.data);
+    validWorkouts.push({
+      id: crypto.randomUUID(),
+      userId: user.uid,
+      name: candidate.data.name,
+      focus: candidate.data.focus,
+      notes: candidate.data.notes,
+      accentColor: candidate.data.accentColor,
+      scheduledDay: candidate.data.scheduledDay,
+      exercises,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   if (validWorkouts.length === 0) {
@@ -933,7 +891,10 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
     );
   }
 
-  const totalExercises = validWorkouts.reduce((sum, workout) => sum + workout.exercises.length, 0);
+  const totalExercises = validWorkouts.reduce(
+    (sum, workout) => sum + workout.exercises.length,
+    0,
+  );
 
   if (validWorkouts.length > MAX_IMPORTED_WORKOUTS) {
     throw new Error(
@@ -954,8 +915,8 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
   };
 };
 
-const parseSpreadsheetWorkouts = (contents: string, fallbackName: string) => {
-  const workbook = read(contents, {type: 'base64'});
+const parseSpreadsheetWorkouts = (contents: ArrayBuffer, fallbackName: string) => {
+  const workbook = read(contents, {type: 'array'});
   const collected: WorkoutSeed[] = [];
   let totalRows = 0;
 
@@ -1016,81 +977,30 @@ const parseTextWorkouts = (contents: string, fallbackName: string) => {
   return parseStructuredText(normalized, fallbackName);
 };
 
-const readSelectedFile = async (localPath: string, fileName: string) => {
-  const isSpreadsheet = /\.(xls|xlsx)$/iu.test(fileName);
-
-  return FileSystem.readFile(localPath, isSpreadsheet ? 'base64' : 'utf8');
-};
-
-const selectTrainingImportFile = async () => {
-  const [pickedFile] = await pick({
-    mode: 'open',
-    requestLongTermAccess: false,
-    type: TRAINING_IMPORT_TYPES,
-    allowMultiSelection: false,
-  });
-
-  if (pickedFile.size && pickedFile.size > MAX_IMPORT_SIZE_BYTES) {
+export const importTrainingFileForCurrentUser = async (
+  user: User,
+  file: File,
+): Promise<TrainingImportResult> => {
+  if (file.size > TRAINING_IMPORT_SIZE_BYTES) {
     throw new Error('O arquivo excede o limite de 10 MB e nao pode ser importado.');
   }
 
-  if (!TRAINING_IMPORT_FILE_EXTENSION.test(pickedFile.name ?? '')) {
+  if (!TRAINING_IMPORT_FILE_EXTENSION.test(file.name)) {
     throw new Error('Use apenas arquivos .txt, .csv, .xls ou .xlsx para importar treinos.');
   }
 
-  const localCopyResponse = await keepLocalCopy({
-    destination: 'cachesDirectory',
-    files: [
-      {
-        uri: pickedFile.uri,
-        fileName: pickedFile.name ?? 'treino-importado.txt',
-      },
-    ],
-  });
+  const fallbackName = humanizeLabel(stripExtension(file.name));
+  const parsedWorkouts = /\.(xls|xlsx)$/iu.test(file.name)
+    ? parseSpreadsheetWorkouts(await file.arrayBuffer(), fallbackName)
+    : parseTextWorkouts(await file.text(), fallbackName);
+  const sanitized = sanitizeWorkoutSeeds(user, parsedWorkouts, fallbackName);
 
-  const localCopy = localCopyResponse[0];
-
-  if (localCopy.status !== 'success') {
-    throw new Error('Nao foi possivel preparar o arquivo selecionado para importacao.');
-  }
+  await importWorkoutsForUser(user, sanitized.workouts);
 
   return {
-    fileName: pickedFile.name ?? 'treino-importado.txt',
-    localPath: decodeFileUriToPath(localCopy.localUri),
+    fileName: file.name,
+    workouts: sanitized.workouts.length,
+    exercises: sanitized.exercises,
+    skippedWorkouts: sanitized.skippedWorkouts,
   };
-};
-
-export const importTrainingFileForCurrentUser = async (
-  user: SessionUser,
-): Promise<TrainingImportResult | null> => {
-  let selectedFile: Awaited<ReturnType<typeof selectTrainingImportFile>> | null = null;
-
-  try {
-    selectedFile = await selectTrainingImportFile();
-    const fallbackName = humanizeLabel(stripExtension(selectedFile.fileName));
-    const contents = await readSelectedFile(selectedFile.localPath, selectedFile.fileName);
-    const parsedWorkouts = /\.(xls|xlsx)$/iu.test(selectedFile.fileName)
-      ? parseSpreadsheetWorkouts(contents, fallbackName)
-      : parseTextWorkouts(contents, fallbackName);
-    const sanitized = sanitizeWorkoutSeeds(parsedWorkouts, fallbackName);
-
-    await importWorkouts(user.id, sanitized.workouts);
-
-    return {
-      fileName: selectedFile.fileName,
-      workouts: sanitized.workouts.length,
-      exercises: sanitized.exercises,
-      skippedWorkouts: sanitized.skippedWorkouts,
-    };
-  } catch (error) {
-    if (isUserCancellation(error)) {
-      return null;
-    }
-
-    throw error;
-  } finally {
-    if (selectedFile && (await FileSystem.exists(selectedFile.localPath))) {
-      await FileSystem.unlink(selectedFile.localPath);
-    }
-  }
 };

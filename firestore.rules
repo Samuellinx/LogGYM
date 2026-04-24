@@ -173,13 +173,17 @@ service cloud.firestore {
 
       match /workouts/{workoutId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isWorkoutDocument(request.resource.data, userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.id == workoutId
+          && isWorkoutDocument(request.resource.data, userId);
         allow delete: if isOwner(userId);
       }
 
       match /sessions/{sessionId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isWorkoutSessionDocument(request.resource.data, userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.id == sessionId
+          && isWorkoutSessionDocument(request.resource.data, userId);
         allow delete: if isOwner(userId);
       }
     }

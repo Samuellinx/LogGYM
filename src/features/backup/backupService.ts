@@ -10,6 +10,7 @@ const BACKUP_SCHEMA_VERSION = 1;
 const BACKUP_DIR = `${Dirs.CacheDir}/loggym-backups`;
 const BACKUP_MIME_TYPE = 'application/json';
 const MAX_BACKUP_SIZE_BYTES = 5 * 1024 * 1024;
+const BACKUP_FILE_EXTENSION = /\.json$/iu;
 
 type BackupWorkoutRow = {
   id: string;
@@ -101,9 +102,49 @@ const decodeFileUriToPath = (uri: string) => decodeURIComponent(uri.replace(/^fi
 const isUserCancellation = (error: unknown) =>
   isErrorWithCode(error) && error.code === errorCodes.OPERATION_CANCELED;
 
+const ensureUniqueIds = (ids: string[], message: string) => {
+  if (new Set(ids).size !== ids.length) {
+    throw new Error(message);
+  }
+};
+
 const validateBackupRelations = (payload: BackupFilePayload) => {
+  ensureUniqueIds(
+    payload.data.workouts.map(item => item.id),
+    'O backup esta inconsistente: IDs de treinos duplicados.',
+  );
+  ensureUniqueIds(
+    payload.data.workoutExercises.map(item => item.id),
+    'O backup esta inconsistente: IDs de exercicios duplicados.',
+  );
+  ensureUniqueIds(
+    payload.data.workoutSessions.map(item => item.id),
+    'O backup esta inconsistente: IDs de sessoes duplicados.',
+  );
+  ensureUniqueIds(
+    payload.data.sessionSets.map(item => item.id),
+    'O backup esta inconsistente: IDs de series duplicados.',
+  );
+
   const workoutIds = new Set(payload.data.workouts.map(item => item.id));
+  const workoutExerciseIds = new Set(payload.data.workoutExercises.map(item => item.id));
   const sessionIds = new Set(payload.data.workoutSessions.map(item => item.id));
+
+  if (payload.stats.workouts !== payload.data.workouts.length) {
+    throw new Error('O backup esta inconsistente: total de treinos invalido.');
+  }
+
+  if (payload.stats.workoutExercises !== payload.data.workoutExercises.length) {
+    throw new Error('O backup esta inconsistente: total de exercicios invalido.');
+  }
+
+  if (payload.stats.workoutSessions !== payload.data.workoutSessions.length) {
+    throw new Error('O backup esta inconsistente: total de sessoes invalido.');
+  }
+
+  if (payload.stats.sessionSets !== payload.data.sessionSets.length) {
+    throw new Error('O backup esta inconsistente: total de series invalido.');
+  }
 
   for (const exercise of payload.data.workoutExercises) {
     if (!workoutIds.has(exercise.workoutId)) {
@@ -111,9 +152,21 @@ const validateBackupRelations = (payload: BackupFilePayload) => {
     }
   }
 
+  for (const session of payload.data.workoutSessions) {
+    if (session.workoutId && !workoutIds.has(session.workoutId)) {
+      throw new Error('O backup esta inconsistente: sessao aponta para um treino inexistente.');
+    }
+  }
+
   for (const set of payload.data.sessionSets) {
     if (!sessionIds.has(set.sessionId)) {
       throw new Error('O backup esta inconsistente: serie sem sessao pai valida.');
+    }
+
+    if (set.templateExerciseId && !workoutExerciseIds.has(set.templateExerciseId)) {
+      throw new Error(
+        'O backup esta inconsistente: serie aponta para um exercicio de treino inexistente.',
+      );
     }
   }
 };
@@ -267,6 +320,10 @@ const readBackupPayloadFromPicker = async () => {
 
   if (!pickedFile.hasRequestedType) {
     throw new Error('Selecione um arquivo de backup do LogGYM.');
+  }
+
+  if (!BACKUP_FILE_EXTENSION.test(pickedFile.name ?? '')) {
+    throw new Error('Selecione um arquivo JSON de backup valido do LogGYM.');
   }
 
   if (pickedFile.size && pickedFile.size > MAX_BACKUP_SIZE_BYTES) {

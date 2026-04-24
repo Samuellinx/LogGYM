@@ -119,7 +119,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
     case 'auth/invalid-email':
       return new Error('Use um e-mail valido.');
     case 'auth/email-already-in-use':
-      return new Error('Ja existe uma conta cadastrada com esse e-mail.');
+      return new Error('Nao foi possivel concluir o cadastro com os dados informados.');
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
@@ -131,7 +131,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
     case 'auth/too-many-requests':
       return new Error('Muitas tentativas seguidas. Aguarde um pouco e tente de novo.');
     case 'auth/user-disabled':
-      return new Error('Esta conta foi desativada.');
+      return new Error('Nao foi possivel concluir a autenticacao desta conta.');
     case 'auth/operation-not-allowed':
       return new Error(
         'Esse metodo de entrada ainda nao foi habilitado no Firebase.',
@@ -218,7 +218,7 @@ export const signInWithEmailAccount = async ({
     initializeFirebaseServices();
 
     const userCredential = await getFirebaseAuth().signInWithEmailAndPassword(
-      email.trim(),
+      email.trim().toLowerCase(),
       password,
     );
 
@@ -241,7 +241,7 @@ export const signUpWithEmailAccount = async ({
     initializeFirebaseServices();
 
     const userCredential = await getFirebaseAuth().createUserWithEmailAndPassword(
-      email.trim(),
+      email.trim().toLowerCase(),
       password,
     );
 

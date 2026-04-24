@@ -58,4 +58,31 @@ export const workoutFormSchema = z.object({
     .max(12, 'Limite de 12 exercicios por treino.'),
 });
 
+export const sessionSetInputSchema = z.object({
+  load: z.number().finite().min(0).max(10000),
+  reps: z.number().int().min(0).max(1000),
+  note: z.string().trim().max(220),
+});
+
+export const trainingExerciseInputSchema = z.object({
+  workoutExerciseId: z.string().trim().max(120),
+  exerciseName: z.string().trim().min(1).max(80),
+  muscleGroup: z.string().trim().min(1).max(40),
+  sets: z.array(sessionSetInputSchema).min(1).max(20),
+});
+
+export const trainingSessionInputSchema = z.object({
+  workoutId: z.string().trim().min(1).max(120),
+  workoutName: z.string().trim().min(2).max(80),
+  focus: z.string().trim().min(1).max(30),
+  overallNotes: z.string().trim().max(1200),
+  performedAt: z
+    .string()
+    .trim()
+    .min(10)
+    .max(40)
+    .refine(value => !Number.isNaN(Date.parse(value)), 'Data da sessao invalida.'),
+  exercises: z.array(trainingExerciseInputSchema).min(1).max(24),
+});
+
 export type WorkoutFormValues = z.infer<typeof workoutFormSchema>;

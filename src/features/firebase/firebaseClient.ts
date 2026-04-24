@@ -27,7 +27,7 @@ export const initializeFirebaseServices = () => {
     return;
   }
 
-  if (parseBooleanFlag(Config.LOGGYM_FIREBASE_USE_EMULATORS)) {
+  if (__DEV__ && parseBooleanFlag(Config.LOGGYM_FIREBASE_USE_EMULATORS)) {
     const authHost = Config.LOGGYM_FIREBASE_AUTH_EMULATOR_HOST?.trim();
     const firestoreHost = parseHostAndPort(
       Config.LOGGYM_FIREBASE_FIRESTORE_EMULATOR_HOST,

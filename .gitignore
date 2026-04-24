@@ -86,5 +86,9 @@ web/.env.*.local
 !.yarn/versions
 
 # Firebase
+.firebase/
 android/app/google-services.json
 ios/GoogleService-Info.plist
+
+# web build output
+web/dist/

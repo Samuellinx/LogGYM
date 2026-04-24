@@ -39,7 +39,9 @@ Write-Host "3. Baixar o google-services.json e salvar em android/app/google-serv
 Write-Host "4. Adicionar o SHA-1 e SHA-256 do debug/release no app Android do Firebase."
 Write-Host "5. Criar um app Web e preencher web/.env com as chaves VITE_FIREBASE_*."
 Write-Host "6. Em Authentication > Settings > Authorized domains, adicionar localhost se for usar o painel web em DEV."
-Write-Host "7. Publicar firestore.rules e firestore.indexes.json com o Firebase CLI."
+Write-Host "7. Em Authentication, habilitar Email Enumeration Protection para producao."
+Write-Host "8. Habilitar App Check para Web e Android antes do deploy publico."
+Write-Host "9. Publicar firestore.rules e firestore.indexes.json com o Firebase CLI."
 
 Write-Host ""
 Write-Host "Comandos uteis:" -ForegroundColor Cyan
