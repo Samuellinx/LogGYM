@@ -23,19 +23,19 @@ export const WorkoutCard = ({
       <View style={styles.copy}>
         <Text style={styles.title}>{workout.name}</Text>
         <Text style={styles.meta}>
-          {workout.focus} - {workout.exerciseCount} exercicios
+          {workout.focus} - {workout.exerciseCount} exercícios
         </Text>
       </View>
       <ChevronRight color={theme.colors.textMuted} size={18} />
     </View>
 
     <Text style={styles.notes} numberOfLines={2}>
-      {workout.notes || 'Treino pronto para registrar cargas e anotacoes.'}
+      {workout.notes || 'Treino pronto para registrar cargas e anotações.'}
     </Text>
 
     <View style={styles.footer}>
       <Text style={styles.lastPerformed}>
-        Ultima execucao: {formatSessionDate(workout.lastPerformedAt)}
+        Última execução: {formatSessionDate(workout.lastPerformedAt)}
       </Text>
 
       <View style={styles.actions}>

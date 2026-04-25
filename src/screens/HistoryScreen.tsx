@@ -58,8 +58,8 @@ export const HistoryScreen = () => {
       await refreshData();
     } catch (error) {
       Alert.alert(
-        'Excluir execucao',
-        toUserMessage(error, 'Nao foi possivel excluir a execucao agora.'),
+        'Excluir execução',
+        toUserMessage(error, 'Não foi possível excluir a execução agora.'),
       );
     } finally {
       setIsDeleting(false);
@@ -76,12 +76,12 @@ export const HistoryScreen = () => {
         />
       }>
       <SectionHeader
-        title="Historico"
-        subtitle="Cada execucao salva fica disponivel para comparacao"
+        title="Histórico"
+        subtitle="Cada execução salva fica disponível para comparação"
       />
 
       <TextField
-        label="Buscar no historico"
+        label="Buscar no histórico"
         placeholder="Supino, legs, upper..."
         value={search}
         onChangeText={setSearch}
@@ -89,7 +89,7 @@ export const HistoryScreen = () => {
 
       <View style={styles.summary}>
         <Text style={styles.summaryText}>
-          {filteredHistory.length} sessoes - {formatVolume(totalVolume)} de volume total
+          {filteredHistory.length} sessões - {formatVolume(totalVolume)} de volume total
         </Text>
       </View>
 
@@ -120,7 +120,7 @@ export const HistoryScreen = () => {
               </View>
 
               <Text style={styles.cardStats}>
-                {item.totalSets} series - {formatVolume(item.totalVolume)}
+                {item.totalSets} séries - {formatVolume(item.totalVolume)}
               </Text>
 
               {item.overallNotes ? (
@@ -145,23 +145,23 @@ export const HistoryScreen = () => {
           ))
         ) : (
           <EmptyState
-            title="Sem execucoes para mostrar"
-            description="Salve um treino para preencher o historico e destravar comparacoes."
+            title="Sem execuções para mostrar"
+            description="Salve um treino para preencher o histórico e destravar comparações."
           />
         )}
       </View>
 
       <ConfirmModal
         visible={sessionToDelete !== null}
-        title="Excluir execucao?"
+        title="Excluir execução?"
         description={
           sessionToDelete
-            ? `A sessao ${sessionToDelete.workoutName} de ${formatSessionDate(
+            ? `A sessão ${sessionToDelete.workoutName} de ${formatSessionDate(
                 sessionToDelete.performedAt,
-              )} sera removida do historico e das metricas associadas.`
+              )} será removida do histórico e das métricas associadas.`
             : ''
         }
-        confirmLabel={isDeleting ? 'Excluindo...' : 'Excluir execucao'}
+        confirmLabel={isDeleting ? 'Excluindo...' : 'Excluir execução'}
         cancelLabel="Cancelar"
         confirmVariant="danger"
         onConfirm={handleDeleteSession}

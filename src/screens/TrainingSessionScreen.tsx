@@ -160,7 +160,7 @@ const buildCompletionSummary = (
   );
 
   if (validSets.length === 0) {
-    throw new Error('Adicione pelo menos uma serie valida antes de salvar.');
+    throw new Error('Adicione pelo menos uma série válida antes de salvar.');
   }
 
   const loadValues = validSets.map(set => set.load);
@@ -325,7 +325,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
       await refreshData();
       setCompletionSummary(summary);
     } catch (error) {
-      Alert.alert('Salvar execucao', toUserMessage(error));
+      Alert.alert('Salvar execução', toUserMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -351,15 +351,15 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         <Text style={styles.loadingText}>Preparando treino...</Text>
       ) : !workout ? (
         <EmptyState
-          title="Treino nao encontrado"
-          description="Nao foi possivel carregar o template para execucao."
+          title="Treino não encontrado"
+          description="Não foi possível carregar o template para execução."
         />
       ) : (
         <>
           <View style={styles.hero}>
             <Text style={styles.title}>{workout.name}</Text>
             <Text style={styles.subtitle}>
-              {workout.focus} - {workout.exerciseCount} exercicios
+              {workout.focus} - {workout.exerciseCount} exercícios
             </Text>
             <Button
               fullWidth={false}
@@ -379,7 +379,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           ) : null}
 
           <TextField
-            label="Notas gerais da execucao"
+            label="Notas gerais da execução"
             placeholder="Como o treino se comportou hoje?"
             value={overallNotes}
             onChangeText={setOverallNotes}
@@ -399,7 +399,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   <Button
                     fullWidth={false}
                     variant="secondary"
-                    label="Nova serie"
+                    label="Nova série"
                     icon={<Plus color={theme.colors.text} size={15} />}
                     onPress={() => addSet(exerciseIndex)}
                   />
@@ -418,7 +418,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                 {exercise.sets.map((set, setIndex) => (
                   <View key={`${exercise.workoutExerciseId}-${setIndex}`} style={styles.setCard}>
                     <View style={styles.setHeader}>
-                      <Text style={styles.setTitle}>Serie {setIndex + 1}</Text>
+                      <Text style={styles.setTitle}>Série {setIndex + 1}</Text>
                       <Pressable
                         hitSlop={10}
                         style={styles.deleteIconButton}
@@ -463,8 +463,8 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                     </View>
 
                     <TextField
-                      label="Anotacao da serie"
-                      placeholder="Ex: ultima repeticao travou."
+                      label="Anotação da série"
+                      placeholder="Ex: última repetição travou."
                       value={set.note}
                       onChangeText={value =>
                         updateSet(exerciseIndex, setIndex, 'note', value)
@@ -477,7 +477,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           </View>
 
           <Button
-            label={isSaving ? 'Salvando execucao...' : 'Salvar execucao'}
+            label={isSaving ? 'Salvando execução...' : 'Salvar execução'}
             onPress={handleSave}
             disabled={isSaving}
           />
@@ -486,9 +486,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
       <ConfirmModal
         visible={setToDelete !== null}
-        title="Excluir serie?"
-        description="Essa serie sera removida do treino atual."
-        confirmLabel="Excluir serie"
+        title="Excluir série?"
+        description="Essa série será removida do treino atual."
+        confirmLabel="Excluir série"
         cancelLabel="Cancelar"
         confirmVariant="danger"
         onConfirm={confirmSetDeletion}

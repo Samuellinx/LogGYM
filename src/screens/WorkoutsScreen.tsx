@@ -189,7 +189,7 @@ export const WorkoutsScreen = () => {
             title="Nenhum treino encontrado"
             description={
               selectedDateLabel
-                ? 'Nao houve treino registrado nessa data. Escolha outro dia ou limpe o filtro.'
+                ? 'Não houve treino registrado nessa data. Escolha outro dia ou limpe o filtro.'
                 : 'Ajuste a busca ou crie um novo template para comecar.'
             }
           />

@@ -86,7 +86,7 @@ export const buildTrainingSessionDocument = ({
   exercises: TrainingDraftExercise[];
 }): WorkoutSessionDocument => {
   if (!performedAt.trim()) {
-    throw new Error('Selecione uma data valida para a execução.');
+    throw new Error('Selecione uma data válida para a execução.');
   }
 
   const validExercises = exercises

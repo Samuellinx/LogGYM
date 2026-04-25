@@ -5,7 +5,7 @@ const isoDateSchema = z
   .trim()
   .min(10)
   .max(40)
-  .refine(value => !Number.isNaN(Date.parse(value)), 'Data ISO invalida.');
+  .refine(value => !Number.isNaN(Date.parse(value)), 'Data ISO inválida.');
 
 const idSchema = z.string().trim().min(1).max(120);
 const nullableShortTextSchema = z.string().trim().max(80).nullable();

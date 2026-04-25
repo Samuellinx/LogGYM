@@ -69,7 +69,7 @@ const mapFirebaseUser = (user: FirebaseAuthTypes.User): SessionUser => {
 
   if (!user.email) {
     throw new Error(
-      'Nao foi possivel identificar o e-mail desta conta. Tente outro metodo de entrada.',
+      'Não foi possível identificar o e-mail desta conta. Tente outro método de entrada.',
     );
   }
 
@@ -104,7 +104,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
       error.message?.includes('DEVELOPER_ERROR')
     ) {
       return new Error(
-        'O login Google ainda nao foi liberado para esta build. Revise o SHA-1 e o arquivo google-services.json.',
+        'O login Google ainda não foi liberado para esta build. Revise o SHA-1 e o arquivo google-services.json.',
       );
     }
 
@@ -117,24 +117,24 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
 
   switch (code) {
     case 'auth/invalid-email':
-      return new Error('Use um e-mail valido.');
+      return new Error('Use um e-mail válido.');
     case 'auth/email-already-in-use':
-      return new Error('Nao foi possivel concluir o cadastro com os dados informados.');
+      return new Error('Não foi possível concluir o cadastro com os dados informados.');
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return new Error('E-mail ou senha invalidos.');
+      return new Error('E-mail ou senha inválidos.');
     case 'auth/weak-password':
       return new Error('Escolha uma senha mais forte para continuar.');
     case 'auth/network-request-failed':
-      return new Error('Sem conexao com a internet para concluir essa etapa.');
+      return new Error('Sem conexão com a internet para concluir essa etapa.');
     case 'auth/too-many-requests':
       return new Error('Muitas tentativas seguidas. Aguarde um pouco e tente de novo.');
     case 'auth/user-disabled':
-      return new Error('Nao foi possivel concluir a autenticacao desta conta.');
+      return new Error('Não foi possível concluir a autenticação desta conta.');
     case 'auth/operation-not-allowed':
       return new Error(
-        'Esse metodo de entrada ainda nao foi habilitado no Firebase.',
+        'Esse método de entrada ainda não foi habilitado no Firebase.',
       );
     default:
       break;
@@ -186,7 +186,7 @@ export const signInWithGoogleAccount = async () => {
 
     if (!googleWebClientId) {
       throw new Error(
-        'O cliente web do Google nao foi configurado para esta build.',
+        'O cliente web do Google não foi configurado para esta build.',
       );
     }
 
@@ -203,7 +203,7 @@ export const signInWithGoogleAccount = async () => {
 
     return mapFirebaseUser(userCredential.user);
   } catch (error) {
-    throw mapAuthError(error, 'Nao foi possivel entrar com Google agora.');
+    throw mapAuthError(error, 'Não foi possível entrar com Google agora.');
   }
 };
 
@@ -224,7 +224,7 @@ export const signInWithEmailAccount = async ({
 
     return mapFirebaseUser(userCredential.user);
   } catch (error) {
-    throw mapAuthError(error, 'Nao foi possivel entrar com e-mail e senha.');
+    throw mapAuthError(error, 'Não foi possível entrar com e-mail e senha.');
   }
 };
 
@@ -256,7 +256,7 @@ export const signUpWithEmailAccount = async ({
       email: email.trim().toLowerCase(),
     };
   } catch (error) {
-    throw mapAuthError(error, 'Nao foi possivel criar sua conta agora.');
+    throw mapAuthError(error, 'Não foi possível criar sua conta agora.');
   }
 };
 
@@ -267,7 +267,7 @@ export const sendPasswordResetForEmail = async (email: string) => {
   } catch (error) {
     throw mapAuthError(
       error,
-      'Nao foi possivel enviar o e-mail de redefinicao agora.',
+      'Não foi possível enviar o e-mail de redefinição agora.',
     );
   }
 };
@@ -299,7 +299,7 @@ export const signOutFromProvider = async (provider: AuthProvider) => {
       configureGoogleSignin();
       await GoogleSignin.signOut();
     } catch {
-      // O logout local do Firebase continua suficiente para invalidar a sessao do app.
+      // O logout local do Firebase continua suficiente para invalidar a sessão do app.
     }
   }
 

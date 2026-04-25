@@ -66,8 +66,8 @@ export const ExerciseProgressScreen = ({route}: Props) => {
     return (
       <Screen>
         <EmptyState
-          title="Sem historico para este exercicio"
-          description="Assim que voce registrar series, a curva de carga aparece aqui."
+          title="Sem histórico para este exercício"
+          description="Assim que você registrar séries, a curva de carga aparece aqui."
         />
       </Screen>
     );
@@ -79,7 +79,7 @@ export const ExerciseProgressScreen = ({route}: Props) => {
     <Screen>
       <SectionHeader
         title={progress.exerciseName}
-        subtitle={`Ultima execucao ${formatSessionDate(progress.lastPerformedAt)}`}
+        subtitle={`Última execução ${formatSessionDate(progress.lastPerformedAt)}`}
       />
 
       <View style={styles.statRow}>
@@ -91,7 +91,7 @@ export const ExerciseProgressScreen = ({route}: Props) => {
         <StatCard
           label="Reps medias"
           value={progress.averageReps.toFixed(1)}
-          helper="media por serie"
+          helper="média por série"
         />
       </View>
 
@@ -107,8 +107,8 @@ export const ExerciseProgressScreen = ({route}: Props) => {
       </View>
 
       <SectionHeader
-        title="Ultimas series"
-        subtitle="Dados recentes para comparar sensacao e tecnica"
+        title="Últimas séries"
+        subtitle="Dados recentes para comparar sensação e técnica"
       />
 
       <View style={styles.recentList}>

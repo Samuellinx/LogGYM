@@ -137,7 +137,7 @@ export const LoginScreen = () => {
 
       Alert.alert(
         'E-mail enviado',
-        'Se existir uma conta com esse e-mail, voce recebera um link para redefinir a senha.',
+        'Se existir uma conta com esse e-mail, você receberá um link para redefinir a senha.',
       );
     } catch (error) {
       Alert.alert('Esqueci a senha', toUserMessage(error));
@@ -181,7 +181,7 @@ export const LoginScreen = () => {
             render={({field}) => (
               <TextField
                 label="E-mail"
-                placeholder="voce@exemplo.com"
+                placeholder="você@exemplo.com"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
                 onChangeText={field.onChange}
@@ -199,7 +199,7 @@ export const LoginScreen = () => {
             render={({field}) => (
               <TextField
                 label="Senha"
-                placeholder="Minimo de 8 caracteres"
+                placeholder="Mínimo de 8 caracteres"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
                 onChangeText={field.onChange}
@@ -230,7 +230,7 @@ export const LoginScreen = () => {
           />
 
           <Text style={styles.formHint}>
-            Depois do primeiro acesso online, seus treinos continuam disponiveis no aparelho mesmo sem internet.
+            Depois do primeiro acesso online, seus treinos continuam disponíveis no aparelho mesmo sem internet.
           </Text>
 
           <Button
@@ -252,7 +252,7 @@ export const LoginScreen = () => {
         <View key="forgot" style={styles.formCard}>
           <Text style={styles.formTitle}>Recuperar senha</Text>
           <Text style={styles.formDescription}>
-            Informe seu e-mail para receber um link oficial de redefinicao.
+            Informe seu e-mail para receber um link oficial de redefinição.
           </Text>
 
           <Controller
@@ -261,7 +261,7 @@ export const LoginScreen = () => {
             render={({field}) => (
               <TextField
                 label="E-mail"
-                placeholder="voce@exemplo.com"
+                placeholder="você@exemplo.com"
                 value={field.value ?? ''}
                 onBlur={field.onBlur}
                 onChangeText={field.onChange}
@@ -277,7 +277,7 @@ export const LoginScreen = () => {
             label={
               pending === 'forgot'
                 ? 'Enviando e-mail...'
-                : 'Enviar e-mail de redefinicao'
+                : 'Enviar e-mail de redefinição'
             }
             onPress={handlePasswordReset}
             disabled={pending !== null || !isOnline}
@@ -295,7 +295,7 @@ export const LoginScreen = () => {
       <View key="signin" style={styles.formCard}>
         <Text style={styles.formTitle}>Entrar com e-mail</Text>
         <Text style={styles.formDescription}>
-          Use a mesma conta no app e no painel web para manter tudo sincronizado por usuario.
+          Use a mesma conta no app e no painel web para manter tudo sincronizado por usuário.
         </Text>
 
         <Controller
@@ -304,7 +304,7 @@ export const LoginScreen = () => {
           render={({field}) => (
             <TextField
               label="E-mail"
-              placeholder="voce@exemplo.com"
+              placeholder="você@exemplo.com"
               value={field.value ?? ''}
               onBlur={field.onBlur}
               onChangeText={field.onChange}
@@ -356,7 +356,7 @@ export const LoginScreen = () => {
             <ActivityIndicator size="large" color={theme.colors.accent} />
             <Text style={styles.progressTitle}>Criando sua conta</Text>
             <Text style={styles.progressText}>
-              Estamos preparando seu acesso e vinculando a sincronizacao segura.
+              Estamos preparando seu acesso e vinculando a sincronização segura.
             </Text>
           </View>
         </View>
@@ -375,7 +375,7 @@ export const LoginScreen = () => {
           <Text style={styles.title}>LogGYM</Text>
           <Text style={styles.headline}>Treine. Registre. Sincronize.</Text>
           <Text style={styles.description}>
-            Seus treinos, cargas e historico ficam alinhados entre app e web.
+            Seus treinos, cargas e histórico ficam alinhados entre app e web.
           </Text>
 
           <View style={styles.badges}>
@@ -386,7 +386,7 @@ export const LoginScreen = () => {
             />
             <TagChip label="Offline first" active />
             <TagChip
-              label="Sync por usuario"
+              label="Sync por usuário"
               active
               accentColor={theme.colors.accentSecondary}
             />
@@ -405,14 +405,14 @@ export const LoginScreen = () => {
         <Text style={styles.summaryText}>
           {isOnline
             ? 'Acesse com Google ou e-mail para sincronizar seus treinos entre celular e painel web.'
-            : 'Sem internet agora. Se voce ja entrou antes, o app continua abrindo com os dados salvos neste aparelho.'}
+            : 'Sem internet agora. Se você já entrou antes, o app continua abrindo com os dados salvos neste aparelho.'}
         </Text>
       </Animated.View>
 
       <View style={styles.googleCard}>
         <Text style={styles.googleTitle}>Entrada com Google</Text>
         <Text style={styles.googleText}>
-          Ideal para acessar rapido e usar a mesma conta em todos os dispositivos.
+          Ideal para acessar rápido e usar a mesma conta em todos os dispositivos.
         </Text>
         <Button
           label={pending === 'google' ? 'Conectando...' : 'Entrar com Google'}

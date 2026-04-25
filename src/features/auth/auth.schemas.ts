@@ -4,7 +4,7 @@ const emailSchema = z
   .string()
   .trim()
   .min(1, 'Informe seu e-mail.')
-  .email('Informe um e-mail valido.')
+  .email('Informe um e-mail válido.')
   .max(254, 'Use um e-mail mais curto.')
   .transform(value => value.toLowerCase());
 
@@ -30,7 +30,7 @@ export const credentialSignUpSchema = z
     confirmPassword: z.string(),
   })
   .refine(values => values.password === values.confirmPassword, {
-    message: 'As senhas nao conferem.',
+    message: 'As senhas não conferem.',
     path: ['confirmPassword'],
   });
 

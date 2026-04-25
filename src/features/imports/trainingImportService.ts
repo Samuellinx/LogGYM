@@ -129,11 +129,11 @@ const weekdayAliasMap: Record<string, string> = {
   segundafeira: 'Segunda',
   monday: 'Segunda',
   mon: 'Segunda',
-  ter: 'Terca',
-  terca: 'Terca',
-  tercafeira: 'Terca',
-  tuesday: 'Terca',
-  tue: 'Terca',
+  ter: 'Terça',
+  terca: 'Terça',
+  tercafeira: 'Terça',
+  tuesday: 'Terça',
+  tue: 'Terça',
   qua: 'Quarta',
   quarta: 'Quarta',
   quartafeira: 'Quarta',
@@ -149,10 +149,10 @@ const weekdayAliasMap: Record<string, string> = {
   sextafeira: 'Sexta',
   friday: 'Sexta',
   fri: 'Sexta',
-  sab: 'Sabado',
-  sabado: 'Sabado',
-  saturday: 'Sabado',
-  sat: 'Sabado',
+  sab: 'Sábado',
+  sabado: 'Sábado',
+  saturday: 'Sábado',
+  sat: 'Sábado',
   dom: 'Domingo',
   domingo: 'Domingo',
   sunday: 'Domingo',
@@ -929,7 +929,7 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
 
   if (validWorkouts.length === 0) {
     throw new Error(
-      'Nao encontrei um treino valido nesse arquivo. Use colunas como Treino, Exercicio, Carga e Repeticoes ou um TXT com blocos iniciados por "Treino:".',
+      'Não encontrei um treino válido nesse arquivo. Use colunas como Treino, Exercício, Carga e Repetições ou um TXT com blocos iniciados por "Treino:".',
     );
   }
 
@@ -943,7 +943,7 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
 
   if (totalExercises > MAX_IMPORTED_EXERCISES) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercicios por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercícios por importação.`,
     );
   }
 
@@ -1031,7 +1031,7 @@ const selectTrainingImportFile = async () => {
   });
 
   if (pickedFile.size && pickedFile.size > MAX_IMPORT_SIZE_BYTES) {
-    throw new Error('O arquivo excede o limite de 10 MB e nao pode ser importado.');
+    throw new Error('O arquivo excede o limite de 10 MB e não pode ser importado.');
   }
 
   if (!TRAINING_IMPORT_FILE_EXTENSION.test(pickedFile.name ?? '')) {
@@ -1051,7 +1051,7 @@ const selectTrainingImportFile = async () => {
   const localCopy = localCopyResponse[0];
 
   if (localCopy.status !== 'success') {
-    throw new Error('Nao foi possivel preparar o arquivo selecionado para importacao.');
+    throw new Error('Não foi possível preparar o arquivo selecionado para importação.');
   }
 
   return {

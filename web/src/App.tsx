@@ -83,24 +83,24 @@ import type {
 } from './types';
 
 const signInSchema = z.object({
-  email: z.string().trim().email('Use um e-mail valido.'),
+  email: z.string().trim().email('Use um e-mail válido.'),
   password: z.string().min(8, 'A senha precisa ter pelo menos 8 caracteres.'),
 });
 
 const signUpSchema = z
   .object({
     name: z.string().trim().min(2, 'Informe seu nome.'),
-    email: z.string().trim().email('Use um e-mail valido.'),
+    email: z.string().trim().email('Use um e-mail válido.'),
     password: z.string().min(8, 'A senha precisa ter pelo menos 8 caracteres.'),
     confirmPassword: z.string(),
   })
   .refine(values => values.password === values.confirmPassword, {
-    message: 'As senhas nao conferem.',
+    message: 'As senhas não conferem.',
     path: ['confirmPassword'],
   });
 
 const resetSchema = z.object({
-  email: z.string().trim().email('Use um e-mail valido.'),
+  email: z.string().trim().email('Use um e-mail válido.'),
 });
 
 const accentPalette = [
@@ -116,11 +116,11 @@ const accentPalette = [
 const weekdayOptions = [
   'Livre',
   'Segunda',
-  'Terca',
+  'Terça',
   'Quarta',
   'Quinta',
   'Sexta',
-  'Sabado',
+  'Sábado',
   'Domingo',
 ];
 
@@ -141,7 +141,7 @@ const modeDescriptions: Record<
   },
   signup: {
     title: 'Crie sua conta',
-    description: 'Monte sua base de treinos e deixe tudo pronto para o proximo ciclo.',
+    description: 'Monte sua base de treinos e deixe tudo pronto para o próximo ciclo.',
     actionLabel: 'Criar conta',
   },
   forgot: {
@@ -478,8 +478,8 @@ function App() {
     ? 'Refinar treino'
     : 'Criar treino';
   const dashboardSubtitle = dashboardSnapshot.lastSession
-    ? `Ultima sessao: ${formatSessionDate(dashboardSnapshot.lastSession.performedAt)}`
-    : 'Seu espaco esta pronto para receber o primeiro treino.';
+    ? `Última sessão: ${formatSessionDate(dashboardSnapshot.lastSession.performedAt)}`
+    : 'Seu espaço está pronto para receber o primeiro treino.';
   const workspaceContent: Record<
     WorkspaceView,
     {eyebrow: string; title: string; description: string}
@@ -493,19 +493,19 @@ function App() {
       eyebrow: 'Treinos',
       title: 'Biblioteca de treinos pronta para editar.',
       description:
-        'Organize treinos, refine exercicios e mantenha sua estrutura pronta para a proxima sessao.',
+        'Organize treinos, refine exercícios e mantenha sua estrutura pronta para a próxima sessão.',
     },
     history: {
       eyebrow: 'Histórico',
-      title: 'Consulte tudo o que ja foi executado.',
+      title: 'Consulte tudo o que já foi executado.',
       description:
-        'Revise volume, series e observacoes das sessoes ja concluidas em um painel direto.',
+        'Revise volume, séries e observações das sessões já concluidas em um painel direto.',
     },
     profile: {
       eyebrow: 'Perfil',
-      title: 'Seu espaco pessoal no LogGYM.',
+      title: 'Seu espaço pessoal no LogGYM.',
       description:
-        'Acompanhe sua conta, exporte backups, restaure copias e importe treinos externos em um unico lugar.',
+        'Acompanhe sua conta, exporte backups, restaure cópias e importe treinos externos em um único lugar.',
     },
   };
   const detailContent =
@@ -547,7 +547,7 @@ function App() {
       await signInWithGooglePopup();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel entrar agora.',
+        error instanceof Error ? error.message : 'Não foi possível entrar agora.',
       );
     } finally {
       setBusyAction(null);
@@ -562,7 +562,7 @@ function App() {
       await signInWithEmailPassword(values.email, values.password);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel entrar agora.',
+        error instanceof Error ? error.message : 'Não foi possível entrar agora.',
       );
     } finally {
       setBusyAction(null);
@@ -577,10 +577,10 @@ function App() {
       await signUpWithEmailPassword(values.name, values.email, values.password);
       signUpForm.reset();
       setAuthMode('signin');
-      setStatusMessage('Conta criada. Agora sua area ja esta pronta para receber treinos.');
+      setStatusMessage('Conta criada. Agora sua área já está pronta para receber treinos.');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel criar sua conta.',
+        error instanceof Error ? error.message : 'Não foi possível criar sua conta.',
       );
     } finally {
       setBusyAction(null);
@@ -596,11 +596,11 @@ function App() {
       resetForm.reset();
       setAuthMode('signin');
       setStatusMessage(
-        'Se existir uma conta com esse e-mail, o link de redefinicao foi enviado.',
+        'Se existir uma conta com esse e-mail, o link de redefinição foi enviado.',
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel enviar o link agora.',
+        error instanceof Error ? error.message : 'Não foi possível enviar o link agora.',
       );
     } finally {
       setBusyAction(null);
@@ -616,7 +616,7 @@ function App() {
       setStatusMessage(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel sair da conta.',
+        error instanceof Error ? error.message : 'Não foi possível sair da conta.',
       );
     } finally {
       setBusyAction(null);
@@ -638,7 +638,7 @@ function App() {
       setStatusMessage('Dados atualizados com sucesso.');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel atualizar os dados agora.',
+        error instanceof Error ? error.message : 'Não foi possível atualizar os dados agora.',
       );
     } finally {
       setBusyAction(null);
@@ -656,13 +656,13 @@ function App() {
     try {
       const result = await exportBackupForCurrentUser(user);
       setStatusMessage(
-        `${result.fileName} salvo com ${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series.`,
+        `${result.fileName} salvo com ${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
       );
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Nao foi possivel exportar seus treinos agora.',
+          : 'Não foi possível exportar seus treinos agora.',
       );
     } finally {
       setBusyAction(null);
@@ -675,7 +675,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      'Isso vai substituir os treinos e o historico atuais pelos dados do arquivo selecionado. Deseja continuar?',
+      'Isso vai substituir os treinos e o histórico atuais pelos dados do arquivo selecionado. Deseja continuar?',
     );
 
     if (!confirmed) {
@@ -702,13 +702,13 @@ function App() {
       setWorkouts(refreshed.workouts);
       setSessions(refreshed.sessions);
       setStatusMessage(
-        `${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series foram restaurados.`,
+        `${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries foram restaurados.`,
       );
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Nao foi possivel restaurar sua copia agora.',
+          : 'Não foi possível restaurar sua cópia agora.',
       );
     } finally {
       setBusyAction(null);
@@ -732,13 +732,13 @@ function App() {
       setWorkouts(refreshed.workouts);
       setSessions(refreshed.sessions);
       setStatusMessage(
-        `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercicios prontos para uso.`,
+        `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercícios prontos para uso.`,
       );
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Nao foi possivel importar o arquivo agora.',
+          : 'Não foi possível importar o arquivo agora.',
       );
     } finally {
       setBusyAction(null);
@@ -803,7 +803,7 @@ function App() {
       }
 
       if (normalizedWorkout.exercises.length === 0) {
-        throw new Error('Adicione pelo menos um exercicio antes de salvar.');
+        throw new Error('Adicione pelo menos um exercício antes de salvar.');
       }
 
       await saveWorkoutFromPanel(user, normalizedWorkout);
@@ -812,7 +812,7 @@ function App() {
       setWorkspaceView('workouts');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel salvar o treino.',
+        error instanceof Error ? error.message : 'Não foi possível salvar o treino.',
       );
     } finally {
       setBusyAction(null);
@@ -851,7 +851,7 @@ function App() {
       setStatusMessage('Treino removido da sua rotina.');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel excluir o treino.',
+        error instanceof Error ? error.message : 'Não foi possível excluir o treino.',
       );
     } finally {
       setBusyAction(null);
@@ -899,7 +899,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      `Excluir a execucao ${sessionItem.workoutName} de ${formatSessionDate(
+      `Excluir a execução ${sessionItem.workoutName} de ${formatSessionDate(
         sessionItem.performedAt,
       )}?`,
     );
@@ -913,10 +913,10 @@ function App() {
 
     try {
       await deleteSessionFromPanel(user.uid, sessionItem.id);
-      setStatusMessage('Execucao removida do historico.');
+      setStatusMessage('Execução removida do histórico.');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Nao foi possivel excluir a execucao.',
+        error instanceof Error ? error.message : 'Não foi possível excluir a execução.',
       );
     } finally {
       setBusyAction(null);
@@ -975,7 +975,7 @@ function App() {
           onClick={() => handleSelectTab('history')}>
           <span>Semana</span>
           <strong>{dashboardSnapshot.weeklySessions}</strong>
-          <small>sessoes registradas</small>
+          <small>Sessões registradas</small>
         </button>
         <button
           type="button"
@@ -983,7 +983,7 @@ function App() {
           onClick={() => handleSelectTab('history')}>
           <span>Sets</span>
           <strong>{formatCompactNumber(dashboardSnapshot.totalTrackedSets)}</strong>
-          <small>series salvas</small>
+          <small>Sessões salvas</small>
         </button>
         <button
           type="button"
@@ -991,7 +991,7 @@ function App() {
           onClick={() => handleSelectTab('workouts')}>
           <span>Templates</span>
           <strong>{dashboardSnapshot.totalTemplates}</strong>
-          <small>treinos ativos</small>
+          <small>Treinos ativos</small>
         </button>
         <button
           type="button"
@@ -1014,7 +1014,7 @@ function App() {
             <label className="search-box">
               <Search size={16} />
               <input
-                placeholder="Nome, foco ou anotacao"
+                placeholder="Nome, foco ou anotação"
                 value={dashboardSearch}
                 onChange={event => setDashboardSearch(event.target.value)}
               />
@@ -1042,14 +1042,14 @@ function App() {
                     <div>
                       <strong>{workout.name}</strong>
                       <p>
-                        {workout.focus} - {workout.exercises.length} exercicios
+                        {workout.focus} - {workout.exercises.length} exercícios
                       </p>
                     </div>
                     <ChevronRight size={18} />
                   </div>
 
                   <p className="workout-notes">
-                    {workout.notes || 'Sem observacoes extras para este treino.'}
+                    {workout.notes || 'Sem observações extras para este treino.'}
                   </p>
 
                   <div className="chip-row">
@@ -1096,7 +1096,7 @@ function App() {
             <div className="panel-head secondary">
               <div>
                 <p className="eyebrow">Recordes</p>
-                <h2>Cargas maximas observadas</h2>
+                <h2>Cargas máximas observadas</h2>
               </div>
             </div>
 
@@ -1114,7 +1114,7 @@ function App() {
                 ))
               ) : (
                 <div className="empty-card">
-                  Registre sessoes para liberar os recordes do seu historico.
+                  Registre sessões para liberar os recordes do seu histórico.
                 </div>
               )}
             </div>
@@ -1123,8 +1123,8 @@ function App() {
           <div className="column-panel">
             <div className="panel-head secondary">
               <div>
-                <p className="eyebrow">Exercicios recentes</p>
-                <h2>Atividade mais recente do historico</h2>
+                <p className="eyebrow">Exercícios recentes</p>
+                <h2>Atividade mais recente do histórico</h2>
               </div>
             </div>
 
@@ -1141,13 +1141,13 @@ function App() {
                       <span className="soft-chip soft-chip--accent">{formatLoad(item.maxLoad)}</span>
                     </div>
                     <p>
-                      {item.totalSets} series - {formatSessionDate(item.lastPerformedAt)}
+                      {item.totalSets} séries - {formatSessionDate(item.lastPerformedAt)}
                     </p>
                   </button>
                 ))
               ) : (
                 <div className="empty-card">
-                  Assim que voce concluir treinos, os exercicios recentes aparecem aqui.
+                  Assim que você concluir treinos, os exercícios recentes aparecem aqui.
                 </div>
               )}
             </div>
@@ -1166,12 +1166,12 @@ function App() {
           <small>Biblioteca pronta para a semana.</small>
         </article>
         <article className="metric-card">
-          <span>Exercicios no plano</span>
+          <span>Exercícios no plano</span>
           <strong>{totalExercises}</strong>
           <small>Distribuidos entre todas as rotinas.</small>
         </article>
         <article className="metric-card">
-          <span>Ultimas series</span>
+          <span>Últimas séries</span>
           <strong>{totalTrackedSets}</strong>
           <small>Volume recente registrado na sua conta.</small>
         </article>
@@ -1188,7 +1188,7 @@ function App() {
             <label className="search-box">
               <Search size={16} />
               <input
-                placeholder="Buscar treino, foco ou exercicio"
+                placeholder="Buscar treino, foco ou exercício"
                 value={workoutSearch}
                 onChange={event => setWorkoutSearch(event.target.value)}
               />
@@ -1210,14 +1210,14 @@ function App() {
                     <div>
                       <strong>{workout.name}</strong>
                       <p>
-                        {workout.focus} - {workout.exercises.length} exercicios
+                        {workout.focus} - {workout.exercises.length} exercícios
                       </p>
                     </div>
                     <ChevronRight size={18} />
                   </div>
 
                   <p className="workout-notes">
-                    {workout.notes || 'Sem observacoes extras para este treino.'}
+                    {workout.notes || 'Sem observações extras para este treino.'}
                   </p>
 
                   <div className="chip-row">
@@ -1271,7 +1271,7 @@ function App() {
           <div className="panel-head secondary">
             <div>
               <p className="eyebrow">Movimento recente</p>
-              <h2>Ultimas sessoes</h2>
+              <h2>Últimas sessões</h2>
             </div>
           </div>
 
@@ -1284,13 +1284,13 @@ function App() {
                     <span>{new Date(sessionItem.performedAt).toLocaleDateString('pt-BR')}</span>
                   </div>
                   <p>
-                    {sessionItem.totalSets} series - pico de {formatLoad(sessionItem.topLoad)}
+                    {sessionItem.totalSets} séries - pico de {formatLoad(sessionItem.topLoad)}
                   </p>
                 </article>
               ))
             ) : (
               <div className="empty-card">
-                Suas ultimas sessoes vao aparecer aqui assim que voce concluir treinos.
+                Suas últimas sessões vão aparecer aqui assim que você concluir treinos.
               </div>
             )}
           </div>
@@ -1308,7 +1308,7 @@ function App() {
           </div>
 
           <p className="editor-support">
-            Preencha o essencial e refine os detalhes na ordem que fizer mais sentido para voce.
+            Preencha o essencial e refine os detalhes na ordem que fizer mais sentido para você.
           </p>
 
           <div className="editor-grid">
@@ -1366,7 +1366,7 @@ function App() {
             <textarea
               value={editorWorkout.notes}
               onChange={event => updateEditor('notes', event.target.value)}
-              placeholder="Observacoes que ajudam durante a execucao."
+              placeholder="Observações que ajudam durante a execução."
               rows={4}
             />
           </label>
@@ -1374,11 +1374,11 @@ function App() {
           <div className="exercise-head">
             <div>
               <p className="eyebrow">Estrutura</p>
-              <h3>Exercicios do treino</h3>
+              <h3>Exercícios do treino</h3>
             </div>
             <button type="button" className="ghost-button" onClick={addExercise}>
               <Plus size={16} />
-              Adicionar exercicio
+              Adicionar exercício
             </button>
           </div>
 
@@ -1386,7 +1386,7 @@ function App() {
             {editorWorkout.exercises.map((exercise, index) => (
               <article className="exercise-card" key={exercise.id}>
                 <div className="exercise-card-head">
-                  <strong>Exercicio {index + 1}</strong>
+                  <strong>Exercício {index + 1}</strong>
                   {editorWorkout.exercises.length > 1 ? (
                     <button
                       type="button"
@@ -1445,7 +1445,7 @@ function App() {
                     value={exercise.note}
                     onChange={event => updateExercise(exercise.id, 'note', event.target.value)}
                     rows={3}
-                    placeholder="Dicas curtas para a execucao."
+                    placeholder="Dicas curtas para a execução."
                   />
                 </label>
               </article>
@@ -1521,7 +1521,7 @@ function App() {
                 </div>
 
                 <p>
-                  {sessionItem.totalSets} series - {formatVolume(sessionItem.totalVolume)}
+                  {sessionItem.totalSets} séries - {formatVolume(sessionItem.totalVolume)}
                 </p>
 
                 {sessionItem.overallNotes ? (
@@ -1569,7 +1569,7 @@ function App() {
             <article className="metric-card">
               <span>Reps medias</span>
               <strong>{exerciseProgress.averageReps.toFixed(1)}</strong>
-              <small>media por serie</small>
+              <small>média por série</small>
             </article>
             <article className="metric-card">
               <span>Volume</span>
@@ -1639,7 +1639,7 @@ function App() {
         <div className="column-panel training-session-panel">
           <div className="panel-head">
             <div>
-              <p className="eyebrow">Sessao</p>
+              <p className="eyebrow">Sessão</p>
               <h2>{activeTrainingWorkout.name}</h2>
             </div>
 
@@ -1755,7 +1755,7 @@ function App() {
                       </div>
 
                       <label className="stacked-field">
-                        <span>Anotacao da série</span>
+                        <span>Anotação da série</span>
                         <textarea
                           value={setItem.note}
                           onChange={event =>
@@ -1770,7 +1770,7 @@ function App() {
                             )
                           }
                           rows={3}
-                          placeholder="Ex: ultima repeticao travou."
+                          placeholder="Ex: última repetição travou."
                         />
                       </label>
                     </div>
@@ -1811,7 +1811,7 @@ function App() {
         <div className="profile-copy">
           <strong>{user?.displayName?.trim() || user?.email || 'Atleta'}</strong>
           <p>{user?.email}</p>
-          <span>Ultimo login {lastLoginLabel}</span>
+          <span>Último login {lastLoginLabel}</span>
         </div>
       </div>
 
@@ -1829,14 +1829,14 @@ function App() {
       <div className="profile-section-head">
         <div>
           <p className="eyebrow">Seu resumo</p>
-          <h2>Visao geral do que ja esta salvo</h2>
+          <h2>Visao geral do que já está salvo</h2>
         </div>
       </div>
 
       <div className="profile-summary-card">
-        <p>{workouts.length} treinos ativos</p>
-        <p>{sessions.length} sessoes no historico</p>
-        <p>{totalTrackedSets} series registradas</p>
+        <p>{workouts.length} Treinos ativos</p>
+        <p>{sessions.length} sessões no histórico</p>
+        <p>{totalTrackedSets} séries registradas</p>
       </div>
 
       <div className="profile-network-card">
@@ -1844,13 +1844,13 @@ function App() {
         <p>
           {isOnline
             ? 'Tudo certo para continuar usando o app e manter seus treinos sincronizados.'
-            : 'Sem internet no momento. O que ja esta salvo continua visivel e volta a sincronizar quando a conexao retornar.'}
+            : 'Sem internet no momento. O que já está salvo continua visível e volta a sincronizar quando a conexão retornar.'}
         </p>
       </div>
 
       <div className="profile-section-head">
         <div>
-          <p className="eyebrow">Sua copia dos treinos</p>
+          <p className="eyebrow">Sua cópia dos treinos</p>
           <h2>Guarde ou recupere seus dados quando precisar</h2>
         </div>
       </div>
@@ -1858,7 +1858,7 @@ function App() {
       <div className="profile-info-card">
         <strong>Backup manual</strong>
         <p>
-          Exporte um arquivo com seus treinos, exercicios, sessoes e series para manter uma copia
+          Exporte um arquivo com seus treinos, exercícios, sessões e séries para manter uma cópia
           segura fora do app.
         </p>
         <span>Ao restaurar, somente a conta atual pode usar esse arquivo.</span>
@@ -1875,7 +1875,7 @@ function App() {
           ) : (
             <Download size={16} />
           )}
-          {busyAction === 'export' ? 'Salvando copia...' : 'Exportar copia'}
+          {busyAction === 'export' ? 'Salvando cópia...' : 'Exportar cópia'}
         </button>
 
         <button
@@ -1888,7 +1888,7 @@ function App() {
           ) : (
             <Upload size={16} />
           )}
-          {busyAction === 'backup-import' ? 'Restaurando copia...' : 'Importar copia'}
+          {busyAction === 'backup-import' ? 'Restaurando cópia...' : 'Importar cópia'}
         </button>
       </div>
 
@@ -1902,10 +1902,10 @@ function App() {
       <div className="profile-info-card">
         <strong>Arquivos aceitos</strong>
         <p>
-          Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino, Exercicio, Carga,
-          Repeticoes, Dia e Cor.
+          Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino, Exercício, Carga,
+          Repetições, Dia e Cor.
         </p>
-        <span>O LogGYM organiza o conteudo em estrutura de treino e ignora blocos vazios.</span>
+        <span>O LogGYM organiza o conteúdo em estrutura de treino e ignora blocos vazios.</span>
       </div>
 
       <div className="profile-action-stack">
@@ -2142,7 +2142,7 @@ function App() {
               <form className="auth-form" onSubmit={handleEmailLogin}>
                 <label>
                   <span>E-mail</span>
-                  <input placeholder="voce@exemplo.com" {...signInForm.register('email')} />
+                  <input placeholder="você@exemplo.com" {...signInForm.register('email')} />
                   <small>{signInForm.formState.errors.email?.message}</small>
                 </label>
                 <label>
@@ -2174,14 +2174,14 @@ function App() {
                 </label>
                 <label>
                   <span>E-mail</span>
-                  <input placeholder="voce@exemplo.com" {...signUpForm.register('email')} />
+                  <input placeholder="você@exemplo.com" {...signUpForm.register('email')} />
                   <small>{signUpForm.formState.errors.email?.message}</small>
                 </label>
                 <label>
                   <span>Senha</span>
                   <input
                     type="password"
-                    placeholder="Minimo de 8 caracteres"
+                    placeholder="Mínimo de 8 caracteres"
                     {...signUpForm.register('password')}
                   />
                   <small>{signUpForm.formState.errors.password?.message}</small>
@@ -2210,7 +2210,7 @@ function App() {
               <form className="auth-form" onSubmit={handleResetPassword}>
                 <label>
                   <span>E-mail</span>
-                  <input placeholder="voce@exemplo.com" {...resetForm.register('email')} />
+                  <input placeholder="você@exemplo.com" {...resetForm.register('email')} />
                   <small>{resetForm.formState.errors.email?.message}</small>
                 </label>
                 <button className="secondary-button wide" type="submit">
@@ -2226,7 +2226,7 @@ function App() {
 
             <div className="auth-footer-note">
               <Dumbbell size={16} />
-              <span>Seu planejamento sempre pronto para a proxima sessao.</span>
+              <span>Seu planejamento sempre pronto para a próxima sessão.</span>
             </div>
           </section>
         </main>

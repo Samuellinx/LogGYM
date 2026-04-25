@@ -19,7 +19,7 @@ LogGYM agora funciona como um produto de duas frentes no mesmo repositório:
 - Google Sign-In mobile com `@react-native-google-signin/google-signin`
 - React web com Vite `8`
 - Firebase Web SDK `12.12.1`
-- Validacao com `zod` + `react-hook-form`
+- Validação com `zod` + `react-hook-form`
 
 ## O que o projeto entrega
 
@@ -126,7 +126,7 @@ Resumo do obrigatório:
 npm run firebase:doctor
 ```
 
-O doctor atual valida:
+O doctor atual válida:
 
 - `firebase.json`
 - `firestore.rules`
@@ -234,7 +234,7 @@ Observação:
 - queries SQLite parametrizadas
 - tela autenticada protegida pela raiz de navegação
 - fila local de sincronização para não depender da rede no momento do registro
-- validação estrutural dos documentos remotos antes de gravar no SQLite
+- válidação estrutural dos documentos remotos antes de gravar no SQLite
 - release Android continua exigindo keystore fora do repositório
 
 ## Riscos residuais
@@ -250,16 +250,16 @@ Observação:
 ```mermaid
 flowchart TD
     A[Inicializacao do app] --> B[Bootstrap do SQLite]
-    B --> C[Restaurar sessao pelo Firebase Auth]
-    C --> D{Sessao encontrada?}
-    D -- Nao --> E[Tela de login]
+    B --> C[Restaurar sessão pelo Firebase Auth]
+    C --> D{Sessão encontrada?}
+    D -- Não --> E[Tela de login]
     D -- Sim --> F[Migrar dados locais antigos pelo e-mail]
     F --> G[Sincronizar fila local com Firestore]
     G --> H[Baixar snapshot remoto]
     H --> I[Atualizar cache SQLite]
     I --> J[Dashboard mobile]
 
-    E --> K{Metodo de entrada}
+    E --> K{Método de entrada}
     K --> L[Google]
     K --> M[E-mail e senha]
     K --> N[Criar conta]
@@ -267,23 +267,23 @@ flowchart TD
     L --> P[Firebase Auth]
     M --> P
     N --> P
-    O --> Q[Enviar e-mail de redefinicao]
+    O --> Q[Enviar e-mail de redefinição]
     P --> F
 
     J --> R[Treinos]
-    J --> S[Historico]
+    J --> S[Histórico]
     J --> T[Perfil]
     R --> U[Criar ou editar treino]
     U --> V[Salvar no SQLite e na sync_queue]
     V --> G
     R --> W[Executar treino]
-    W --> X[Salvar sessao local]
+    W --> X[Salvar sessão local]
     X --> Y[Mostrar resumo final]
     Y --> S
-    T --> Z[Backup, importacao, refresh e logout]
+    T --> Z[Backup, importação, refresh e logout]
 
     AA[Painel web React] --> AB[Firebase Auth web]
-    AB --> AC[Listar treinos do usuario]
+    AB --> AC[Listar treinos do usuário]
     AC --> AD[Criar ou editar treino]
     AD --> AE[Salvar no Firestore]
     AE --> H

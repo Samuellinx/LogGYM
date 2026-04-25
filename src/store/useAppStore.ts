@@ -122,7 +122,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Nao foi possivel sincronizar os treinos com a nuvem agora.',
+            'Não foi possível sincronizar os treinos com a nuvem agora.',
           );
         }
       }
@@ -137,7 +137,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       });
     } catch (error) {
       set({
-        error: toUserMessage(error, 'Nao foi possivel iniciar o aplicativo.'),
+        error: toUserMessage(error, 'Não foi possível iniciar o aplicativo.'),
         isBootstrapping: false,
       });
     }
@@ -163,7 +163,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Nao foi possivel sincronizar os treinos com a nuvem agora.',
+            'Não foi possível sincronizar os treinos com a nuvem agora.',
           );
         }
       }
@@ -192,7 +192,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Entrou na conta, mas a sincronizacao ainda nao aconteceu.',
+            'Entrou na conta, mas a sincronização ainda não aconteceu.',
           );
         }
       }
@@ -216,7 +216,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const capabilities = getAuthCapabilities();
 
       if (!capabilities.allowDevLogin) {
-        throw new Error('Modo DEV local indisponivel nesta build.');
+        throw new Error('Modo DEV local indisponível nesta build.');
       }
 
       const user = await signInWithDevelopmentAccount();
@@ -232,7 +232,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } catch (error) {
       const message = toUserMessage(
         error,
-        'Falha ao abrir a sessao de desenvolvimento.',
+        'Falha ao abrir a sessão de desenvolvimento.',
       );
       set({error: message});
       throw new Error(message);
@@ -252,7 +252,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Entrou na conta, mas a sincronizacao ainda nao aconteceu.',
+            'Entrou na conta, mas a sincronização ainda não aconteceu.',
           );
         }
       }
@@ -295,7 +295,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } catch (error) {
       const message = toUserMessage(
         error,
-        'Falha ao enviar o e-mail de redefinicao.',
+        'Falha ao enviar o e-mail de redefinição.',
       );
       set({error: message});
       throw new Error(message);

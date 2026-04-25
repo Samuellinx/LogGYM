@@ -207,7 +207,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     if (remainingSlots <= 0) {
       Alert.alert(
         'Limite atingido',
-        `Este treino ja chegou ao limite de ${MAX_EXERCISES} exercicios.`,
+        `Este treino já chegou ao limite de ${MAX_EXERCISES} exercícios.`,
       );
       return;
     }
@@ -219,7 +219,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     if (exercisesToAdd < exerciseBatchCount) {
       Alert.alert(
         'Quantidade ajustada',
-        `Foram adicionados ${exercisesToAdd} exercicios para respeitar o limite do treino.`,
+        `Foram adicionados ${exercisesToAdd} exercícios para respeitar o limite do treino.`,
       );
     }
   };
@@ -255,7 +255,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
         {route.params?.workoutId ? 'Editar treino' : 'Novo treino'}
       </Text>
       <Text style={styles.subtitle}>
-        Monte o treino com cor, exercicios e anotacoes do jeito que voce realmente usa.
+        Monte o treino com cor, exercícios e anotações do jeito que você realmente usa.
       </Text>
 
       {isLoading ? (
@@ -366,9 +366,9 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
 
           <View style={styles.exerciseHeader}>
             <View style={styles.exerciseHeaderCopy}>
-              <Text style={styles.exerciseTitle}>Exercicios</Text>
+              <Text style={styles.exerciseTitle}>Exercícios</Text>
               <Text style={styles.exerciseSubtitle}>
-                Defina ordem, carga, repeticoes e observacoes para cada bloco.
+                Defina ordem, carga, repeticoes e observações para cada bloco.
               </Text>
             </View>
 
@@ -408,7 +408,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
           {fields.map((item, index) => (
             <View key={item.id} style={styles.exerciseCard}>
               <View style={styles.exerciseCardHeader}>
-                <Text style={styles.exerciseCardTitle}>Exercicio {index + 1}</Text>
+                <Text style={styles.exerciseCardTitle}>Exercício {index + 1}</Text>
                 {fields.length > 1 ? (
                   <Pressable
                     hitSlop={10}
@@ -479,7 +479,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                 </Text>
                 {watch(`exercises.${index}.baseLoadLegacy`) ? (
                   <Text style={styles.loadPreviewHint}>
-                    A carga antiga foi mantida como referencia ate voce substituir por Kg e Plates.
+                    A carga antiga foi mantida como referência até você substituir por Kg e Plates.
                   </Text>
                 ) : null}
               </View>
@@ -503,7 +503,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                 name={`exercises.${index}.note`}
                 render={({field}) => (
                   <TextField
-                    label="Observacao"
+                    label="Observação"
                     placeholder="Ex: segurar 1 segundo no pico."
                     value={field.value}
                     onChangeText={field.onChange}
@@ -526,7 +526,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
       <ConfirmModal
         visible={showDiscardModal}
         title="Tem certeza que deseja voltar?"
-        description="Suas alteracoes nao salvas serao perdidas."
+        description="Suas alterações não salvas serão perdidas."
         confirmLabel="Voltar mesmo assim"
         cancelLabel="Continuar editando"
         confirmVariant="danger"
@@ -536,9 +536,9 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
 
       <ConfirmModal
         visible={exerciseToDelete !== null}
-        title="Excluir exercicio?"
-        description="Esse exercicio sera removido do treino atual."
-        confirmLabel="Excluir exercicio"
+        title="Excluir exercício?"
+        description="Esse exercício será removido do treino atual."
+        confirmLabel="Excluir exercício"
         cancelLabel="Cancelar"
         confirmVariant="danger"
         onConfirm={confirmExerciseDeletion}

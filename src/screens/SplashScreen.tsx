@@ -18,14 +18,14 @@ export const SplashScreen = ({error, onRetry}: SplashScreenProps) => (
 
     <View style={styles.copy}>
       <Text style={styles.title}>LogGYM</Text>
-      <Text style={styles.subtitle}>Preparando seu espaco de treino</Text>
+      <Text style={styles.subtitle}>Preparando seu espaço de treino</Text>
     </View>
 
     {error ? (
       <View style={styles.errorCard}>
         <ShieldCheck color={theme.colors.warning} size={20} />
         <Text style={styles.errorText}>
-          Nao foi possivel abrir o app agora. Tente novamente.
+          Não foi possível abrir o app agora. Tente novamente.
         </Text>
       </View>
     ) : (

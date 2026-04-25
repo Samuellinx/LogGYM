@@ -1010,7 +1010,7 @@ export const importWorkouts = async (
   inputs: WorkoutInput[],
 ) => {
   if (inputs.length === 0) {
-    throw new Error('Nenhum treino valido foi encontrado para importar.');
+    throw new Error('Nenhum treino válido foi encontrado para importar.');
   }
 
   const validatedInputs = inputs.map(input => workoutInputSchema.parse(input));
@@ -1021,13 +1021,13 @@ export const importWorkouts = async (
 
   if (validatedInputs.length > MAX_IMPORTED_WORKOUTS) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importação.`,
     );
   }
 
   if (totalExercises > MAX_IMPORTED_EXERCISES) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercicios por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercícios por importação.`,
     );
   }
 
@@ -1098,7 +1098,7 @@ export const duplicateWorkout = async (userId: string, workoutId: string) => {
   const workout = await getWorkoutDetail(userId, workoutId);
 
   if (!workout) {
-    throw new Error('Treino nao encontrado para duplicacao.');
+    throw new Error('Treino não encontrado para duplicação.');
   }
 
   return saveWorkout(userId, {
@@ -1153,7 +1153,7 @@ export const saveTrainingSession = async (
     .filter(exercise => exercise.sets.length > 0);
 
   if (validExercises.length === 0) {
-    throw new Error('Adicione pelo menos uma serie valida antes de salvar.');
+    throw new Error('Adicione pelo menos uma série válida antes de salvar.');
   }
 
   const sessionId = createId();

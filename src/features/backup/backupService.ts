@@ -111,19 +111,19 @@ const ensureUniqueIds = (ids: string[], message: string) => {
 const validateBackupRelations = (payload: BackupFilePayload) => {
   ensureUniqueIds(
     payload.data.workouts.map(item => item.id),
-    'O backup esta inconsistente: IDs de treinos duplicados.',
+    'O backup está inconsistente: IDs de treinos duplicados.',
   );
   ensureUniqueIds(
     payload.data.workoutExercises.map(item => item.id),
-    'O backup esta inconsistente: IDs de exercicios duplicados.',
+    'O backup está inconsistente: IDs de exercícios duplicados.',
   );
   ensureUniqueIds(
     payload.data.workoutSessions.map(item => item.id),
-    'O backup esta inconsistente: IDs de sessoes duplicados.',
+    'O backup está inconsistente: IDs de sessões duplicados.',
   );
   ensureUniqueIds(
     payload.data.sessionSets.map(item => item.id),
-    'O backup esta inconsistente: IDs de series duplicados.',
+    'O backup está inconsistente: IDs de séries duplicados.',
   );
 
   const workoutIds = new Set(payload.data.workouts.map(item => item.id));
@@ -131,41 +131,41 @@ const validateBackupRelations = (payload: BackupFilePayload) => {
   const sessionIds = new Set(payload.data.workoutSessions.map(item => item.id));
 
   if (payload.stats.workouts !== payload.data.workouts.length) {
-    throw new Error('O backup esta inconsistente: total de treinos invalido.');
+    throw new Error('O backup está inconsistente: total de treinos inválido.');
   }
 
   if (payload.stats.workoutExercises !== payload.data.workoutExercises.length) {
-    throw new Error('O backup esta inconsistente: total de exercicios invalido.');
+    throw new Error('O backup está inconsistente: total de exercícios inválido.');
   }
 
   if (payload.stats.workoutSessions !== payload.data.workoutSessions.length) {
-    throw new Error('O backup esta inconsistente: total de sessoes invalido.');
+    throw new Error('O backup está inconsistente: total de sessões inválido.');
   }
 
   if (payload.stats.sessionSets !== payload.data.sessionSets.length) {
-    throw new Error('O backup esta inconsistente: total de series invalido.');
+    throw new Error('O backup está inconsistente: total de séries inválido.');
   }
 
   for (const exercise of payload.data.workoutExercises) {
     if (!workoutIds.has(exercise.workoutId)) {
-      throw new Error('O backup esta inconsistente: exercicio sem treino pai valido.');
+      throw new Error('O backup está inconsistente: exercício sem treino pai válido.');
     }
   }
 
   for (const session of payload.data.workoutSessions) {
     if (session.workoutId && !workoutIds.has(session.workoutId)) {
-      throw new Error('O backup esta inconsistente: sessao aponta para um treino inexistente.');
+      throw new Error('O backup está inconsistente: sessão aponta para um treino inexistente.');
     }
   }
 
   for (const set of payload.data.sessionSets) {
     if (!sessionIds.has(set.sessionId)) {
-      throw new Error('O backup esta inconsistente: serie sem sessao pai valida.');
+      throw new Error('O backup está inconsistente: série sem sessão pai válida.');
     }
 
     if (set.templateExerciseId && !workoutExerciseIds.has(set.templateExerciseId)) {
       throw new Error(
-        'O backup esta inconsistente: serie aponta para um exercicio de treino inexistente.',
+        'O backup está inconsistente: série aponta para um exercício de treino inexistente.',
       );
     }
   }
@@ -323,7 +323,7 @@ const readBackupPayloadFromPicker = async () => {
   }
 
   if (!BACKUP_FILE_EXTENSION.test(pickedFile.name ?? '')) {
-    throw new Error('Selecione um arquivo JSON de backup valido do LogGYM.');
+    throw new Error('Selecione um arquivo JSON de backup válido do LogGYM.');
   }
 
   if (pickedFile.size && pickedFile.size > MAX_BACKUP_SIZE_BYTES) {
@@ -342,7 +342,7 @@ const readBackupPayloadFromPicker = async () => {
 
   const localCopy = localCopyResponse[0];
   if (localCopy.status !== 'success') {
-    throw new Error('Nao foi possivel preparar o arquivo de backup para importacao.');
+    throw new Error('Não foi possível preparar o arquivo de backup para importação.');
   }
 
   const localPath = decodeFileUriToPath(localCopy.localUri);
@@ -354,7 +354,7 @@ const readBackupPayloadFromPicker = async () => {
     try {
       parsedJson = JSON.parse(contents) as unknown;
     } catch {
-      throw new Error('O arquivo selecionado nao e um backup valido do LogGYM.');
+      throw new Error('O arquivo selecionado não é um backup válido do LogGYM.');
     }
 
     let payload: BackupFilePayload;
@@ -362,7 +362,7 @@ const readBackupPayloadFromPicker = async () => {
     try {
       payload = backupFileSchema.parse(parsedJson);
     } catch {
-      throw new Error('O arquivo selecionado nao e compativel com o LogGYM.');
+      throw new Error('O arquivo selecionado não e compatível com o LogGYM.');
     }
 
     validateBackupRelations(payload);
@@ -399,7 +399,7 @@ export const exportBackupForCurrentUser = async (
     });
 
     if (savedDocument.error) {
-      throw new Error('Nao foi possivel salvar o backup agora.');
+      throw new Error('Não foi possível salvar o backup agora.');
     }
 
     return {
@@ -433,7 +433,7 @@ export const importBackupForCurrentUser = async (
       payload.user.email.toLowerCase() !== user.email.toLowerCase()
     ) {
       throw new Error(
-        'Este backup pertence a outra conta. O LogGYM so permite restaurar backup da mesma conta autenticada.',
+        'Este backup pertence a outra conta. O LogGYM só permite restaurar backup da mesma conta autenticada.',
       );
     }
 

@@ -1,16 +1,16 @@
 export const setTypeOptions = [
-  'Serie de aquecimento',
-  'Serie preparatoria',
-  'Serie de trabalho',
+  'Série de aquecimento',
+  'Série preparatória',
+  'Série de trabalho',
 ];
 
 export const weekdayOptions = [
   'Segunda',
-  'Terca',
+  'Terça',
   'Quarta',
   'Quinta',
   'Sexta',
-  'Sabado',
+  'Sábado',
   'Domingo',
 ];
 
@@ -25,8 +25,8 @@ export const accentSpectrum = [
 ];
 
 export const securityHighlights = [
-  'Sessao protegida pelo Firebase Auth',
+  'Sessão protegida pelo Firebase Auth',
   'Dados offline salvos em SQLite parametrizado',
   'Sem tokens persistidos em texto puro',
-  'Backups so restauram dados da mesma conta autenticada',
+  'Backups só restauram dados da mesma conta autenticada',
 ];

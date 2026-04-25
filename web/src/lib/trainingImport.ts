@@ -7,11 +7,11 @@ import {importWorkoutsForUser} from './workouts';
 
 const weekdayOptions = [
   'Segunda',
-  'Terca',
+  'Terça',
   'Quarta',
   'Quinta',
   'Sexta',
-  'Sabado',
+  'Sábado',
   'Domingo',
 ];
 
@@ -26,9 +26,9 @@ const accentSpectrum = [
 ];
 
 const setTypeOptions = [
-  'Serie de aquecimento',
-  'Serie preparatoria',
-  'Serie de trabalho',
+  'Série de aquecimento',
+  'Série preparatória',
+  'Série de trabalho',
 ];
 
 const workoutImportSchema = z.object({
@@ -142,11 +142,11 @@ const weekdayAliasMap: Record<string, string> = {
   segundafeira: 'Segunda',
   monday: 'Segunda',
   mon: 'Segunda',
-  ter: 'Terca',
-  terca: 'Terca',
-  tercafeira: 'Terca',
-  tuesday: 'Terca',
-  tue: 'Terca',
+  ter: 'Terça',
+  terca: 'Terça',
+  tercafeira: 'Terça',
+  tuesday: 'Terça',
+  tue: 'Terça',
   qua: 'Quarta',
   quarta: 'Quarta',
   quartafeira: 'Quarta',
@@ -162,10 +162,10 @@ const weekdayAliasMap: Record<string, string> = {
   sextafeira: 'Sexta',
   friday: 'Sexta',
   fri: 'Sexta',
-  sab: 'Sabado',
-  sabado: 'Sabado',
-  saturday: 'Sabado',
-  sat: 'Sabado',
+  sab: 'Sábado',
+  sabado: 'Sábado',
+  saturday: 'Sábado',
+  sat: 'Sábado',
   dom: 'Domingo',
   domingo: 'Domingo',
   sunday: 'Domingo',
@@ -887,7 +887,7 @@ const sanitizeWorkoutSeeds = (user: User, workouts: WorkoutSeed[], fallbackName:
 
   if (validWorkouts.length === 0) {
     throw new Error(
-      'Nao encontrei um treino valido nesse arquivo. Use colunas como Treino, Exercicio, Carga e Repeticoes ou um TXT com blocos iniciados por "Treino:".',
+      'Não encontrei um treino válido nesse arquivo. Use colunas como Treino, Exercício, Carga e Repetições ou um TXT com blocos iniciados por "Treino:".',
     );
   }
 
@@ -904,7 +904,7 @@ const sanitizeWorkoutSeeds = (user: User, workouts: WorkoutSeed[], fallbackName:
 
   if (totalExercises > MAX_IMPORTED_EXERCISES) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercicios por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercícios por importação.`,
     );
   }
 
@@ -982,7 +982,7 @@ export const importTrainingFileForCurrentUser = async (
   file: File,
 ): Promise<TrainingImportResult> => {
   if (file.size > TRAINING_IMPORT_SIZE_BYTES) {
-    throw new Error('O arquivo excede o limite de 10 MB e nao pode ser importado.');
+    throw new Error('O arquivo excede o limite de 10 MB e não pode ser importado.');
   }
 
   if (!TRAINING_IMPORT_FILE_EXTENSION.test(file.name)) {

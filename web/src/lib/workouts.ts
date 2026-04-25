@@ -244,13 +244,13 @@ export const importWorkoutsForUser = async (
 
   if (validatedWorkouts.length > MAX_IMPORTED_WORKOUTS) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importação.`,
     );
   }
 
   if (totalExercises > MAX_IMPORTED_EXERCISES) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercicios por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_EXERCISES} exercícios por importação.`,
     );
   }
 

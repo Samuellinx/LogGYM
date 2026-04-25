@@ -95,7 +95,7 @@ const MainTabs = () => (
     }}>
     <Tabs.Screen name="Dashboard" component={DashboardScreen} />
     <Tabs.Screen name="Workouts" component={WorkoutsScreen} options={{title: 'Treinos'}} />
-    <Tabs.Screen name="History" component={HistoryScreen} options={{title: 'Historico'}} />
+    <Tabs.Screen name="History" component={HistoryScreen} options={{title: 'Histórico'}} />
     <Tabs.Screen name="Profile" component={ProfileScreen} options={{title: 'Perfil'}} />
   </Tabs.Navigator>
 );
@@ -139,7 +139,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="ExerciseProgress"
             component={ExerciseProgressScreen}
-            options={{title: 'Evolucao do exercicio'}}
+            options={{title: 'Evolucao do exercício'}}
           />
         </Stack.Navigator>
       ) : (

@@ -24,7 +24,7 @@ const App = () => {
 
   useEffect(() => {
     bootstrap().catch(() => {
-      // O estado de erro ja e tratado dentro do store.
+      // O estado de erro já é tratado dentro do store.
     });
 
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -42,7 +42,7 @@ const App = () => {
     }
 
     refreshData().catch(() => {
-      // O erro de sincronizacao ja e refletido pelo store.
+      // O erro de sincronização já é refletido pelo store.
     });
   }, [isOnline, refreshData, session]);
 
@@ -52,7 +52,7 @@ const App = () => {
         error={error}
         onRetry={() => {
           bootstrap().catch(() => {
-            // O estado de erro ja e tratado dentro do store.
+            // O estado de erro já é tratado dentro do store.
           });
         }}
       />
@@ -70,7 +70,7 @@ const App = () => {
           <OfflineBanner visible={!isOnline && Boolean(session)} />
           {error && session ? (
             <Text style={styles.errorLabel}>
-              Algumas informacoes nao foram atualizadas agora. Tente novamente em instantes.
+              Algumas informações não foram atualizadas agora. Tente novamente em instantes.
             </Text>
           ) : null}
           <View style={styles.navigatorWrap}>

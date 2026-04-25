@@ -67,7 +67,7 @@ export const WorkoutCompletionModal = ({
             <View style={styles.copyBlock}>
               <Text style={styles.title}>Treino finalizado</Text>
               <Text style={styles.subtitle}>
-                Parabens. Seu treino foi salvo e o historico ja foi atualizado.
+                Parabéns. Seu treino foi salvo e o histórico já foi atualizado.
               </Text>
               {summary ? <Text style={styles.workoutName}>{summary.workoutName}</Text> : null}
             </View>
@@ -75,7 +75,7 @@ export const WorkoutCompletionModal = ({
             {summary ? (
               <>
                 <View style={styles.highlightCard}>
-                  <Text style={styles.highlightLabel}>Series registradas</Text>
+                  <Text style={styles.highlightLabel}>Séries registradas</Text>
                   <Text style={styles.highlightValue}>{summary.totalSets}</Text>
                 </View>
 
@@ -93,17 +93,17 @@ export const WorkoutCompletionModal = ({
                     </Text>
                   </View>
                   <View style={styles.metricCard}>
-                    <Text style={styles.metricLabel}>Maior repeticao</Text>
+                    <Text style={styles.metricLabel}>Maior repetição</Text>
                     <Text style={styles.metricValue}>{formatMetric(summary.maxReps)}</Text>
                   </View>
                   <View style={styles.metricCard}>
-                    <Text style={styles.metricLabel}>Menor repeticao</Text>
+                    <Text style={styles.metricLabel}>Menor repetição</Text>
                     <Text style={styles.metricValue}>{formatMetric(summary.minReps)}</Text>
                   </View>
                 </View>
 
                 <View style={styles.groupCard}>
-                  <Text style={styles.groupTitle}>Series por grupo muscular</Text>
+                  <Text style={styles.groupTitle}>Séries por grupo muscular</Text>
                   <View style={styles.groupList}>
                     {summary.seriesByGroup.map(group => (
                       <View key={group.label} style={styles.groupPill}>

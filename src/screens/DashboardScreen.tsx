@@ -35,8 +35,8 @@ export const DashboardScreen = () => {
   const deferredSearch = useDeferredValue(search);
 
   const heroSubtitle = dashboard?.lastSession?.performedAt
-    ? `Ultima sessao: ${formatSessionDate(dashboard.lastSession.performedAt)}`
-    : 'Seu espaco esta pronto para receber o primeiro treino.';
+    ? `Última sessão: ${formatSessionDate(dashboard.lastSession.performedAt)}`
+    : 'Seu espaço está pronto para receber o primeiro treino.';
   const normalized = deferredSearch.trim().toLowerCase();
   const highlightedWorkouts = !normalized
     ? dashboard?.suggestedTemplates ?? []
@@ -48,7 +48,7 @@ export const DashboardScreen = () => {
   const workoutSectionTitle = normalized ? 'Resultados da busca' : 'Treinos em foco';
   const workoutSectionSubtitle = normalized
     ? 'Toque em um treino para abrir, iniciar ou duplicar.'
-    : 'Seus templates prontos para uso rapido';
+    : 'Seus templates prontos para uso rápido';
 
   const handleDuplicate = async (workoutId: string) => {
     if (!session) {
@@ -93,13 +93,13 @@ export const DashboardScreen = () => {
         <StatCard
           label="Semana"
           value={String(dashboard?.weeklySessions ?? 0)}
-          helper="sessoes registradas"
+          helper="Sessões registradas"
           onPress={() => navigation.navigate('History')}
         />
         <StatCard
           label="Sets"
           value={formatCompactNumber(dashboard?.totalTrackedSets ?? 0)}
-          helper="series salvas"
+          helper="Sessões salvas"
           onPress={() => navigation.navigate('History')}
         />
       </View>
@@ -108,20 +108,20 @@ export const DashboardScreen = () => {
         <StatCard
           label="Templates"
           value={String(dashboard?.totalTemplates ?? 0)}
-          helper="treinos ativos"
+          helper="Treinos ativos"
           onPress={() => navigation.navigate('Workouts')}
         />
         <StatCard
-          label="Historico"
+          label="Histórico"
           value={String(dashboard?.totalSessions ?? 0)}
-          helper="execucoes totais"
+          helper="Execuções totais"
           onPress={() => navigation.navigate('History')}
         />
       </View>
 
       <TextField
         label="Pesquisar treinos"
-        placeholder="Nome, foco ou anotacao"
+        placeholder="Nome, foco ou anotação"
         value={search}
         onChangeText={setSearch}
       />
@@ -165,7 +165,7 @@ export const DashboardScreen = () => {
 
       <SectionHeader
         title="Recordes"
-        subtitle="Cargas maximas observadas no historico"
+        subtitle="Cargas máximas observadas no histórico"
       />
 
       <View style={styles.recordList}>
@@ -183,14 +183,14 @@ export const DashboardScreen = () => {
         ) : (
           <EmptyState
             title="Sem recordes ainda"
-            description="Registre sua primeira execucao para liberar os indicadores de carga."
+            description="Registre sua primeira execução para liberar os indicadores de carga."
           />
         )}
       </View>
 
       <SectionHeader
-        title="Exercicios recentes"
-        subtitle="Atividade mais recente do seu historico"
+        title="Exercícios recentes"
+        subtitle="Atividade mais recente do seu histórico"
       />
 
       <View style={styles.exerciseList}>
@@ -206,14 +206,14 @@ export const DashboardScreen = () => {
                 <TagChip label={formatLoad(item.maxLoad)} active />
               </View>
               <Text style={styles.exerciseMeta}>
-                {item.totalSets} series - {formatSessionDate(item.lastPerformedAt)}
+                {item.totalSets} séries - {formatSessionDate(item.lastPerformedAt)}
               </Text>
             </Pressable>
           ))
         ) : (
           <EmptyState
-            title="Historico recente vazio"
-            description="Assim que voce registrar um treino, os exercicios aparecem aqui."
+            title="Histórico recente vazio"
+            description="Assim que você registrar um treino, os exercícios aparecem aqui."
           />
         )}
       </View>

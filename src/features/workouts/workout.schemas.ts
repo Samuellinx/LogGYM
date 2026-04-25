@@ -10,8 +10,8 @@ const optionalLoadFieldSchema = z
 
 export const workoutInputExerciseSchema = z.object({
   id: z.string().optional(),
-  name: z.string().trim().min(2, 'Informe o nome do exercicio.').max(60),
-  muscleGroup: z.string().trim().min(2, 'Escolha o tipo de serie.').max(40),
+  name: z.string().trim().min(2, 'Informe o nome do exercício.').max(60),
+  muscleGroup: z.string().trim().min(2, 'Escolha o tipo de série.').max(40),
   baseLoad: z.string().trim().max(60),
   targetReps: z.string().trim().min(1, 'Informe a faixa de repeticoes.').max(20),
   note: z.string().trim().max(220),
@@ -19,8 +19,8 @@ export const workoutInputExerciseSchema = z.object({
 
 export const workoutExerciseSchema = z.object({
   id: z.string().optional(),
-  name: z.string().trim().min(2, 'Informe o nome do exercicio.').max(60),
-  muscleGroup: z.string().trim().min(2, 'Escolha o tipo de serie.').max(40),
+  name: z.string().trim().min(2, 'Informe o nome do exercício.').max(60),
+  muscleGroup: z.string().trim().min(2, 'Escolha o tipo de série.').max(40),
   baseLoadKg: optionalLoadFieldSchema,
   baseLoadPlates: optionalLoadFieldSchema,
   baseLoadLegacy: z.string().trim().max(60),
@@ -35,12 +35,12 @@ export const workoutInputSchema = z.object({
   accentColor: z
     .string()
     .trim()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Cor invalida.'),
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Cor inválida.'),
   scheduledDay: z.string().trim().max(20).nullable().optional(),
   exercises: z
     .array(workoutInputExerciseSchema)
-    .min(1, 'Adicione pelo menos um exercicio.')
-    .max(12, 'Limite de 12 exercicios por treino.'),
+    .min(1, 'Adicione pelo menos um exercício.')
+    .max(12, 'Limite de 12 exercícios por treino.'),
 });
 
 export const workoutFormSchema = z.object({
@@ -50,12 +50,12 @@ export const workoutFormSchema = z.object({
   accentColor: z
     .string()
     .trim()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Cor invalida.'),
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Cor inválida.'),
   scheduledDay: z.string().trim().max(20).nullable().optional(),
   exercises: z
     .array(workoutExerciseSchema)
-    .min(1, 'Adicione pelo menos um exercicio.')
-    .max(12, 'Limite de 12 exercicios por treino.'),
+    .min(1, 'Adicione pelo menos um exercício.')
+    .max(12, 'Limite de 12 exercícios por treino.'),
 });
 
 export const sessionSetInputSchema = z.object({
@@ -81,7 +81,7 @@ export const trainingSessionInputSchema = z.object({
     .trim()
     .min(10)
     .max(40)
-    .refine(value => !Number.isNaN(Date.parse(value)), 'Data da sessao invalida.'),
+    .refine(value => !Number.isNaN(Date.parse(value)), 'Data da sessão inválida.'),
   exercises: z.array(trainingExerciseInputSchema).min(1).max(24),
 });
 

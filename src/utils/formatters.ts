@@ -3,7 +3,7 @@ import {ptBR} from 'date-fns/locale';
 
 export const formatSessionDate = (value: string | null) => {
   if (!value) {
-    return 'Ainda nao executado';
+    return 'Ainda não executado';
   }
 
   const date = new Date(value);

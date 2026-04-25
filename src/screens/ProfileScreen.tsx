@@ -37,7 +37,7 @@ export const ProfileScreen = () => {
         style: 'destructive',
         onPress: () => {
           signOut().catch(() => {
-            // A limpeza local ja e suficiente; qualquer falha remota nao bloqueia logout.
+            // A limpeza local já é suficiente; qualquer falha remota não bloqueia logout.
           });
         },
       },
@@ -59,16 +59,16 @@ export const ProfileScreen = () => {
       }
 
       Alert.alert(
-        'Copia salva',
+        'Cópia salva',
         [
           `${result.fileName} salvo com sucesso.`,
-          `${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series foram incluidos nesse arquivo.`,
+          `${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries foram incluídos nesse arquivo.`,
         ].join(' '),
       );
     } catch (error) {
       Alert.alert(
-        'Nao foi possivel salvar sua copia',
-        toUserMessage(error, 'Nao foi possivel exportar seus treinos agora.'),
+        'Não foi possível salvar sua cópia',
+        toUserMessage(error, 'Não foi possível exportar seus treinos agora.'),
       );
     } finally {
       setActiveAction(null);
@@ -92,16 +92,16 @@ export const ProfileScreen = () => {
       await refreshData();
 
       Alert.alert(
-        'Copia restaurada',
+        'Cópia restaurada',
         [
-          `${result.workouts} treinos, ${result.workoutSessions} sessoes e ${result.sessionSets} series foram restaurados.`,
-          'A restauracao so aceita arquivos da sua propria conta.',
+          `${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries foram restaurados.`,
+          'A restauração só aceita arquivos da sua própria conta.',
         ].join(' '),
       );
     } catch (error) {
       Alert.alert(
-        'Nao foi possivel restaurar sua copia',
-        toUserMessage(error, 'Nao foi possivel restaurar seus treinos agora.'),
+        'Não foi possível restaurar sua cópia',
+        toUserMessage(error, 'Não foi possível restaurar seus treinos agora.'),
       );
     } finally {
       setActiveAction(null);
@@ -110,8 +110,8 @@ export const ProfileScreen = () => {
 
   const handleImportBackup = () => {
     Alert.alert(
-      'Restaurar copia',
-      'Isso vai substituir os treinos e o historico atuais pelos dados do arquivo selecionado. Deseja continuar?',
+      'Restaurar cópia',
+      'Isso vai substituir os treinos e o histórico atuais pelos dados do arquivo selecionado. Deseja continuar?',
       [
         {text: 'Cancelar', style: 'cancel'},
         {
@@ -144,18 +144,18 @@ export const ProfileScreen = () => {
       Alert.alert(
         'Treinos importados',
         [
-          `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercicios prontos para uso.`,
+          `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercícios prontos para uso.`,
           result.skippedWorkouts > 0
             ? `${result.skippedWorkouts} treino(s) incompleto(s) foram ignorados.`
-            : 'Tudo que foi reconhecido ja esta salvo na sua conta.',
+            : 'Tudo que foi reconhecido já está salvo na sua conta.',
         ].join(' '),
       );
     } catch (error) {
       Alert.alert(
-        'Nao foi possivel importar o arquivo',
+        'Não foi possível importar o arquivo',
         toUserMessage(
           error,
-          'Nao foi possivel converter esse arquivo em estrutura de treino agora.',
+          'Não foi possível converter esse arquivo em estrutura de treino agora.',
         ),
       );
     } finally {
@@ -180,7 +180,7 @@ export const ProfileScreen = () => {
           <Text style={styles.name}>{session?.user.name}</Text>
           <Text style={styles.email}>{session?.user.email}</Text>
           <Text style={styles.meta}>
-            Ultimo login {formatSessionDate(session?.user.lastLoginAt ?? null)}
+            Último login {formatSessionDate(session?.user.lastLoginAt ?? null)}
           </Text>
         </View>
       </View>
@@ -204,13 +204,13 @@ export const ProfileScreen = () => {
         />
       </View>
 
-      <SectionHeader title="Seu resumo" subtitle="Visao geral do que ja esta salvo" />
+      <SectionHeader title="Seu resumo" subtitle="Visão geral do que já está salvo" />
 
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryText}>{workouts.length} treinos ativos</Text>
-        <Text style={styles.summaryText}>{history.length} sessoes no historico</Text>
+        <Text style={styles.summaryText}>{workouts.length} Treinos ativos</Text>
+        <Text style={styles.summaryText}>{history.length} sessões no histórico</Text>
         <Text style={styles.summaryText}>
-          {dashboard?.totalTrackedSets ?? 0} series registradas
+          {dashboard?.totalTrackedSets ?? 0} séries registradas
         </Text>
       </View>
 
@@ -223,20 +223,20 @@ export const ProfileScreen = () => {
         <Text style={styles.networkText}>
           {isOnline
             ? 'Tudo certo para continuar usando o app e manter seus treinos sincronizados.'
-            : 'Sem internet no momento. O que ja esta salvo continua disponivel neste aparelho e sera sincronizado quando a conexao voltar.'}
+            : 'Sem internet no momento. O que já está salvo continua disponível neste aparelho e será sincronizado quando a conexão voltar.'}
         </Text>
       </View>
 
       <SectionHeader
-        title="Sua copia dos treinos"
+        title="Sua cópia dos treinos"
         subtitle="Guarde ou recupere seus dados quando precisar"
       />
 
       <View style={styles.backupCard}>
         <Text style={styles.backupTitle}>Backup manual</Text>
         <Text style={styles.backupText}>
-          Exporte um arquivo com seus treinos, exercicios, sessoes e series para
-          manter uma copia segura fora do app.
+          Exporte um arquivo com seus treinos, exercícios, sessões e séries para
+          manter uma cópia segura fora do app.
         </Text>
         <Text style={styles.backupHint}>
           Ao restaurar, somente a conta atual pode usar esse arquivo.
@@ -245,14 +245,14 @@ export const ProfileScreen = () => {
 
       <Button
         variant="secondary"
-        label={activeAction === 'export' ? 'Salvando copia...' : 'Exportar copia'}
+        label={activeAction === 'export' ? 'Salvando cópia...' : 'Exportar cópia'}
         onPress={handleExportBackup}
         disabled={!session || isBusy}
       />
       <Button
         variant="secondary"
         label={
-          activeAction === 'backup-import' ? 'Restaurando copia...' : 'Importar copia'
+          activeAction === 'backup-import' ? 'Restaurando cópia...' : 'Importar cópia'
         }
         onPress={handleImportBackup}
         disabled={!session || isBusy}
@@ -267,10 +267,10 @@ export const ProfileScreen = () => {
         <Text style={styles.backupTitle}>Arquivos aceitos</Text>
         <Text style={styles.backupText}>
           Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino,
-          Exercicio, Carga, Repeticoes, Dia e Cor.
+          Exercício, Carga, Repetições, Dia e Cor.
         </Text>
         <Text style={styles.backupHint}>
-          O app organiza o conteudo em estrutura de treino e ignora blocos vazios
+          O app organiza o conteúdo em estrutura de treino e ignora blocos vazios
           ou incompletos.
         </Text>
       </View>

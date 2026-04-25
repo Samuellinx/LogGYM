@@ -24,24 +24,24 @@ const toAuthMessage = (error: unknown, fallback: string) => {
     case 'auth/popup-blocked':
       return new Error('Libere pop-ups no navegador para continuar com o login.');
     case 'auth/network-request-failed':
-      return new Error('Nao foi possivel conectar agora. Verifique sua internet.');
+      return new Error('Não foi possível conectar agora. Verifique sua internet.');
     case 'auth/unauthorized-domain':
-      return new Error('Este endereco ainda nao esta autorizado para login.');
+      return new Error('Este endereço ainda não está autorizado para login.');
     case 'auth/operation-not-allowed':
-      return new Error('Este metodo de acesso nao esta disponivel no momento.');
+      return new Error('Este método de acesso não está disponível no momento.');
     case 'auth/too-many-requests':
       return new Error('Muitas tentativas em pouco tempo. Aguarde e tente novamente.');
     case 'auth/invalid-login-credentials':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
     case 'auth/invalid-credential':
-      return new Error('E-mail ou senha invalidos.');
+      return new Error('E-mail ou senha inválidos.');
     case 'auth/email-already-in-use':
-      return new Error('Nao foi possivel concluir o cadastro com os dados informados.');
+      return new Error('Não foi possível concluir o cadastro com os dados informados.');
     case 'auth/weak-password':
       return new Error('Use uma senha mais forte para continuar.');
     case 'auth/user-disabled':
-      return new Error('Nao foi possivel concluir a autenticacao desta conta.');
+      return new Error('Não foi possível concluir a autenticação desta conta.');
     default:
       return new Error(fallback);
   }
@@ -54,7 +54,7 @@ export const signInWithGooglePopup = async () => {
   try {
     await signInWithPopup(firebaseAuth, googleProvider);
   } catch (error) {
-    throw toAuthMessage(error, 'Nao foi possivel entrar com Google agora.');
+    throw toAuthMessage(error, 'Não foi possível entrar com Google agora.');
   }
 };
 
@@ -62,7 +62,7 @@ export const signInWithEmailPassword = async (email: string, password: string) =
   try {
     await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
   } catch (error) {
-    throw toAuthMessage(error, 'Nao foi possivel entrar com e-mail agora.');
+    throw toAuthMessage(error, 'Não foi possível entrar com e-mail agora.');
   }
 };
 
@@ -82,7 +82,7 @@ export const signUpWithEmailPassword = async (
       displayName: name.trim(),
     });
   } catch (error) {
-    throw toAuthMessage(error, 'Nao foi possivel criar a conta agora.');
+    throw toAuthMessage(error, 'Não foi possível criar a conta agora.');
   }
 };
 
@@ -90,7 +90,7 @@ export const sendResetPasswordEmail = async (email: string) => {
   try {
     await sendPasswordResetEmail(firebaseAuth, email.trim().toLowerCase());
   } catch (error) {
-    throw toAuthMessage(error, 'Nao foi possivel enviar o link agora.');
+    throw toAuthMessage(error, 'Não foi possível enviar o link agora.');
   }
 };
 
@@ -98,6 +98,6 @@ export const signOutFromPanel = async () => {
   try {
     await signOut(firebaseAuth);
   } catch (error) {
-    throw toAuthMessage(error, 'Nao foi possivel sair da conta agora.');
+    throw toAuthMessage(error, 'Não foi possível sair da conta agora.');
   }
 };

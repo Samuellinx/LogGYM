@@ -101,19 +101,19 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
         <Text style={styles.loadingText}>Carregando detalhe do treino...</Text>
       ) : !detail ? (
         <EmptyState
-          title="Treino nao encontrado"
-          description="Este template pode ter sido removido ou nao pertence mais a esta sessao."
+          title="Treino não encontrado"
+          description="Este template pode ter sido removido ou não pertence mais a esta sessão."
         />
       ) : (
         <>
           <View style={[styles.hero, {borderLeftColor: detail.accentColor}]}>
             <Text style={styles.heroTitle}>{detail.name}</Text>
             <Text style={styles.heroSubtitle}>
-              {detail.focus} - {detail.exerciseCount} exercicios - ultima vez{' '}
+              {detail.focus} - {detail.exerciseCount} exercícios - última vez{' '}
               {formatSessionDate(detail.lastPerformedAt)}
             </Text>
             <Text style={styles.heroNotes}>
-              {detail.notes || 'Sem observacoes extras para este treino.'}
+              {detail.notes || 'Sem observações extras para este treino.'}
             </Text>
             <View style={styles.heroActions}>
               <Button
@@ -152,8 +152,8 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
           </View>
 
           <SectionHeader
-            title="Exercicios"
-            subtitle="Toque em um exercicio para abrir a evolucao de carga"
+            title="Exercícios"
+            subtitle="Toque em um exercício para abrir a evolucao de carga"
           />
 
           <View style={styles.exerciseList}>
@@ -198,7 +198,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
       <ConfirmModal
         visible={showDeleteModal}
         title="Excluir treino?"
-        description="Esse treino sera removido da sua lista. O historico ja salvo continua preservado."
+        description="Esse treino será removido da sua lista. O histórico já salvo continua preservado."
         confirmLabel="Excluir treino"
         cancelLabel="Cancelar"
         confirmVariant="danger"
