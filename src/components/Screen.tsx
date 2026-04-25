@@ -1,6 +1,6 @@
-import type {PropsWithChildren, ReactElement} from 'react';
-import type {RefreshControlProps, StyleProp, ViewStyle} from 'react-native';
-import {ScrollView, StyleSheet, View} from 'react-native';
+import type {PropsWithChildren, ReactElement, RefObject} from 'react';
+import type {RefreshControlProps, ScrollView, StyleProp, ViewStyle} from 'react-native';
+import {ScrollView as NativeScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {theme} from '@/theme';
@@ -10,6 +10,7 @@ interface ScreenProps extends PropsWithChildren {
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
   refreshControl?: ReactElement<RefreshControlProps>;
+  scrollViewRef?: RefObject<ScrollView | null>;
 }
 
 export const Screen = ({
@@ -18,6 +19,7 @@ export const Screen = ({
   style,
   contentContainerStyle,
   refreshControl,
+  scrollViewRef,
 }: ScreenProps) => {
   if (!scroll) {
     return (
@@ -29,14 +31,15 @@ export const Screen = ({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safe, style]}>
-      <ScrollView
+      <NativeScrollView
+        ref={scrollViewRef}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={refreshControl}
         contentContainerStyle={[styles.content, contentContainerStyle]}>
         {children}
-      </ScrollView>
+      </NativeScrollView>
     </SafeAreaView>
   );
 };

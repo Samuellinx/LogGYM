@@ -14,6 +14,11 @@ import {
   trainingSessionInputSchema,
   workoutInputSchema,
 } from '@/features/workouts/workout.schemas';
+import {
+  hasStartedTrainingDraft,
+  parseTrainingDraftSnapshot,
+  type TrainingDraftAutosavePayload,
+} from '@/features/workouts/trainingDraftAutosave';
 import type {
   FirebaseWorkoutDocument,
   FirebaseWorkoutExerciseDocument,
@@ -140,6 +145,7 @@ type SyncQueueRow = {
 };
 
 type MetadataRow = {value: string};
+type MetadataEntryRow = {key: string; value: string};
 type NamedWorkoutRow = {name: string};
 type NamedSessionRow = {workout_name: string};
 
@@ -149,6 +155,8 @@ const MAX_IMPORTED_WORKOUTS = 100;
 const MAX_IMPORTED_EXERCISES = 1200;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const getTrainingDraftMetadataKey = (userId: string, workoutId: string) =>
+  `training-draft:${userId}:${workoutId}`;
 
 const mapSessionUser = (row: UserRow): SessionUser => ({
   id: row.id,
@@ -916,6 +924,64 @@ export const getWorkoutDetail = async (
       orderIndex: Number(row.order_index),
     })),
   };
+};
+
+export const getTrainingDraftAutosave = async (
+  userId: string,
+  workoutId: string,
+): Promise<TrainingDraftAutosavePayload | null> => {
+  const db = getDatabase();
+  const result = await db.executeAsync<MetadataRow>(
+    'SELECT value FROM metadata WHERE key = ? LIMIT 1;',
+    [getTrainingDraftMetadataKey(userId, workoutId)],
+  );
+
+  return parseTrainingDraftSnapshot(result.rows._array[0]?.value ?? null);
+};
+
+export const saveTrainingDraftAutosave = async (
+  draft: TrainingDraftAutosavePayload,
+) => {
+  const db = getDatabase();
+
+  await db.executeAsync(
+    `INSERT INTO metadata (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+    [
+      getTrainingDraftMetadataKey(draft.userId, draft.workoutId),
+      JSON.stringify(draft),
+    ],
+  );
+};
+
+export const deleteTrainingDraftAutosave = async (
+  userId: string,
+  workoutId: string,
+) => {
+  const db = getDatabase();
+
+  await db.executeAsync('DELETE FROM metadata WHERE key = ?;', [
+    getTrainingDraftMetadataKey(userId, workoutId),
+  ]);
+};
+
+export const listStartedTrainingDraftWorkoutIds = async (userId: string) => {
+  const db = getDatabase();
+  const prefix = `training-draft:${userId}:`;
+  const result = await db.executeAsync<MetadataEntryRow>(
+    'SELECT key, value FROM metadata WHERE key LIKE ?;',
+    [`${prefix}%`],
+  );
+
+  return result.rows._array.flatMap(item => {
+    const draft = parseTrainingDraftSnapshot(item.value);
+
+    if (!hasStartedTrainingDraft(draft)) {
+      return [];
+    }
+
+    return draft ? [draft.workoutId] : [];
+  });
 };
 
 export const saveWorkout = async (

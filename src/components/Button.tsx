@@ -4,7 +4,7 @@ import LinearGradient from 'react-native-linear-gradient';
 
 import {cardShadow, theme} from '@/theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'resume';
 
 interface ButtonProps {
   label: string;
@@ -27,6 +27,12 @@ const variantStyles = {
     textColor: theme.colors.text,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceElevated,
+  },
+  resume: {
+    gradient: ['#51C7FF', '#7ED8FF'],
+    textColor: '#04131B',
+    borderColor: 'transparent',
+    backgroundColor: theme.colors.accentSecondary,
   },
   ghost: {
     gradient: null,
@@ -70,7 +76,12 @@ export const Button = ({
           style={styles.gradient}>
           <View style={styles.content}>
             {icon}
-            <Text style={[styles.label, {color: config.textColor}]}>{label}</Text>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.label, {color: config.textColor}]}>
+              {label}
+            </Text>
           </View>
         </LinearGradient>
       ) : (
@@ -84,7 +95,12 @@ export const Button = ({
           ]}>
           <View style={styles.content}>
             {icon}
-            <Text style={[styles.label, {color: config.textColor}]}>{label}</Text>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.label, {color: config.textColor}]}>
+              {label}
+            </Text>
           </View>
         </View>
       )}
@@ -102,24 +118,28 @@ const styles = StyleSheet.create({
   },
   gradient: {
     borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     ...cardShadow,
   },
   flat: {
     borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderWidth: 1,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: theme.spacing.sm,
+    gap: 8,
+    minWidth: 0,
   },
   label: {
-    ...theme.typography.subtitle,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   pressed: {
     opacity: 0.9,

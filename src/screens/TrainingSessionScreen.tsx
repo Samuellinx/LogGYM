@@ -1,7 +1,9 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {
   Alert,
+  LayoutChangeEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,7 +13,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {Plus, Trash2} from 'lucide-react-native';
+import {ChevronRight, Plus, Trash2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {ConfirmModal} from '@/components/ConfirmModal';
@@ -23,9 +25,19 @@ import {
   type WorkoutCompletionSummary,
 } from '@/components/WorkoutCompletionModal';
 import {
+  deleteTrainingDraftAutosave,
+  getTrainingDraftAutosave,
   getWorkoutDetail,
   saveTrainingSession,
+  saveTrainingDraftAutosave,
 } from '@/features/workouts/workoutRepository';
+import {
+  createTrainingDraftSnapshot,
+  restoreTrainingDraftExercises,
+  type TrainingDraftExercise,
+  type TrainingDraftSet,
+} from '@/features/workouts/trainingDraftAutosave';
+import {getNextTrainingExerciseIndex} from '@/features/workouts/trainingSessionUi';
 import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
@@ -36,43 +48,16 @@ import {formatDateLong} from '@/utils/formatters';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainingSession'>;
 
-type DraftSet = {
-  load: string;
-  reps: string;
-  note: string;
-};
-
-type DraftExercise = {
-  workoutExerciseId: string;
-  exerciseName: string;
-  muscleGroup: string;
-  baseLoad: string;
-  targetReps: string;
-  hint: string;
-  sets: DraftSet[];
-};
-
 type PendingSetDeletion = {
   exerciseIndex: number;
   setIndex: number;
 } | null;
 
-const createBlankSet = (): DraftSet => ({
+const createBlankSet = (): TrainingDraftSet => ({
   load: '',
   reps: '',
   note: '',
 });
-
-const createDraftFromWorkout = (workout: WorkoutDetail): DraftExercise[] =>
-  workout.exercises.map(exercise => ({
-    workoutExerciseId: exercise.id,
-    exerciseName: exercise.name,
-    muscleGroup: exercise.muscleGroup,
-    baseLoad: exercise.baseLoad,
-    targetReps: exercise.targetReps,
-    hint: exercise.note,
-    sets: [createBlankSet()],
-  }));
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 
@@ -140,7 +125,7 @@ const resolveMuscleGroupLabel = (exerciseName: string, workoutFocus: string) => 
 const buildCompletionSummary = (
   workoutName: string,
   workoutFocus: string,
-  exercises: DraftExercise[],
+  exercises: TrainingDraftExercise[],
 ): WorkoutCompletionSummary => {
   const validSets = exercises.flatMap(exercise =>
     exercise.sets
@@ -188,7 +173,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
   const refreshData = useAppStore(state => state.refreshData);
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
-  const [drafts, setDrafts] = useState<DraftExercise[]>([]);
+  const [drafts, setDrafts] = useState<TrainingDraftExercise[]>([]);
   const [performedAt, setPerformedAt] = useState(new Date());
   const [overallNotes, setOverallNotes] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -197,24 +182,39 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [setToDelete, setSetToDelete] = useState<PendingSetDeletion>(null);
   const [completionSummary, setCompletionSummary] =
     useState<WorkoutCompletionSummary | null>(null);
+  const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const exercisePositions = useRef<number[]>([]);
+  const exerciseLoadInputRefs = useRef<Array<TextInput | null>>([]);
 
   useEffect(() => {
     let active = true;
 
     const loadWorkout = async () => {
       if (!session) {
+        setIsLoading(false);
         return;
       }
 
       try {
-        const detail = await getWorkoutDetail(session.user.id, route.params.workoutId);
+        const [detail, savedDraft] = await Promise.all([
+          getWorkoutDetail(session.user.id, route.params.workoutId),
+          getTrainingDraftAutosave(session.user.id, route.params.workoutId),
+        ]);
 
         if (!active || !detail) {
           return;
         }
 
         setWorkout(detail);
-        setDrafts(createDraftFromWorkout(detail));
+        setDrafts(restoreTrainingDraftExercises(detail, savedDraft));
+
+        if (savedDraft) {
+          setOverallNotes(savedDraft.overallNotes);
+          setPerformedAt(new Date(savedDraft.performedAt));
+        }
+
+        setHasLoadedDraft(true);
       } catch (error) {
         if (active) {
           Alert.alert('Executar treino', toUserMessage(error));
@@ -233,10 +233,31 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     };
   }, [route.params.workoutId, session]);
 
+  useEffect(() => {
+    if (!session || !workout || !hasLoadedDraft) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      saveTrainingDraftAutosave(
+        createTrainingDraftSnapshot({
+          userId: session.user.id,
+          workoutId: workout.id,
+          performedAt: performedAt.toISOString(),
+          overallNotes,
+          exercises: drafts,
+          updatedAt: new Date().toISOString(),
+        }),
+      ).catch(() => undefined);
+    }, 350);
+
+    return () => clearTimeout(timeoutId);
+  }, [drafts, hasLoadedDraft, overallNotes, performedAt, session, workout]);
+
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    field: keyof DraftSet,
+    field: keyof TrainingDraftSet,
     value: string,
   ) => {
     setDrafts(current =>
@@ -295,6 +316,34 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     }
   };
 
+  const handleExerciseLayout =
+    (exerciseIndex: number) => (event: LayoutChangeEvent) => {
+      exercisePositions.current[exerciseIndex] = event.nativeEvent.layout.y;
+    };
+
+  const handleFinishExercise = (exerciseIndex: number) => {
+    const nextExerciseIndex = getNextTrainingExerciseIndex(
+      exerciseIndex,
+      drafts.length,
+    );
+
+    if (nextExerciseIndex === null) {
+      return;
+    }
+
+    scrollViewRef.current?.scrollTo({
+      y: Math.max(
+        (exercisePositions.current[nextExerciseIndex] ?? 0) - theme.spacing.md,
+        0,
+      ),
+      animated: true,
+    });
+
+    setTimeout(() => {
+      exerciseLoadInputRefs.current[nextExerciseIndex]?.focus();
+    }, 220);
+  };
+
   const handleSave = async () => {
     if (!session || !workout) {
       return;
@@ -322,6 +371,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         })),
       });
 
+      await deleteTrainingDraftAutosave(session.user.id, workout.id);
       await refreshData();
       setCompletionSummary(summary);
     } catch (error) {
@@ -346,7 +396,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   };
 
   return (
-    <Screen>
+    <Screen scrollViewRef={scrollViewRef}>
       {isLoading ? (
         <Text style={styles.loadingText}>Preparando treino...</Text>
       ) : !workout ? (
@@ -388,7 +438,10 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
           <View style={styles.exerciseList}>
             {drafts.map((exercise, exerciseIndex) => (
-              <View key={exercise.workoutExerciseId} style={styles.exerciseCard}>
+              <View
+                key={exercise.workoutExerciseId}
+                style={styles.exerciseCard}
+                onLayout={handleExerciseLayout(exerciseIndex)}>
                 <View style={styles.exerciseHeader}>
                   <View style={styles.exerciseHeaderCopy}>
                     <Text style={styles.exerciseName}>{exercise.exerciseName}</Text>
@@ -418,7 +471,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                 {exercise.sets.map((set, setIndex) => (
                   <View key={`${exercise.workoutExerciseId}-${setIndex}`} style={styles.setCard}>
                     <View style={styles.setHeader}>
-                      <Text style={styles.setTitle}>Série {setIndex + 1}</Text>
+                      <Text style={styles.setTitle}>Série - {setIndex + 1}</Text>
                       <Pressable
                         hitSlop={10}
                         style={styles.deleteIconButton}
@@ -436,6 +489,11 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                       <View style={styles.metricField}>
                         <Text style={styles.metricLabel}>Carga</Text>
                         <TextInput
+                          ref={input => {
+                            if (setIndex === 0) {
+                              exerciseLoadInputRefs.current[exerciseIndex] = input;
+                            }
+                          }}
                           value={set.load}
                           onChangeText={value =>
                             updateSet(exerciseIndex, setIndex, 'load', value)
@@ -472,6 +530,18 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                     />
                   </View>
                 ))}
+
+                {getNextTrainingExerciseIndex(exerciseIndex, drafts.length) !== null ? (
+                  <View style={styles.finishExerciseAction}>
+                    <Button
+                      fullWidth={false}
+                      variant="secondary"
+                      label="Finalizar exercício"
+                      icon={<ChevronRight color={theme.colors.text} size={15} />}
+                      onPress={() => handleFinishExercise(exerciseIndex)}
+                    />
+                  </View>
+                ) : null}
               </View>
             ))}
           </View>
@@ -563,6 +633,9 @@ const styles = StyleSheet.create({
   exerciseLoadHint: {
     ...theme.typography.caption,
     color: theme.colors.accent,
+  },
+  finishExerciseAction: {
+    alignItems: 'flex-end',
   },
   setCard: {
     padding: theme.spacing.md,

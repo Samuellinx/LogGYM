@@ -685,11 +685,22 @@ h3 {
 }
 
 .training-date-field {
-  min-width: 220px;
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr);
+  align-items: center;
+  justify-content: end;
+  gap: 12px;
+  width: fit-content;
+  margin-left: auto;
 }
 
 .training-date-field input {
-  min-width: 100%;
+  min-width: 220px;
+}
+
+.training-date-field > span {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .training-support-text {
@@ -698,6 +709,10 @@ h3 {
 
 .training-support-text--accent {
   color: var(--accent);
+}
+
+.training-next-button {
+  justify-self: end;
 }
 
 .workspace-grid {
@@ -759,6 +774,11 @@ h3 {
 .profile-copy {
   display: grid;
   gap: 4px;
+}
+
+.profile-photo-button {
+  justify-self: start;
+  margin-top: 8px;
 }
 
 .profile-copy p {
@@ -923,6 +943,10 @@ select:focus {
   justify-content: space-between;
 }
 
+.card-actions {
+  flex-wrap: wrap;
+}
+
 .workout-card-top p,
 .session-card-top span {
   color: var(--text-soft);
@@ -992,6 +1016,8 @@ select:focus {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
+  font-size: 0.9rem;
+  white-space: nowrap;
   transition:
     transform 160ms ease,
     opacity 160ms ease,
@@ -1004,6 +1030,20 @@ select:focus {
   color: #07110a;
   border-color: rgba(124, 255, 79, 0.2);
   font-weight: 800;
+}
+
+.card-actions .primary-button,
+.card-actions .secondary-button,
+.card-actions .ghost-button,
+.card-actions .danger-button {
+  padding: 11px 16px;
+  min-height: 44px;
+}
+
+.primary-button--resume {
+  background: linear-gradient(135deg, var(--accent-secondary), #7ed8ff);
+  border-color: rgba(81, 199, 255, 0.26);
+  color: #04131b;
 }
 
 .secondary-button {
@@ -1186,6 +1226,12 @@ select:focus {
   .training-date-field {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .training-date-field {
+    grid-template-columns: 1fr;
+    width: 100%;
+    margin-left: 0;
   }
 
   .auth-tabs,

@@ -1,4 +1,4 @@
-import {useDeferredValue, useState} from 'react';
+import {useDeferredValue, useEffect, useState} from 'react';
 import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -13,7 +13,12 @@ import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TextField} from '@/components/TextField';
 import {WorkoutCard} from '@/components/WorkoutCard';
-import {duplicateWorkout} from '@/features/workouts/workoutRepository';
+import {
+  deleteTrainingDraftAutosave,
+  duplicateWorkout,
+  listStartedTrainingDraftWorkoutIds,
+} from '@/features/workouts/workoutRepository';
+import {getTrainingStartActionConfig} from '@/features/workouts/trainingSessionUi';
 import {MainTabParamList, RootStackParamList} from '@/navigation/types';
 import {theme} from '@/theme';
 import {toUserMessage} from '@/utils/errors';
@@ -29,6 +34,7 @@ export const WorkoutsScreen = () => {
   const isRefreshing = useAppStore(state => state.isRefreshing);
   const session = useAppStore(state => state.session);
   const [search, setSearch] = useState('');
+  const [startedWorkoutIds, setStartedWorkoutIds] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -93,6 +99,46 @@ export const WorkoutsScreen = () => {
       setSelectedDate(date);
     }
   };
+
+  const handleClearTrainingDraft = async (workoutId: string) => {
+    if (!session) {
+      return;
+    }
+
+    try {
+      await deleteTrainingDraftAutosave(session.user.id, workoutId);
+      setStartedWorkoutIds(current => current.filter(id => id !== workoutId));
+    } catch (error) {
+      Alert.alert('Limpar treino', toUserMessage(error));
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStartedWorkouts = async () => {
+      if (!session) {
+        if (active) {
+          setStartedWorkoutIds([]);
+        }
+        return;
+      }
+
+      const startedIds = await listStartedTrainingDraftWorkoutIds(session.user.id);
+
+      if (active) {
+        setStartedWorkoutIds(startedIds);
+      }
+    };
+
+    const unsubscribe = navigation.addListener('focus', loadStartedWorkouts);
+    loadStartedWorkouts().catch(() => undefined);
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [navigation, session, workouts]);
 
   return (
     <Screen
@@ -173,17 +219,29 @@ export const WorkoutsScreen = () => {
 
       <View style={styles.list}>
         {filteredWorkouts.length ? (
-          filteredWorkouts.map(workout => (
-            <WorkoutCard
-              key={workout.id}
-              workout={workout}
-              onPress={() => navigation.navigate('WorkoutDetail', {workoutId: workout.id})}
-              onStart={() =>
-                navigation.navigate('TrainingSession', {workoutId: workout.id})
-              }
-              onDuplicate={() => handleDuplicate(workout.id)}
-            />
-          ))
+          filteredWorkouts.map(workout => {
+            const startAction = getTrainingStartActionConfig(
+              startedWorkoutIds.includes(workout.id),
+            );
+
+            return (
+              <WorkoutCard
+                key={workout.id}
+                workout={workout}
+                onPress={() =>
+                  navigation.navigate('WorkoutDetail', {workoutId: workout.id})
+                }
+                onStart={() =>
+                  navigation.navigate('TrainingSession', {workoutId: workout.id})
+                }
+                onDuplicate={() => handleDuplicate(workout.id)}
+                onClearTraining={() => handleClearTrainingDraft(workout.id)}
+                clearTrainingDisabled={!startedWorkoutIds.includes(workout.id)}
+                startLabel={startAction.label}
+                isResume={startAction.variant === 'resume'}
+              />
+            );
+          })
         ) : (
           <EmptyState
             title="Nenhum treino encontrado"

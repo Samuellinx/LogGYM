@@ -305,3 +305,37 @@ export const signOutFromProvider = async (provider: AuthProvider) => {
 
   await getFirebaseAuth().signOut();
 };
+
+export const updateProfilePhoto = async (
+  currentUser: SessionUser,
+  photoDataUrl: string,
+) => {
+  if (currentUser.provider === 'dev-local') {
+    return {
+      ...currentUser,
+      photo: photoDataUrl,
+    };
+  }
+
+  try {
+    initializeFirebaseServices();
+    const firebaseUser = getFirebaseAuth().currentUser;
+
+    if (!firebaseUser) {
+      throw new Error('Sua sessão não está pronta para atualizar a foto agora.');
+    }
+
+    await firebaseUser.updateProfile({photoURL: photoDataUrl});
+    await firebaseUser.reload();
+
+    const reloadedUser = getFirebaseAuth().currentUser;
+
+    if (!reloadedUser) {
+      throw new Error('Sua sessão não está pronta para atualizar a foto agora.');
+    }
+
+    return mapFirebaseUser(reloadedUser);
+  } catch (error) {
+    throw mapAuthError(error, 'Não foi possível atualizar a foto de perfil agora.');
+  }
+};

@@ -1,5 +1,5 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {ChevronRight, Play, Repeat2} from 'lucide-react-native';
+import {ChevronRight, Play, Repeat2, Trash2} from 'lucide-react-native';
 
 import type {WorkoutSummary} from '@/types/domain';
 import {cardShadow, theme} from '@/theme';
@@ -8,8 +8,12 @@ import {formatSessionDate} from '@/utils/formatters';
 interface WorkoutCardProps {
   workout: WorkoutSummary;
   onPress: () => void;
-  onStart: () => void;
+  onStart?: () => void;
   onDuplicate?: () => void;
+  onClearTraining?: () => void;
+  clearTrainingDisabled?: boolean;
+  startLabel?: string;
+  isResume?: boolean;
 }
 
 export const WorkoutCard = ({
@@ -17,6 +21,10 @@ export const WorkoutCard = ({
   onPress,
   onStart,
   onDuplicate,
+  onClearTraining,
+  clearTrainingDisabled = false,
+  startLabel = 'Iniciar treino',
+  isResume = false,
 }: WorkoutCardProps) => (
   <Pressable onPress={onPress} style={[styles.card, {borderLeftColor: workout.accentColor}]}>
     <View style={styles.header}>
@@ -38,17 +46,45 @@ export const WorkoutCard = ({
         Última execução: {formatSessionDate(workout.lastPerformedAt)}
       </Text>
 
-      <View style={styles.actions}>
-        {onDuplicate ? (
-          <Pressable onPress={onDuplicate} style={styles.actionPill}>
-            <Repeat2 color={theme.colors.textMuted} size={16} />
-          </Pressable>
-        ) : null}
-        <Pressable onPress={onStart} style={styles.startButton}>
-          <Play color="#06120A" fill="#06120A" size={14} />
-          <Text style={styles.startLabel}>Iniciar</Text>
-        </Pressable>
-      </View>
+      {onDuplicate || onClearTraining || onStart ? (
+        <View style={styles.actions}>
+          {onDuplicate ? (
+            <Pressable onPress={onDuplicate} style={styles.actionPill}>
+              <Repeat2 color={theme.colors.textMuted} size={16} />
+            </Pressable>
+          ) : null}
+          {onClearTraining ? (
+            <Pressable
+              disabled={clearTrainingDisabled}
+              onPress={onClearTraining}
+              style={[
+                styles.clearButton,
+                clearTrainingDisabled ? styles.clearButtonDisabled : null,
+              ]}>
+              <Trash2 color="#FF9FAA" size={14} />
+              <Text numberOfLines={1} style={styles.clearLabel}>
+                Limpar treino
+              </Text>
+            </Pressable>
+          ) : null}
+          {onStart ? (
+            <Pressable
+              onPress={onStart}
+              style={[styles.startButton, isResume ? styles.startButtonResume : null]}>
+              <Play
+                color={isResume ? '#04131B' : '#06120A'}
+                fill={isResume ? '#04131B' : '#06120A'}
+                size={14}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.startLabel, isResume ? styles.startLabelResume : null]}>
+                {startLabel}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   </Pressable>
 );
@@ -87,20 +123,17 @@ const styles = StyleSheet.create({
     color: theme.colors.textSoft,
   },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   lastPerformed: {
-    flex: 1,
     ...theme.typography.caption,
     color: theme.colors.textMuted,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   actionPill: {
     width: 38,
@@ -113,15 +146,52 @@ const styles = StyleSheet.create({
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: theme.spacing.md,
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.accent,
+    minHeight: 38,
+    flexShrink: 1,
+    maxWidth: '100%',
+  },
+  startButtonResume: {
+    backgroundColor: theme.colors.accentSecondary,
   },
   startLabel: {
-    ...theme.typography.caption,
+    fontSize: 12,
+    lineHeight: 16,
     color: '#06120A',
     fontWeight: '700',
+    flexShrink: 1,
+  },
+  startLabelResume: {
+    color: '#04131B',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(255,111,125,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,111,125,0.18)',
+    minHeight: 38,
+    flexShrink: 1,
+    maxWidth: '100%',
+  },
+  clearLabel: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#FF9FAA',
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  clearButtonDisabled: {
+    opacity: 0.45,
   },
 });

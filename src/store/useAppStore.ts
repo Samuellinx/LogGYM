@@ -16,6 +16,7 @@ import {
   signInWithGoogleAccount,
   signOutFromProvider,
   signUpWithEmailAccount,
+  updateProfilePhoto as persistProfilePhoto,
 } from '@/features/auth/authService';
 import {syncFirebaseUserData} from '@/features/sync/firebaseSyncService';
 import {
@@ -48,6 +49,7 @@ interface AppStoreState {
     password: string,
   ) => Promise<{name: string; email: string}>;
   sendPasswordReset: (email: string) => Promise<void>;
+  updateProfilePhoto: (photoDataUrl: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
   setOnline: (isOnline: boolean) => void;
@@ -296,6 +298,44 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const message = toUserMessage(
         error,
         'Falha ao enviar o e-mail de redefinição.',
+      );
+      set({error: message});
+      throw new Error(message);
+    }
+  },
+
+  updateProfilePhoto: async photoDataUrl => {
+    const session = get().session;
+
+    if (!session) {
+      throw new Error('Nenhuma sessão ativa para atualizar a foto.');
+    }
+
+    try {
+      const updatedUser = await persistProfilePhoto(session.user, photoDataUrl);
+      await ensureUserRecord(updatedUser);
+
+      let syncError: string | null = null;
+
+      if (shouldSyncRemote(get().isOnline, updatedUser)) {
+        try {
+          await syncFirebaseUserData(updatedUser);
+        } catch (error) {
+          syncError = toUserMessage(
+            error,
+            'A foto foi atualizada, mas a sincronização ainda não aconteceu.',
+          );
+        }
+      }
+
+      set({
+        session: createSession(updatedUser),
+        error: syncError,
+      });
+    } catch (error) {
+      const message = toUserMessage(
+        error,
+        'Não foi possível atualizar a foto de perfil.',
       );
       set({error: message});
       throw new Error(message);

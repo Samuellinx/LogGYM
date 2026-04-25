@@ -1,5 +1,5 @@
 import {useDeferredValue, useState} from 'react';
-import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import Animated, {FadeInDown} from 'react-native-reanimated';
@@ -11,11 +11,9 @@ import {StatCard} from '@/components/StatCard';
 import {TagChip} from '@/components/TagChip';
 import {TextField} from '@/components/TextField';
 import {WorkoutCard} from '@/components/WorkoutCard';
-import {duplicateWorkout} from '@/features/workouts/workoutRepository';
 import {MainTabParamList, RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
-import {toUserMessage} from '@/utils/errors';
 import {
   formatCompactNumber,
   formatLoad,
@@ -49,20 +47,6 @@ export const DashboardScreen = () => {
   const workoutSectionSubtitle = normalized
     ? 'Toque em um treino para abrir, iniciar ou duplicar.'
     : 'Seus templates prontos para uso rápido';
-
-  const handleDuplicate = async (workoutId: string) => {
-    if (!session) {
-      return;
-    }
-
-    try {
-      const duplicatedId = await duplicateWorkout(session.user.id, workoutId);
-      await refreshData();
-      navigation.navigate('WorkoutDetail', {workoutId: duplicatedId});
-    } catch (error) {
-      Alert.alert('Duplicar treino', toUserMessage(error));
-    }
-  };
 
   const openExerciseProgress = (exerciseName: string) => {
     navigation.navigate('ExerciseProgress', {exerciseName});
@@ -138,20 +122,20 @@ export const DashboardScreen = () => {
       />
 
       {highlightedWorkouts.length ? (
-        highlightedWorkouts.map((workout, index) => (
-          <Animated.View
-            key={workout.id}
-            entering={FadeInDown.delay(40 * index).duration(320)}>
-            <WorkoutCard
-              workout={workout}
-              onPress={() => navigation.navigate('WorkoutDetail', {workoutId: workout.id})}
-              onStart={() =>
-                navigation.navigate('TrainingSession', {workoutId: workout.id})
-              }
-              onDuplicate={() => handleDuplicate(workout.id)}
-            />
-          </Animated.View>
-        ))
+        highlightedWorkouts.map((workout, index) => {
+          return (
+            <Animated.View
+              key={workout.id}
+              entering={FadeInDown.delay(40 * index).duration(320)}>
+              <WorkoutCard
+                workout={workout}
+                onPress={() =>
+                  navigation.navigate('WorkoutDetail', {workoutId: workout.id})
+                }
+              />
+            </Animated.View>
+          );
+        })
       ) : (
         <EmptyState
           title="Nenhum treino encontrado"

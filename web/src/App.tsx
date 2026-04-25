@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react';
+﻿import {useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react';
 import type {User} from 'firebase/auth';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -55,11 +55,20 @@ import {
   buildExerciseProgressData,
   buildSparklinePath,
 } from './lib/exerciseProgress';
+import {getNextTrainingExerciseIndex} from './lib/trainingSessionNavigation';
 import {importTrainingFileForCurrentUser} from './lib/trainingImport';
+import {updateProfilePhotoFromFile} from './lib/profilePhoto';
+import {
+  createTrainingDraftSnapshot,
+  deleteTrainingDraftAutosave,
+  getTrainingDraftAutosave,
+  hasStartedTrainingDraft,
+  restoreTrainingDraftExercises,
+  saveTrainingDraftAutosave,
+} from './lib/trainingDraftAutosave';
 import {
   addDraftSet,
   buildTrainingSessionDocument,
-  createTrainingDraftFromWorkout,
   removeDraftSet,
   updateDraftSet,
 } from './lib/trainingSession';
@@ -207,7 +216,7 @@ const normalizeWorkoutForSave = (
   };
 };
 
-const BrandMark = ({compact = false}: {compact?: boolean}) => (
+const BrandMark = ({compact = false}: {compact: boolean}) => (
   <div className={compact ? 'brand-mark brand-mark--compact' : 'brand-mark'}>
     <svg viewBox="0 0 64 64" aria-hidden="true">
       <defs>
@@ -295,6 +304,7 @@ function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('dashboard');
   const [user, setUser] = useState<User | null>(null);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === 'undefined' ? true : navigator.onLine,
   );
@@ -316,7 +326,10 @@ function App() {
   );
   const [trainingOverallNotes, setTrainingOverallNotes] = useState('');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const trainingImportInputRef = useRef<HTMLInputElement | null>(null);
+  const trainingExerciseRefs = useRef<Array<HTMLElement | null>>([]);
+  const trainingExerciseLoadInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const signInForm = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
@@ -347,6 +360,7 @@ function App() {
     () =>
       observeAuthState(nextUser => {
         setUser(nextUser);
+        setProfilePhotoUrl(nextUser?.photoURL ?? null);
 
         if (!nextUser) {
           setWorkouts([]);
@@ -421,6 +435,43 @@ function App() {
         : null,
     [detailView, workouts],
   );
+  const startedWorkoutIds = !user
+    ? new Set<string>()
+    : new Set(
+        workouts
+          .filter(workout =>
+            hasStartedTrainingDraft(getTrainingDraftAutosave(user.uid, workout.id)),
+          )
+          .map(workout => workout.id),
+      );
+
+  useEffect(() => {
+    if (!user || detailView?.kind !== 'training-session' || !activeTrainingWorkout) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveTrainingDraftAutosave(
+        createTrainingDraftSnapshot({
+          userId: user.uid,
+          workoutId: activeTrainingWorkout.id,
+          performedAt: trainingPerformedAt,
+          overallNotes: trainingOverallNotes,
+          exercises: trainingDrafts,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeTrainingWorkout,
+    detailView,
+    trainingDrafts,
+    trainingOverallNotes,
+    trainingPerformedAt,
+    user,
+  ]);
 
   const historyTotalVolume = useMemo(
     () => filteredHistory.reduce((sum, sessionItem) => sum + sessionItem.totalVolume, 0),
@@ -445,7 +496,11 @@ function App() {
       return 'Atleta';
     }
 
-    return user.displayName?.trim().split(/\s+/)[0] || user.email?.split('@')[0] || 'Atleta';
+    return (
+      user.displayName?.trim().split(/\s+/)[0] ||
+      user.email?.split('@')[0] ||
+      'Atleta'
+    );
   }, [user]);
 
   const accountProviderLabel = useMemo(() => {
@@ -499,7 +554,7 @@ function App() {
       eyebrow: 'Histórico',
       title: 'Consulte tudo o que já foi executado.',
       description:
-        'Revise volume, séries e observações das sessões já concluidas em um painel direto.',
+        'Revise volume, séries e observações das sessões já concluídas em um painel direto.',
     },
     profile: {
       eyebrow: 'Perfil',
@@ -510,14 +565,13 @@ function App() {
   };
   const detailContent =
     detailView?.kind === 'exercise-progress'
-        ? {
-            eyebrow: 'Exercício',
-            title: detailView.exerciseName,
-            description:
-              exerciseProgress?.lastPerformedAt
-              ? `Última execução: ${formatSessionDate(exerciseProgress.lastPerformedAt)}`
-              : 'Sem histórico suficiente para este exercício.',
-          }
+      ? {
+          eyebrow: 'Exercício',
+          title: detailView.exerciseName,
+          description: exerciseProgress?.lastPerformedAt
+            ? `Última execução: ${formatSessionDate(exerciseProgress.lastPerformedAt)}`
+            : 'Sem histórico suficiente para este exercício.',
+        }
       : detailView?.kind === 'training-session'
         ? {
             eyebrow: 'Execução',
@@ -656,13 +710,11 @@ function App() {
     try {
       const result = await exportBackupForCurrentUser(user);
       setStatusMessage(
-        `${result.fileName} salvo com ${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
+        `Download da cópia iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível exportar seus treinos agora.',
+        error instanceof Error ? error.message : 'Não foi possível exportar seus treinos agora.',
       );
     } finally {
       setBusyAction(null);
@@ -675,7 +727,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      'Isso vai substituir os treinos e o histórico atuais pelos dados do arquivo selecionado. Deseja continuar?',
+      'Isso vai substituir os treinos e o histórico atuais pelos dados do arquivo selecionado. Deseja continuar',
     );
 
     if (!confirmed) {
@@ -702,13 +754,11 @@ function App() {
       setWorkouts(refreshed.workouts);
       setSessions(refreshed.sessions);
       setStatusMessage(
-        `${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries foram restaurados.`,
+        `Restauração concluída com sucesso. Foram aplicados ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries. Os dados atuais da conta foram substituídos pelo conteúdo do arquivo.`,
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível restaurar sua cópia agora.',
+        error instanceof Error ? error.message : 'Não foi possível restaurar sua cópia agora.',
       );
     } finally {
       setBusyAction(null);
@@ -732,13 +782,11 @@ function App() {
       setWorkouts(refreshed.workouts);
       setSessions(refreshed.sessions);
       setStatusMessage(
-        `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercícios prontos para uso.`,
+        `Importação concluída com sucesso. Arquivo: ${result.fileName}. Resultado: ${result.workouts} treinos e ${result.exercises} exercícios importados.${result.skippedWorkouts > 0 ? ` ${result.skippedWorkouts} treino(s) incompleto(s) foram ignorados.` : ''}`,
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível importar o arquivo agora.',
+        error instanceof Error ? error.message : 'Não foi possível importar o arquivo agora.',
       );
     } finally {
       setBusyAction(null);
@@ -760,7 +808,7 @@ function App() {
     setEditorWorkout(current => ({
       ...current,
       exercises: current.exercises.map(exercise =>
-        exercise.id === exerciseId ? {...exercise, [field]: value} : exercise,
+        exercise.id === exerciseId ? { ...exercise, [field]: value } : exercise,
       ),
     }));
   };
@@ -834,7 +882,7 @@ function App() {
       return;
     }
 
-    if (!window.confirm('Tem certeza que deseja excluir este treino?')) {
+    if (!window.confirm('Tem certeza que deseja excluir este treino')) {
       return;
     }
 
@@ -874,9 +922,15 @@ function App() {
 
   const openTrainingSession = (workout: WorkoutDocument, returnTo: WorkspaceView) => {
     clearFeedback();
-    setTrainingDrafts(createTrainingDraftFromWorkout(workout));
-    setTrainingOverallNotes('');
-    setTrainingPerformedAt(formatDateInputValue(new Date().toISOString()));
+    const savedDraft = user ? getTrainingDraftAutosave(user.uid, workout.id) : null;
+
+    setTrainingDrafts(restoreTrainingDraftExercises(workout, savedDraft));
+    setTrainingOverallNotes(savedDraft?.overallNotes ?? '');
+    setTrainingPerformedAt(
+      savedDraft
+        ? formatDateInputValue(savedDraft.performedAt)
+        : formatDateInputValue(new Date().toISOString()),
+    );
     setDetailView({
       kind: 'training-session',
       workoutId: workout.id,
@@ -901,7 +955,7 @@ function App() {
     const confirmed = window.confirm(
       `Excluir a execução ${sessionItem.workoutName} de ${formatSessionDate(
         sessionItem.performedAt,
-      )}?`,
+      )}`,
     );
 
     if (!confirmed) {
@@ -941,6 +995,7 @@ function App() {
       });
 
       await saveTrainingSessionFromPanel(user.uid, sessionDocument);
+      deleteTrainingDraftAutosave(user.uid, activeTrainingWorkout.id);
       setStatusMessage('Execução salva com sucesso.');
       setDetailView(null);
       setWorkspaceView('history');
@@ -952,6 +1007,44 @@ function App() {
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const handleProfilePhotoSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file || !user) {
+      return;
+    }
+
+    clearFeedback();
+    setBusyAction('profile-photo');
+
+    try {
+      const updatedUser = await updateProfilePhotoFromFile(user, file);
+      if (updatedUser) {
+        setUser(updatedUser);
+        setProfilePhotoUrl(updatedUser.photoURL ?? null);
+      }
+
+      setStatusMessage('Foto de perfil atualizada com sucesso.');
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Não foi possível atualizar a foto de perfil agora.',
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleClearTrainingDraft = (workoutId: string) => {
+    if (!user) {
+      return;
+    }
+
+    clearFeedback();
+    deleteTrainingDraftAutosave(user.uid, workoutId);
+    setStatusMessage('Rascunho do treino limpo.');
   };
 
   const getHistorySecondaryText = (sessionItem: WorkoutSessionDocument) => {
@@ -1023,7 +1116,7 @@ function App() {
 
           <p className="editor-support">
             {dashboardSearch.trim()
-              ? 'Toque em um treino para abrir o editor ou limpar a busca.'
+              ? 'Consulte os treinos encontrados pela busca.'
               : 'Os treinos mais recentes ficam sempre prontos para consulta rapida.'}
           </p>
 
@@ -1061,23 +1154,6 @@ function App() {
                       <Clock3 size={14} />
                       Atualizado {formatSessionDate(workout.updatedAt)}
                     </span>
-                  </div>
-
-                  <div className="card-actions">
-                    <button
-                      type="button"
-                      className="primary-button"
-                      onClick={() => openTrainingSession(workout, 'dashboard')}>
-                      <Play size={16} />
-                      Iniciar treino
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() => handleEditWorkout(workout)}>
-                      <PencilLine size={16} />
-                      Abrir no editor
-                    </button>
                   </div>
                 </article>
               ))
@@ -1234,10 +1310,22 @@ function App() {
                   <div className="card-actions">
                     <button
                       type="button"
-                      className="primary-button"
+                      className={
+                        startedWorkoutIds.has(workout.id)
+                          ? 'primary-button primary-button--resume'
+                          : 'primary-button'
+                      }
                       onClick={() => openTrainingSession(workout, 'workouts')}>
                       <Play size={16} />
-                      Iniciar treino
+                      {startedWorkoutIds.has(workout.id) ? 'Continuar treino' : 'Iniciar treino'}
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-button"
+                      disabled={!startedWorkoutIds.has(workout.id)}
+                      onClick={() => handleClearTrainingDraft(workout.id)}>
+                      <Trash2 size={16} />
+                      Limpar treino
                     </button>
                     <button
                       type="button"
@@ -1290,7 +1378,7 @@ function App() {
               ))
             ) : (
               <div className="empty-card">
-                Suas últimas sessões vão aparecer aqui assim que você concluir treinos.
+                Suas Últimas sessões vão aparecer aqui assim que você concluir treinos.
               </div>
             )}
           </div>
@@ -1663,13 +1751,18 @@ function App() {
               value={trainingOverallNotes}
               onChange={event => setTrainingOverallNotes(event.target.value)}
               rows={4}
-              placeholder="Como o treino se comportou hoje?"
+              placeholder="Como o treino se comportou hoje"
             />
           </label>
 
           <div className="exercise-stack">
             {trainingDrafts.map((exercise, exerciseIndex) => (
-              <article className="exercise-card training-exercise-card" key={exercise.workoutExerciseId}>
+              <article
+                className="exercise-card training-exercise-card"
+                key={exercise.workoutExerciseId}
+                ref={element => {
+                  trainingExerciseRefs.current[exerciseIndex] = element;
+                }}>
                 <div className="exercise-card-head">
                   <div>
                     <strong>{exercise.exerciseName}</strong>
@@ -1701,7 +1794,7 @@ function App() {
                       className="training-set-card"
                       key={`${exercise.workoutExerciseId}-${setIndex}`}>
                       <div className="exercise-card-head">
-                        <strong>Série {setIndex + 1}</strong>
+                        <strong>Série - {setIndex + 1}</strong>
                         <button
                           type="button"
                           className="danger-button subtle"
@@ -1719,6 +1812,11 @@ function App() {
                         <label>
                           <span>Carga</span>
                           <input
+                            ref={element => {
+                              if (setIndex === 0) {
+                                trainingExerciseLoadInputRefs.current[exerciseIndex] = element;
+                              }
+                            }}
                             value={setItem.load}
                             onChange={event =>
                               setTrainingDrafts(current =>
@@ -1776,6 +1874,34 @@ function App() {
                     </div>
                   ))}
                 </div>
+
+                {getNextTrainingExerciseIndex(exerciseIndex, trainingDrafts.length) !== null ? (
+                  <button
+                    type="button"
+                    className="secondary-button training-next-button"
+                    onClick={() => {
+                      const nextExerciseIndex = getNextTrainingExerciseIndex(
+                        exerciseIndex,
+                        trainingDrafts.length,
+                      );
+
+                      if (nextExerciseIndex === null) {
+                        return;
+                      }
+
+                      trainingExerciseRefs.current[nextExerciseIndex]?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      });
+
+                      window.setTimeout(() => {
+                        trainingExerciseLoadInputRefs.current[nextExerciseIndex]?.focus();
+                      }, 180);
+                    }}>
+                    <ChevronRight size={16} />
+                    Finalizar exercício
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>
@@ -1800,8 +1926,12 @@ function App() {
   const renderProfileWorkspace = () => (
     <section className="profile-layout">
       <div className="profile-card">
-        {user?.photoURL ? (
-          <img src={user.photoURL} alt={user.displayName ?? 'Perfil'} className="profile-avatar" />
+        {profilePhotoUrl ? (
+          <img
+            src={profilePhotoUrl}
+            alt={user?.displayName ?? 'Perfil'}
+            className="profile-avatar"
+          />
         ) : (
           <div className="profile-avatar profile-avatar--fallback">
             {(user?.displayName ?? user?.email ?? 'L').slice(0, 1).toUpperCase()}
@@ -1812,6 +1942,18 @@ function App() {
           <strong>{user?.displayName?.trim() || user?.email || 'Atleta'}</strong>
           <p>{user?.email}</p>
           <span>Último login {lastLoginLabel}</span>
+          <button
+            type="button"
+            className="secondary-button profile-photo-button"
+            disabled={!user || isBusy}
+            onClick={() => profilePhotoInputRef.current?.click()}>
+            {busyAction === 'profile-photo' ? (
+              <LoaderCircle className="spin" size={16} />
+            ) : (
+              <Upload size={16} />
+            )}
+            {busyAction === 'profile-photo' ? 'Salvando foto...' : 'Adicionar foto'}
+          </button>
         </div>
       </div>
 
@@ -1829,7 +1971,7 @@ function App() {
       <div className="profile-section-head">
         <div>
           <p className="eyebrow">Seu resumo</p>
-          <h2>Visao geral do que já está salvo</h2>
+          <h2>Visão geral do que já está salvo</h2>
         </div>
       </div>
 
@@ -1952,6 +2094,13 @@ function App() {
       </div>
 
       <input
+        ref={profilePhotoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden-file-input"
+        onChange={handleProfilePhotoSelected}
+      />
+      <input
         ref={backupInputRef}
         type="file"
         accept="application/json,.json"
@@ -1967,7 +2116,6 @@ function App() {
       />
     </section>
   );
-
   return (
     <div className={user ? 'panel-shell panel-shell--workspace' : 'panel-shell panel-shell--auth'}>
       {user ? (
@@ -2143,7 +2291,7 @@ function App() {
                 <label>
                   <span>E-mail</span>
                   <input placeholder="você@exemplo.com" {...signInForm.register('email')} />
-                  <small>{signInForm.formState.errors.email?.message}</small>
+                  <small>{signInForm.formState.errors.email?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>Senha</span>
@@ -2152,7 +2300,7 @@ function App() {
                     placeholder="Sua senha"
                     {...signInForm.register('password')}
                   />
-                  <small>{signInForm.formState.errors.password?.message}</small>
+                  <small>{signInForm.formState.errors.password?.message ?? ''}</small>
                 </label>
                 <button className="secondary-button wide" type="submit">
                   {busyAction === 'signin' ? (
@@ -2170,12 +2318,12 @@ function App() {
                 <label>
                   <span>Nome</span>
                   <input placeholder="Seu nome" {...signUpForm.register('name')} />
-                  <small>{signUpForm.formState.errors.name?.message}</small>
+                  <small>{signUpForm.formState.errors.name?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>E-mail</span>
                   <input placeholder="você@exemplo.com" {...signUpForm.register('email')} />
-                  <small>{signUpForm.formState.errors.email?.message}</small>
+                  <small>{signUpForm.formState.errors.email?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>Senha</span>
@@ -2184,7 +2332,7 @@ function App() {
                     placeholder="Mínimo de 8 caracteres"
                     {...signUpForm.register('password')}
                   />
-                  <small>{signUpForm.formState.errors.password?.message}</small>
+                  <small>{signUpForm.formState.errors.password?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>Confirmar senha</span>
@@ -2193,7 +2341,7 @@ function App() {
                     placeholder="Repita a senha"
                     {...signUpForm.register('confirmPassword')}
                   />
-                  <small>{signUpForm.formState.errors.confirmPassword?.message}</small>
+                  <small>{signUpForm.formState.errors.confirmPassword?.message ?? ''}</small>
                 </label>
                 <button className="secondary-button wide" type="submit">
                   {busyAction === 'signup' ? (
@@ -2211,7 +2359,7 @@ function App() {
                 <label>
                   <span>E-mail</span>
                   <input placeholder="você@exemplo.com" {...resetForm.register('email')} />
-                  <small>{resetForm.formState.errors.email?.message}</small>
+                  <small>{resetForm.formState.errors.email?.message ?? ''}</small>
                 </label>
                 <button className="secondary-button wide" type="submit">
                   {busyAction === 'forgot' ? (

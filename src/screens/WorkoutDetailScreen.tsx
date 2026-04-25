@@ -10,10 +10,14 @@ import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TagChip} from '@/components/TagChip';
 import {
+  deleteTrainingDraftAutosave,
   deleteWorkout,
   duplicateWorkout,
   getWorkoutDetail,
+  getTrainingDraftAutosave,
 } from '@/features/workouts/workoutRepository';
+import {hasStartedTrainingDraft} from '@/features/workouts/trainingDraftAutosave';
+import {getTrainingStartActionConfig} from '@/features/workouts/trainingSessionUi';
 import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
@@ -29,6 +33,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getWorkoutDetail>>>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [hasStartedDraft, setHasStartedDraft] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,10 +46,14 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
       setIsLoading(true);
 
       try {
-        const data = await getWorkoutDetail(session.user.id, route.params.workoutId);
+        const [data, draft] = await Promise.all([
+          getWorkoutDetail(session.user.id, route.params.workoutId),
+          getTrainingDraftAutosave(session.user.id, route.params.workoutId),
+        ]);
 
         if (active) {
           setDetail(data);
+          setHasStartedDraft(hasStartedTrainingDraft(draft));
         }
       } catch (error) {
         if (active) {
@@ -95,6 +104,21 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
     }
   };
 
+  const handleClearTrainingDraft = async () => {
+    if (!session || !detail) {
+      return;
+    }
+
+    try {
+      await deleteTrainingDraftAutosave(session.user.id, detail.id);
+      setHasStartedDraft(false);
+    } catch (error) {
+      Alert.alert('Limpar treino', toUserMessage(error));
+    }
+  };
+
+  const startAction = getTrainingStartActionConfig(hasStartedDraft);
+
   return (
     <Screen>
       {isLoading ? (
@@ -118,10 +142,18 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
             <View style={styles.heroActions}>
               <Button
                 fullWidth={false}
-                label="Iniciar treino"
+                variant={startAction.variant}
+                label={startAction.label}
                 onPress={() =>
                   navigation.navigate('TrainingSession', {workoutId: detail.id})
                 }
+              />
+              <Button
+                fullWidth={false}
+                variant="danger"
+                label="Limpar treino"
+                disabled={!hasStartedDraft}
+                onPress={handleClearTrainingDraft}
               />
               <Button
                 fullWidth={false}

@@ -101,3 +101,13 @@ export const signOutFromPanel = async () => {
     throw toAuthMessage(error, 'Não foi possível sair da conta agora.');
   }
 };
+
+export const updateUserProfilePhoto = async (user: User, photoDataUrl: string) => {
+  try {
+    await updateProfile(user, {photoURL: photoDataUrl});
+    await user.reload();
+    return firebaseAuth.currentUser;
+  } catch (error) {
+    throw toAuthMessage(error, 'Não foi possível atualizar a foto de perfil agora.');
+  }
+};

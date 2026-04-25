@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {Alert, Image, StyleSheet, Text, View} from 'react-native';
-import {Wifi, WifiOff} from 'lucide-react-native';
+import {Upload, Wifi, WifiOff} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {Screen} from '@/components/Screen';
@@ -10,6 +10,7 @@ import {
   exportBackupForCurrentUser,
   importBackupForCurrentUser,
 } from '@/features/backup/backupService';
+import {pickProfilePhotoDataUrl} from '@/features/auth/profilePhotoService';
 import {importTrainingFileForCurrentUser} from '@/features/imports/trainingImportService';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
@@ -18,7 +19,7 @@ import {formatSessionDate} from '@/utils/formatters';
 
 export const ProfileScreen = () => {
   const [activeAction, setActiveAction] = useState<
-    'export' | 'backup-import' | 'training-import' | null
+    'export' | 'backup-import' | 'training-import' | 'profile-photo' | null
   >(null);
   const session = useAppStore(state => state.session);
   const dashboard = useAppStore(state => state.dashboard);
@@ -27,6 +28,7 @@ export const ProfileScreen = () => {
   const isOnline = useAppStore(state => state.isOnline);
   const refreshData = useAppStore(state => state.refreshData);
   const signOut = useAppStore(state => state.signOut);
+  const updateProfilePhoto = useAppStore(state => state.updateProfilePhoto);
   const isBusy = activeAction !== null;
 
   const handleLogout = () => {
@@ -61,8 +63,9 @@ export const ProfileScreen = () => {
       Alert.alert(
         'Cópia salva',
         [
-          `${result.fileName} salvo com sucesso.`,
-          `${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries foram incluídos nesse arquivo.`,
+          'Sua cópia foi exportada com sucesso.',
+          `Arquivo: ${result.fileName}.`,
+          `Conteúdo: ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
         ].join(' '),
       );
     } catch (error) {
@@ -94,8 +97,9 @@ export const ProfileScreen = () => {
       Alert.alert(
         'Cópia restaurada',
         [
-          `${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries foram restaurados.`,
-          'A restauração só aceita arquivos da sua própria conta.',
+          'A restauração foi concluída com sucesso.',
+          `Foram aplicados ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
+          'Os dados atuais da conta neste aparelho foram substituídos pelo conteúdo do arquivo selecionado.',
         ].join(' '),
       );
     } catch (error) {
@@ -144,7 +148,9 @@ export const ProfileScreen = () => {
       Alert.alert(
         'Treinos importados',
         [
-          `${result.fileName} gerou ${result.workouts} treinos com ${result.exercises} exercícios prontos para uso.`,
+          'A importação do arquivo foi concluída com sucesso.',
+          `Arquivo: ${result.fileName}.`,
+          `Resultado: ${result.workouts} treinos e ${result.exercises} exercícios importados.`,
           result.skippedWorkouts > 0
             ? `${result.skippedWorkouts} treino(s) incompleto(s) foram ignorados.`
             : 'Tudo que foi reconhecido já está salvo na sua conta.',
@@ -157,6 +163,36 @@ export const ProfileScreen = () => {
           error,
           'Não foi possível converter esse arquivo em estrutura de treino agora.',
         ),
+      );
+    } finally {
+      setActiveAction(null);
+    }
+  };
+
+  const handleProfilePhotoUpload = async () => {
+    if (!session?.user) {
+      return;
+    }
+
+    setActiveAction('profile-photo');
+
+    try {
+      const photoDataUrl = await pickProfilePhotoDataUrl();
+
+      if (!photoDataUrl) {
+        return;
+      }
+
+      await updateProfilePhoto(photoDataUrl);
+
+      Alert.alert(
+        'Foto atualizada',
+        'Sua foto de perfil foi salva com sucesso e já está disponível nesta conta.',
+      );
+    } catch (error) {
+      Alert.alert(
+        'Não foi possível atualizar a foto',
+        toUserMessage(error, 'Não foi possível atualizar a foto de perfil agora.'),
       );
     } finally {
       setActiveAction(null);
@@ -182,6 +218,16 @@ export const ProfileScreen = () => {
           <Text style={styles.meta}>
             Último login {formatSessionDate(session?.user.lastLoginAt ?? null)}
           </Text>
+          <Button
+            fullWidth={false}
+            variant="secondary"
+            label={
+              activeAction === 'profile-photo' ? 'Salvando foto...' : 'Adicionar foto'
+            }
+            icon={<Upload color={theme.colors.text} size={16} />}
+            onPress={handleProfilePhotoUpload}
+            disabled={!session || isBusy}
+          />
         </View>
       </View>
 
