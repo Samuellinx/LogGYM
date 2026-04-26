@@ -104,4 +104,11 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_sync_queue_user_entity ON sync_queue(user_id, entity_type, entity_id);`,
     ],
   },
+  {
+    id: '004_users_avatar_id',
+    statements: [
+      `ALTER TABLE users ADD COLUMN avatar_id TEXT NOT NULL DEFAULT 'caio-surge';`,
+      `UPDATE users SET avatar_id = 'caio-surge' WHERE avatar_id IS NULL OR TRIM(avatar_id) = '';`,
+    ],
+  },
 ];

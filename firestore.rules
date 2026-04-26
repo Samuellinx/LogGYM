@@ -26,6 +26,17 @@ service cloud.firestore {
       return value is string && value.matches('^#[0-9A-Fa-f]{6}$');
     }
 
+    function isAvatarId(value) {
+      return value == 'caio-surge'
+        || value == 'lia-vibe'
+        || value == 'enzo-pulse'
+        || value == 'maya-glow'
+        || value == 'noah-beat'
+        || value == 'clara-shift'
+        || value == 'kenji-flare'
+        || value == 'yuna-bloom';
+    }
+
     function isWorkoutExercise(value) {
       return value is map
         && value.keys().hasOnly([
@@ -143,6 +154,7 @@ service cloud.firestore {
           'email',
           'name',
           'photo',
+          'avatarId',
           'givenName',
           'familyName',
           'provider',
@@ -153,7 +165,8 @@ service cloud.firestore {
         && data.uid == userId
         && isString(data.email, 3, 254)
         && isString(data.name, 1, 120)
-        && isNullableString(data.photo, 500)
+        && isNullableString(data.photo, 2000)
+        && isAvatarId(data.avatarId)
         && isNullableString(data.givenName, 120)
         && isNullableString(data.familyName, 120)
         && (

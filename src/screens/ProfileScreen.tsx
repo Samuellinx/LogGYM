@@ -1,16 +1,21 @@
 import {useState} from 'react';
-import {Alert, Image, StyleSheet, Text, View} from 'react-native';
-import {Upload, Wifi, WifiOff} from 'lucide-react-native';
+import {Alert, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Wifi, WifiOff} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
+import {ProfileAvatar} from '@/components/ProfileAvatar';
 import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TagChip} from '@/components/TagChip';
+import {TextField} from '@/components/TextField';
 import {
   exportBackupForCurrentUser,
   importBackupForCurrentUser,
 } from '@/features/backup/backupService';
-import {pickProfilePhotoDataUrl} from '@/features/auth/profilePhotoService';
+import {
+  defaultProfileAvatarId,
+  profileAvatarCatalog,
+} from '@/features/auth/profileAvatarCatalog';
 import {importTrainingFileForCurrentUser} from '@/features/imports/trainingImportService';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
@@ -19,8 +24,10 @@ import {formatSessionDate} from '@/utils/formatters';
 
 export const ProfileScreen = () => {
   const [activeAction, setActiveAction] = useState<
-    'export' | 'backup-import' | 'training-import' | 'profile-photo' | null
+    'export' | 'backup-import' | 'training-import' | 'profile-avatar' | null
   >(null);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('');
   const session = useAppStore(state => state.session);
   const dashboard = useAppStore(state => state.dashboard);
   const workouts = useAppStore(state => state.workouts);
@@ -28,8 +35,9 @@ export const ProfileScreen = () => {
   const isOnline = useAppStore(state => state.isOnline);
   const refreshData = useAppStore(state => state.refreshData);
   const signOut = useAppStore(state => state.signOut);
-  const updateProfilePhoto = useAppStore(state => state.updateProfilePhoto);
+  const updateProfileAvatar = useAppStore(state => state.updateProfileAvatar);
   const isBusy = activeAction !== null;
+  const selectedAvatarId = session?.user.avatarId ?? defaultProfileAvatarId;
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja realmente sair do LogGYM?', [
@@ -54,7 +62,13 @@ export const ProfileScreen = () => {
     setActiveAction('export');
 
     try {
-      const result = await exportBackupForCurrentUser(session.user);
+      const result = await exportBackupForCurrentUser(
+        session.user,
+        backupPassword,
+        backupPasswordConfirm,
+      );
+      setBackupPassword('');
+      setBackupPasswordConfirm('');
 
       if (!result) {
         return;
@@ -86,7 +100,8 @@ export const ProfileScreen = () => {
     setActiveAction('backup-import');
 
     try {
-      const result = await importBackupForCurrentUser(session.user);
+      const result = await importBackupForCurrentUser(session.user, backupPassword);
+      setBackupPassword('');
 
       if (!result) {
         return;
@@ -98,7 +113,7 @@ export const ProfileScreen = () => {
         'Cópia restaurada',
         [
           'A restauração foi concluída com sucesso.',
-          `Foram aplicados ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
+          `Foram aplicados ${result.workouts} treinos, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
           'Os dados atuais da conta neste aparelho foram substituídos pelo conteúdo do arquivo selecionado.',
         ].join(' '),
       );
@@ -169,30 +184,23 @@ export const ProfileScreen = () => {
     }
   };
 
-  const handleProfilePhotoUpload = async () => {
-    if (!session?.user) {
+  const handleSelectAvatar = async (avatarId: string) => {
+    if (!session?.user || isBusy || avatarId === selectedAvatarId) {
       return;
     }
 
-    setActiveAction('profile-photo');
+    setActiveAction('profile-avatar');
 
     try {
-      const photoDataUrl = await pickProfilePhotoDataUrl();
-
-      if (!photoDataUrl) {
-        return;
-      }
-
-      await updateProfilePhoto(photoDataUrl);
-
+      await updateProfileAvatar(avatarId);
       Alert.alert(
-        'Foto atualizada',
-        'Sua foto de perfil foi salva com sucesso e já está disponível nesta conta.',
+        'Avatar atualizado',
+        'Seu personagem de perfil foi salvo com sucesso nesta conta.',
       );
     } catch (error) {
       Alert.alert(
-        'Não foi possível atualizar a foto',
-        toUserMessage(error, 'Não foi possível atualizar a foto de perfil agora.'),
+        'Não foi possível atualizar o avatar',
+        toUserMessage(error, 'Não foi possível atualizar o avatar do perfil agora.'),
       );
     } finally {
       setActiveAction(null);
@@ -202,15 +210,7 @@ export const ProfileScreen = () => {
   return (
     <Screen>
       <View style={styles.profileCard}>
-        {session?.user.photo ? (
-          <Image source={{uri: session.user.photo}} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarFallback}>
-            <Text style={styles.avatarLabel}>
-              {(session?.user.name ?? 'L').slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-        )}
+        <ProfileAvatar avatarId={selectedAvatarId} size={86} />
 
         <View style={styles.profileCopy}>
           <Text style={styles.name}>{session?.user.name}</Text>
@@ -218,16 +218,41 @@ export const ProfileScreen = () => {
           <Text style={styles.meta}>
             Último login {formatSessionDate(session?.user.lastLoginAt ?? null)}
           </Text>
-          <Button
-            fullWidth={false}
-            variant="secondary"
-            label={
-              activeAction === 'profile-photo' ? 'Salvando foto...' : 'Adicionar foto'
-            }
-            icon={<Upload color={theme.colors.text} size={16} />}
-            onPress={handleProfilePhotoUpload}
-            disabled={!session || isBusy}
-          />
+          <Text style={styles.avatarHint}>
+            Escolha um personagem para representar sua conta no app.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.avatarPickerCard}>
+        <Text style={styles.avatarPickerTitle}>Seu avatar</Text>
+        <Text style={styles.avatarPickerText}>
+          Toque em um personagem para salvar a seleção.
+        </Text>
+
+        <View style={styles.avatarGrid}>
+          {profileAvatarCatalog.map(avatar => {
+            const isSelected = avatar.id === selectedAvatarId;
+
+            return (
+              <Pressable
+                key={avatar.id}
+                onPress={() => handleSelectAvatar(avatar.id)}
+                disabled={!session || isBusy}
+                style={({pressed}) => [
+                  styles.avatarOption,
+                  isSelected ? styles.avatarOptionSelected : null,
+                  pressed && !isBusy ? styles.avatarOptionPressed : null,
+                ]}>
+                <ProfileAvatar
+                  avatarId={avatar.id}
+                  size={64}
+                  selected={isSelected}
+                />
+                <Text style={styles.avatarOptionLabel}>{avatar.name}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -281,11 +306,35 @@ export const ProfileScreen = () => {
       <View style={styles.backupCard}>
         <Text style={styles.backupTitle}>Backup manual</Text>
         <Text style={styles.backupText}>
-          Exporte um arquivo com seus treinos, exercícios, sessões e séries para
-          manter uma cópia segura fora do app.
+          Exporte um arquivo criptografado com seus treinos, exercícios, sessões e
+          séries para manter uma cópia segura fora do app.
         </Text>
         <Text style={styles.backupHint}>
           Ao restaurar, somente a conta atual pode usar esse arquivo.
+        </Text>
+      </View>
+
+      <View style={styles.backupCard}>
+        <TextField
+          label="Senha da cópia"
+          value={backupPassword}
+          onChangeText={setBackupPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!isBusy}
+        />
+        <TextField
+          label="Confirmar senha da cópia"
+          value={backupPasswordConfirm}
+          onChangeText={setBackupPasswordConfirm}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!isBusy}
+        />
+        <Text style={styles.backupHint}>
+          Use essa senha para exportar e para restaurar a mesma cópia protegida.
         </Text>
       </View>
 
@@ -316,8 +365,8 @@ export const ProfileScreen = () => {
           Exercício, Carga, Repetições, Dia e Cor.
         </Text>
         <Text style={styles.backupHint}>
-          O app organiza o conteúdo em estrutura de treino e ignora blocos vazios
-          ou incompletos.
+          O app organiza o conteúdo em estrutura de treino e ignora blocos vazios ou
+          incompletos.
         </Text>
       </View>
 
@@ -349,23 +398,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     alignItems: 'center',
   },
-  avatar: {
-    width: 68,
-    height: 68,
-    borderRadius: theme.radius.pill,
-  },
-  avatarFallback: {
-    width: 68,
-    height: 68,
-    borderRadius: theme.radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(124,255,79,0.12)',
-  },
-  avatarLabel: {
-    ...theme.typography.title,
-    color: theme.colors.accent,
-  },
   profileCopy: {
     flex: 1,
     gap: 4,
@@ -381,6 +413,53 @@ const styles = StyleSheet.create({
   meta: {
     ...theme.typography.caption,
     color: theme.colors.textSoft,
+  },
+  avatarHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  avatarPickerCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.sm,
+  },
+  avatarPickerTitle: {
+    ...theme.typography.subtitle,
+    color: theme.colors.text,
+  },
+  avatarPickerText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSoft,
+  },
+  avatarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  avatarOption: {
+    width: '22%',
+    minWidth: 66,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  avatarOptionSelected: {
+    backgroundColor: 'rgba(81,199,255,0.08)',
+    borderColor: 'rgba(81,199,255,0.28)',
+  },
+  avatarOptionPressed: {
+    opacity: 0.88,
+  },
+  avatarOptionLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
   },
   statusRow: {
     flexDirection: 'row',

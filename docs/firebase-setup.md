@@ -5,6 +5,7 @@ Este repositório agora usa Firebase como identidade compartilhada e camada de s
 - app mobile React Native
 - painel web React
 - Firestore por usuário
+- Cloud Storage para foto de perfil
 
 ## 1. Criar o projeto Firebase
 
@@ -15,6 +16,7 @@ Este repositório agora usa Firebase como identidade compartilhada e camada de s
    - `Google`
    - `Email/Password`
 5. Ative `Cloud Firestore`.
+6. Ative `Cloud Storage`.
 
 ## 2. Configurar o app Android
 
@@ -73,13 +75,14 @@ LOGGYM_ENABLE_DEV_LOGIN=false
 LOGGYM_FIREBASE_USE_EMULATORS=false
 LOGGYM_FIREBASE_AUTH_EMULATOR_HOST=10.0.2.2:9099
 LOGGYM_FIREBASE_FIRESTORE_EMULATOR_HOST=10.0.2.2:8080
+LOGGYM_FIREBASE_STORAGE_EMULATOR_HOST=10.0.2.2:9199
 ```
 
 Observações:
 
 - `LOGGYM_GOOGLE_WEB_CLIENT_ID` é obrigatória para o login Google real no Android com Firebase Auth.
-- `LOGGYM_ENABLE_DEV_LOGIN` deve permanecer `false` em fluxos normais.
-- os emuladores Firebase são opcionais.
+- `LOGGYM_ENABLE_DEV_LOGIN` deve permanecer `false` em fluxos normais e só libera `dev-local` em builds `__DEV__` com opt-in explícito.
+- os emuladores Firebase são opcionais, mas agora só ligam com configuração completa de Auth, Firestore e Storage.
 
 ## 5. Publicar regras e índices
 
@@ -88,6 +91,7 @@ O repositório já inclui:
 - `firebase.json`
 - `firestore.rules`
 - `firestore.indexes.json`
+- `storage.rules`
 
 Depois de instalar o Firebase CLI e autenticar:
 

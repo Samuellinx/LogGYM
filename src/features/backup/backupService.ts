@@ -4,13 +4,18 @@ import {Dirs, FileSystem} from 'react-native-file-access';
 import {getDatabase} from '@/storage/database';
 import type {SessionUser} from '@/types/domain';
 
+import {
+  decryptBackupJson,
+  encryptBackupJson,
+  validateBackupPassword,
+} from './backupProtection';
 import {backupFileSchema, type BackupFilePayload} from './backup.schemas';
 
 const BACKUP_SCHEMA_VERSION = 1;
 const BACKUP_DIR = `${Dirs.CacheDir}/loggym-backups`;
 const BACKUP_MIME_TYPE = 'application/json';
 const MAX_BACKUP_SIZE_BYTES = 5 * 1024 * 1024;
-const BACKUP_FILE_EXTENSION = /\.json$/iu;
+const BACKUP_FILE_EXTENSION = /\.(json|lgbak)$/iu;
 
 type BackupWorkoutRow = {
   id: string;
@@ -92,7 +97,7 @@ const getBackupFileName = (user: SessionUser) => {
   const safeEmail = sanitizeEmailForFile(user.email) || 'athlete';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-  return `loggym-backup-${safeEmail}-${stamp}.json`;
+  return `loggym-backup-${safeEmail}-${stamp}.lgbak`;
 };
 
 const toFileUri = (path: string) => `file://${path}`;
@@ -310,7 +315,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
   });
 };
 
-const readBackupPayloadFromPicker = async () => {
+const readBackupPayloadFromPicker = async (password: string) => {
   const [pickedFile] = await pick({
     mode: 'open',
     requestLongTermAccess: false,
@@ -323,7 +328,7 @@ const readBackupPayloadFromPicker = async () => {
   }
 
   if (!BACKUP_FILE_EXTENSION.test(pickedFile.name ?? '')) {
-    throw new Error('Selecione um arquivo JSON de backup válido do LogGYM.');
+    throw new Error('Selecione um arquivo de backup válido do LogGYM (.lgbak ou .json legado).');
   }
 
   if (pickedFile.size && pickedFile.size > MAX_BACKUP_SIZE_BYTES) {
@@ -335,7 +340,7 @@ const readBackupPayloadFromPicker = async () => {
     files: [
       {
         uri: pickedFile.uri,
-        fileName: pickedFile.name ?? 'loggym-backup-import.json',
+        fileName: pickedFile.name ?? 'loggym-backup-import.lgbak',
       },
     ],
   });
@@ -349,10 +354,11 @@ const readBackupPayloadFromPicker = async () => {
 
   try {
     const contents = await FileSystem.readFile(localPath);
+    const decryptedContents = await decryptBackupJson(contents, password);
     let parsedJson: unknown;
 
     try {
-      parsedJson = JSON.parse(contents) as unknown;
+      parsedJson = JSON.parse(decryptedContents) as unknown;
     } catch {
       throw new Error('O arquivo selecionado não é um backup válido do LogGYM.');
     }
@@ -362,7 +368,7 @@ const readBackupPayloadFromPicker = async () => {
     try {
       payload = backupFileSchema.parse(parsedJson);
     } catch {
-      throw new Error('O arquivo selecionado não e compatível com o LogGYM.');
+      throw new Error('O arquivo selecionado não é compatível com o LogGYM.');
     }
 
     validateBackupRelations(payload);
@@ -377,7 +383,10 @@ const readBackupPayloadFromPicker = async () => {
 
 export const exportBackupForCurrentUser = async (
   user: SessionUser,
+  password: string,
+  confirmPassword: string,
 ): Promise<BackupExportResult | null> => {
+  const normalizedPassword = validateBackupPassword(password, confirmPassword);
   const payload = await buildBackupPayload(user);
   const fileName = getBackupFileName(user);
 
@@ -386,11 +395,12 @@ export const exportBackupForCurrentUser = async (
   const tempFilePath = `${BACKUP_DIR}/${fileName}`;
 
   try {
-    await FileSystem.writeFile(
-      tempFilePath,
+    const encryptedContents = await encryptBackupJson(
       `${JSON.stringify(payload, null, 2)}\n`,
-      'utf8',
+      normalizedPassword,
     );
+
+    await FileSystem.writeFile(tempFilePath, encryptedContents, 'utf8');
 
     const [savedDocument] = await saveDocuments({
       sourceUris: [toFileUri(tempFilePath)],
@@ -424,9 +434,10 @@ export const exportBackupForCurrentUser = async (
 
 export const importBackupForCurrentUser = async (
   user: SessionUser,
+  password: string,
 ): Promise<BackupImportResult | null> => {
   try {
-    const payload = await readBackupPayloadFromPicker();
+    const payload = await readBackupPayloadFromPicker(password);
 
     if (
       payload.user.provider !== user.provider ||

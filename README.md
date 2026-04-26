@@ -27,7 +27,7 @@ LogGYM agora funciona como um produto de duas frentes no mesmo repositório:
 - sincronização por usuário entre painel web e app
 - cache local SQLite no app para continuar usando sem internet
 - fila de sincronização local para não perder alterações feitas offline
-- backup manual e importação externa de treinos continuam disponíveis no app
+- backup manual protegido por senha e importação externa de treinos continuam disponíveis no app
 - regras do Firestore no repositório
 - painel web real para criar, editar e excluir treinos
 
@@ -92,6 +92,12 @@ LOGGYM_FIREBASE_USE_EMULATORS=false
 LOGGYM_FIREBASE_AUTH_EMULATOR_HOST=10.0.2.2:9099
 LOGGYM_FIREBASE_FIRESTORE_EMULATOR_HOST=10.0.2.2:8080
 ```
+
+Observações de segurança em DEV:
+
+- `LOGGYM_ENABLE_DEV_LOGIN` só libera `dev-local` em runtime `__DEV__` e deve permanecer `false` fora de testes locais.
+- os emuladores Firebase no mobile só são ativados quando `LOGGYM_FIREBASE_USE_EMULATORS=true` e os três endpoints (`AUTH`, `FIRESTORE` e `STORAGE`) estão válidos.
+- o painel web só ativa emuladores em `localhost`/`127.0.0.1` com configuração completa de Auth, Firestore e Storage.
 
 Web:
 

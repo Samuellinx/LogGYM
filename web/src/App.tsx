@@ -29,6 +29,7 @@ import {
 import {z} from 'zod';
 
 import './index.css';
+import {ProfileAvatar} from './components/ProfileAvatar';
 import {
   observeAuthState,
   sendResetPasswordEmail,
@@ -55,11 +56,20 @@ import {
   buildExerciseProgressData,
   buildSparklinePath,
 } from './lib/exerciseProgress';
+import {
+  defaultProfileAvatarId,
+  profileAvatarCatalog,
+} from './lib/profileAvatarCatalog';
+import {
+  ensureUserProfileDocument,
+  updateUserProfileAvatar,
+  watchUserProfile,
+} from './lib/profile';
 import {getNextTrainingExerciseIndex} from './lib/trainingSessionNavigation';
 import {importTrainingFileForCurrentUser} from './lib/trainingImport';
-import {updateProfilePhotoFromFile} from './lib/profilePhoto';
 import {
   createTrainingDraftSnapshot,
+  deleteAllTrainingDraftAutosavesForUser,
   deleteTrainingDraftAutosave,
   getTrainingDraftAutosave,
   hasStartedTrainingDraft,
@@ -304,13 +314,15 @@ function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('dashboard');
   const [user, setUser] = useState<User | null>(null);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [profileAvatarId, setProfileAvatarId] = useState<string>(defaultProfileAvatarId);
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === 'undefined' ? true : navigator.onLine,
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('');
   const [dashboardSearch, setDashboardSearch] = useState('');
   const [workoutSearch, setWorkoutSearch] = useState('');
   const [historySearch, setHistorySearch] = useState('');
@@ -326,7 +338,6 @@ function App() {
   );
   const [trainingOverallNotes, setTrainingOverallNotes] = useState('');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
-  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const trainingImportInputRef = useRef<HTMLInputElement | null>(null);
   const trainingExerciseRefs = useRef<Array<HTMLElement | null>>([]);
   const trainingExerciseLoadInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -360,7 +371,7 @@ function App() {
     () =>
       observeAuthState(nextUser => {
         setUser(nextUser);
-        setProfilePhotoUrl(nextUser?.photoURL ?? null);
+        setProfileAvatarId(defaultProfileAvatarId);
 
         if (!nextUser) {
           setWorkouts([]);
@@ -375,6 +386,22 @@ function App() {
       }),
     [],
   );
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    void ensureUserProfileDocument(user).catch(() => undefined);
+
+    const unsubscribeProfile = watchUserProfile(user.uid, profile => {
+      setProfileAvatarId(profile?.avatarId ?? defaultProfileAvatarId);
+    });
+
+    return () => {
+      unsubscribeProfile();
+    };
+  }, [user]);
 
   useEffect(() => {
     const syncOnlineStatus = () => setIsOnline(window.navigator.onLine);
@@ -662,11 +689,16 @@ function App() {
   });
 
   const handleLogout = async () => {
+    if (!user) {
+      return;
+    }
+
     clearFeedback();
     setBusyAction('logout');
 
     try {
       await signOutFromPanel();
+      deleteAllTrainingDraftAutosavesForUser(user.uid);
       setStatusMessage(null);
     } catch (error) {
       setErrorMessage(
@@ -708,9 +740,15 @@ function App() {
     setBusyAction('export');
 
     try {
-      const result = await exportBackupForCurrentUser(user);
+      const result = await exportBackupForCurrentUser(
+        user,
+        backupPassword,
+        backupPasswordConfirm,
+      );
+      setBackupPassword('');
+      setBackupPasswordConfirm('');
       setStatusMessage(
-        `Download da cópia iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
+        `Download da cópia protegida iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
       );
     } catch (error) {
       setErrorMessage(
@@ -749,7 +787,8 @@ function App() {
     setBusyAction('backup-import');
 
     try {
-      const result = await importBackupFileForCurrentUser(user, file);
+      const result = await importBackupFileForCurrentUser(user, file, backupPassword);
+      setBackupPassword('');
       const refreshed = await refreshWorkspaceData(user.uid);
       setWorkouts(refreshed.workouts);
       setSessions(refreshed.sessions);
@@ -1009,28 +1048,21 @@ function App() {
     }
   };
 
-  const handleProfilePhotoSelected = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-
-    if (!file || !user) {
+  const handleProfileAvatarSelected = async (avatarId: string) => {
+    if (!user || isBusy || avatarId === profileAvatarId) {
       return;
     }
 
     clearFeedback();
-    setBusyAction('profile-photo');
+    setBusyAction('profile-avatar');
 
     try {
-      const updatedUser = await updateProfilePhotoFromFile(user, file);
-      if (updatedUser) {
-        setUser(updatedUser);
-        setProfilePhotoUrl(updatedUser.photoURL ?? null);
-      }
-
-      setStatusMessage('Foto de perfil atualizada com sucesso.');
+      const updatedProfile = await updateUserProfileAvatar(user, avatarId);
+      setProfileAvatarId(updatedProfile.avatarId);
+      setStatusMessage('Avatar atualizado com sucesso.');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível atualizar a foto de perfil agora.',
+        error instanceof Error ? error.message : 'Não foi possível atualizar o avatar agora.',
       );
     } finally {
       setBusyAction(null);
@@ -1926,34 +1958,46 @@ function App() {
   const renderProfileWorkspace = () => (
     <section className="profile-layout">
       <div className="profile-card">
-        {profilePhotoUrl ? (
-          <img
-            src={profilePhotoUrl}
-            alt={user?.displayName ?? 'Perfil'}
-            className="profile-avatar"
-          />
-        ) : (
-          <div className="profile-avatar profile-avatar--fallback">
-            {(user?.displayName ?? user?.email ?? 'L').slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <div className="profile-avatar">
+          <ProfileAvatar avatarId={profileAvatarId} size={88} />
+        </div>
 
         <div className="profile-copy">
           <strong>{user?.displayName?.trim() || user?.email || 'Atleta'}</strong>
           <p>{user?.email}</p>
           <span>Último login {lastLoginLabel}</span>
-          <button
-            type="button"
-            className="secondary-button profile-photo-button"
-            disabled={!user || isBusy}
-            onClick={() => profilePhotoInputRef.current?.click()}>
-            {busyAction === 'profile-photo' ? (
-              <LoaderCircle className="spin" size={16} />
-            ) : (
-              <Upload size={16} />
-            )}
-            {busyAction === 'profile-photo' ? 'Salvando foto...' : 'Adicionar foto'}
-          </button>
+          <span className="profile-avatar-support">
+            {busyAction === 'profile-avatar'
+              ? 'Salvando avatar...'
+              : 'Escolha um personagem para representar sua conta.'}
+          </span>
+        </div>
+      </div>
+
+      <div className="profile-avatar-picker">
+        <div className="profile-avatar-picker-copy">
+          <strong>Seu avatar</strong>
+          <span>Toque em um personagem para salvar a seleção.</span>
+        </div>
+
+        <div className="profile-avatar-grid">
+          {profileAvatarCatalog.map(avatar => {
+            const isSelected = avatar.id === profileAvatarId;
+
+            return (
+              <button
+                key={avatar.id}
+                type="button"
+                className={isSelected ? 'profile-avatar-option active' : 'profile-avatar-option'}
+                disabled={!user || isBusy}
+                onClick={() => handleProfileAvatarSelected(avatar.id)}>
+                <span className="profile-avatar-option-preview">
+                  <ProfileAvatar avatarId={avatar.id} size={64} />
+                </span>
+                <span>{avatar.name}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -2000,10 +2044,32 @@ function App() {
       <div className="profile-info-card">
         <strong>Backup manual</strong>
         <p>
-          Exporte um arquivo com seus treinos, exercícios, sessões e séries para manter uma cópia
-          segura fora do app.
+          Exporte um arquivo criptografado com seus treinos, exercícios, sessões e séries para
+          manter uma cópia segura fora do app.
         </p>
         <span>Ao restaurar, somente a conta atual pode usar esse arquivo.</span>
+      </div>
+
+      <div className="profile-info-card">
+        <label className="field-label">
+          <span>Senha da cópia</span>
+          <input
+            type="password"
+            value={backupPassword}
+            onChange={event => setBackupPassword(event.target.value)}
+            disabled={Boolean(busyAction)}
+          />
+        </label>
+        <label className="field-label">
+          <span>Confirmar senha da cópia</span>
+          <input
+            type="password"
+            value={backupPasswordConfirm}
+            onChange={event => setBackupPasswordConfirm(event.target.value)}
+            disabled={Boolean(busyAction)}
+          />
+        </label>
+        <span>Use a mesma senha para exportar e restaurar backups protegidos.</span>
       </div>
 
       <div className="profile-action-stack">
@@ -2094,16 +2160,9 @@ function App() {
       </div>
 
       <input
-        ref={profilePhotoInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden-file-input"
-        onChange={handleProfilePhotoSelected}
-      />
-      <input
         ref={backupInputRef}
         type="file"
-        accept="application/json,.json"
+        accept="application/json,.json,.lgbak"
         className="hidden-file-input"
         onChange={handleBackupFileSelected}
       />

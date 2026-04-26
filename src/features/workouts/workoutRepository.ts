@@ -10,6 +10,7 @@ import type {
   WorkoutInput,
   WorkoutSummary,
 } from '@/types/domain';
+import {normalizeProfileAvatarId} from '@/features/auth/profileAvatarCatalog';
 import {
   trainingSessionInputSchema,
   workoutInputSchema,
@@ -38,6 +39,7 @@ type UserRow = {
   email: string;
   name: string;
   photo: string | null;
+  avatar_id: string | null;
   given_name: string | null;
   family_name: string | null;
   provider: SessionUser['provider'];
@@ -163,6 +165,7 @@ const mapSessionUser = (row: UserRow): SessionUser => ({
   email: row.email,
   name: row.name,
   photo: row.photo,
+  avatarId: normalizeProfileAvatarId(row.avatar_id),
   givenName: row.given_name,
   familyName: row.family_name,
   provider: row.provider,
@@ -225,12 +228,13 @@ export const ensureUserRecord = async (user: SessionUser) => {
 
   await db.executeAsync(
     `INSERT INTO users (
-      id, email, name, photo, given_name, family_name, provider, created_at, last_login_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, email, name, photo, avatar_id, given_name, family_name, provider, created_at, last_login_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       email = excluded.email,
       name = excluded.name,
       photo = excluded.photo,
+      avatar_id = excluded.avatar_id,
       given_name = excluded.given_name,
       family_name = excluded.family_name,
       provider = excluded.provider,
@@ -240,6 +244,7 @@ export const ensureUserRecord = async (user: SessionUser) => {
       normalizedEmail,
       user.name,
       user.photo,
+      normalizeProfileAvatarId(user.avatarId),
       user.givenName,
       user.familyName,
       user.provider,
@@ -258,6 +263,7 @@ export const findUserByEmail = async (email: string) => {
       email,
       name,
       photo,
+      avatar_id,
       given_name,
       family_name,
       provider,
@@ -283,6 +289,7 @@ export const buildFirebaseUserProfileDocument = (
     email: normalizeEmail(user.email),
     name: user.name.trim(),
     photo: user.photo,
+    avatarId: normalizeProfileAvatarId(user.avatarId),
     givenName: user.givenName,
     familyName: user.familyName,
     provider: user.provider,
@@ -312,12 +319,13 @@ export const migrateLegacyUserToSession = async (user: SessionUser) => {
 
     await tx.executeAsync(
       `INSERT INTO users (
-        id, email, name, photo, given_name, family_name, provider, created_at, last_login_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, email, name, photo, avatar_id, given_name, family_name, provider, created_at, last_login_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         email = excluded.email,
         name = excluded.name,
         photo = excluded.photo,
+        avatar_id = excluded.avatar_id,
         given_name = excluded.given_name,
         family_name = excluded.family_name,
         provider = excluded.provider,
@@ -327,6 +335,7 @@ export const migrateLegacyUserToSession = async (user: SessionUser) => {
         normalizedEmail,
         user.name,
         user.photo,
+        normalizeProfileAvatarId(user.avatarId),
         user.givenName,
         user.familyName,
         user.provider,
@@ -962,6 +971,14 @@ export const deleteTrainingDraftAutosave = async (
 
   await db.executeAsync('DELETE FROM metadata WHERE key = ?;', [
     getTrainingDraftMetadataKey(userId, workoutId),
+  ]);
+};
+
+export const deleteAllTrainingDraftAutosaves = async (userId: string) => {
+  const db = getDatabase();
+
+  await db.executeAsync('DELETE FROM metadata WHERE key LIKE ?;', [
+    `training-draft:${userId}:%`,
   ]);
 };
 

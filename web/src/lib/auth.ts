@@ -20,7 +20,7 @@ const toAuthMessage = (error: unknown, fallback: string) => {
   switch (error.code) {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
-      return new Error('O login foi cancelado antes de ser concluido.');
+      return new Error('O login foi cancelado antes de ser concluído.');
     case 'auth/popup-blocked':
       return new Error('Libere pop-ups no navegador para continuar com o login.');
     case 'auth/network-request-failed':
@@ -99,15 +99,5 @@ export const signOutFromPanel = async () => {
     await signOut(firebaseAuth);
   } catch (error) {
     throw toAuthMessage(error, 'Não foi possível sair da conta agora.');
-  }
-};
-
-export const updateUserProfilePhoto = async (user: User, photoDataUrl: string) => {
-  try {
-    await updateProfile(user, {photoURL: photoDataUrl});
-    await user.reload();
-    return firebaseAuth.currentUser;
-  } catch (error) {
-    throw toAuthMessage(error, 'Não foi possível atualizar a foto de perfil agora.');
   }
 };

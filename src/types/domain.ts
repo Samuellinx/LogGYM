@@ -5,6 +5,7 @@ export interface SessionUser {
   name: string;
   email: string;
   photo: string | null;
+  avatarId: string;
   givenName: string | null;
   familyName: string | null;
   provider: AuthProvider;

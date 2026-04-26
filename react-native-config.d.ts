@@ -6,6 +6,7 @@ declare module 'react-native-config' {
     LOGGYM_FIREBASE_USE_EMULATORS?: string;
     LOGGYM_FIREBASE_AUTH_EMULATOR_HOST?: string;
     LOGGYM_FIREBASE_FIRESTORE_EMULATOR_HOST?: string;
+    LOGGYM_FIREBASE_STORAGE_EMULATOR_HOST?: string;
   }
 
   const Config: NativeConfig;

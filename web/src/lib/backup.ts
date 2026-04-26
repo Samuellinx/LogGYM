@@ -12,6 +12,11 @@ import {
   listAllWorkoutsForUser,
   replaceAllWorkoutsAndSessions,
 } from './workouts';
+import {
+  decryptBackupJson,
+  encryptBackupJson,
+  validateBackupPassword,
+} from './backupProtection';
 
 const isoDateSchema = z
   .string()
@@ -23,7 +28,7 @@ const isoDateSchema = z
 const idSchema = z.string().trim().min(1).max(120);
 const nullableShortTextSchema = z.string().trim().max(80).nullable();
 const MAX_BACKUP_SIZE_BYTES = 5 * 1024 * 1024;
-const BACKUP_FILE_EXTENSION = /\.json$/iu;
+const BACKUP_FILE_EXTENSION = /\.(json|lgbak)$/iu;
 const BACKUP_MIME_TYPES = new Set(['application/json', 'text/json', '']);
 
 const backupWorkoutSchema = z.object({
@@ -122,7 +127,7 @@ const getBackupFileName = (email: string) => {
   const safeEmail = sanitizeEmailForFile(email) || 'athlete';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-  return `loggym-backup-${safeEmail}-${stamp}.json`;
+  return `loggym-backup-${safeEmail}-${stamp}.lgbak`;
 };
 
 const triggerDownload = (fileName: string, contents: string) => {
@@ -398,15 +403,22 @@ const buildSessionDocumentsFromBackup = (
 
 export const exportBackupForCurrentUser = async (
   user: User,
+  password: string,
+  confirmPassword: string,
 ): Promise<BackupExportResult> => {
   if (!user.email) {
     throw new Error('Sua conta precisa ter um e-mail válido para exportar a cópia.');
   }
 
+  const normalizedPassword = validateBackupPassword(password, confirmPassword);
   const payload = await buildBackupPayload(user);
   const fileName = getBackupFileName(user.email);
+  const encryptedContents = await encryptBackupJson(
+    `${JSON.stringify(payload, null, 2)}\n`,
+    normalizedPassword,
+  );
 
-  triggerDownload(fileName, `${JSON.stringify(payload, null, 2)}\n`);
+  triggerDownload(fileName, encryptedContents);
 
   return {
     fileName,
@@ -420,6 +432,7 @@ export const exportBackupForCurrentUser = async (
 export const importBackupFileForCurrentUser = async (
   user: User,
   file: File,
+  password: string,
 ): Promise<BackupImportResult> => {
   if (!user.email) {
     throw new Error('Sua conta precisa ter um e-mail válido para restaurar a cópia.');
@@ -430,14 +443,15 @@ export const importBackupFileForCurrentUser = async (
   }
 
   if (!BACKUP_FILE_EXTENSION.test(file.name) || !BACKUP_MIME_TYPES.has(file.type)) {
-    throw new Error('Selecione um arquivo JSON de backup válido do LogGYM.');
+    throw new Error('Selecione um arquivo de backup válido do LogGYM (.lgbak ou .json legado).');
   }
 
   const contents = await file.text();
+  const decryptedContents = await decryptBackupJson(contents, password);
   let parsedJson: unknown;
 
   try {
-    parsedJson = JSON.parse(contents) as unknown;
+    parsedJson = JSON.parse(decryptedContents) as unknown;
   } catch {
     throw new Error('O arquivo selecionado não é um backup válido do LogGYM.');
   }

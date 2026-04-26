@@ -1,4 +1,4 @@
-import {create} from 'zustand';
+﻿import {create} from 'zustand';
 
 import type {
   DashboardData,
@@ -16,11 +16,13 @@ import {
   signInWithGoogleAccount,
   signOutFromProvider,
   signUpWithEmailAccount,
-  updateProfilePhoto as persistProfilePhoto,
+  updateProfileAvatar as persistProfileAvatar,
 } from '@/features/auth/authService';
 import {syncFirebaseUserData} from '@/features/sync/firebaseSyncService';
 import {
+  deleteAllTrainingDraftAutosaves,
   ensureUserRecord,
+  findUserByEmail,
   getDashboardData,
   listHistory,
   listWorkouts,
@@ -49,7 +51,7 @@ interface AppStoreState {
     password: string,
   ) => Promise<{name: string; email: string}>;
   sendPasswordReset: (email: string) => Promise<void>;
-  updateProfilePhoto: (photoDataUrl: string) => Promise<void>;
+  updateProfileAvatar: (avatarId: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
   setOnline: (isOnline: boolean) => void;
@@ -84,6 +86,21 @@ const prepareLocalSessionData = async (
   await purgeLegacySeedData(user.id);
 };
 
+const hydrateStoredAvatar = async (
+  user: NonNullable<StoredSession['user']>,
+) => {
+  const storedUser = await findUserByEmail(user.email);
+
+  if (!storedUser) {
+    return user;
+  }
+
+  return {
+    ...user,
+    avatarId: storedUser.avatarId || user.avatarId,
+  };
+};
+
 export const useAppStore = create<AppStoreState>((set, get) => ({
   isBootstrapping: true,
   isRefreshing: false,
@@ -114,32 +131,33 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         return;
       }
 
-      await prepareLocalSessionData(restoredUser);
+      const hydratedUser = await hydrateStoredAvatar(restoredUser);
+      await prepareLocalSessionData(hydratedUser);
 
       let syncError: string | null = null;
 
-      if (shouldSyncRemote(get().isOnline, restoredUser)) {
+      if (shouldSyncRemote(get().isOnline, hydratedUser)) {
         try {
-          await syncFirebaseUserData(restoredUser);
+          await syncFirebaseUserData(hydratedUser);
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Não foi possível sincronizar os treinos com a nuvem agora.',
+            'NÃ£o foi possÃ­vel sincronizar os treinos com a nuvem agora.',
           );
         }
       }
 
-      const data = await loadAllData(restoredUser.id);
+      const data = await loadAllData(hydratedUser.id);
 
       set({
         ...data,
-        session: createSession(restoredUser),
+        session: createSession(hydratedUser),
         isBootstrapping: false,
         error: syncError,
       });
     } catch (error) {
       set({
-        error: toUserMessage(error, 'Não foi possível iniciar o aplicativo.'),
+        error: toUserMessage(error, 'NÃ£o foi possÃ­vel iniciar o aplicativo.'),
         isBootstrapping: false,
       });
     }
@@ -165,7 +183,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Não foi possível sincronizar os treinos com a nuvem agora.',
+            'NÃ£o foi possÃ­vel sincronizar os treinos com a nuvem agora.',
           );
         }
       }
@@ -184,26 +202,27 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   signInWithGoogle: async () => {
     try {
       const user = await signInWithGoogleAccount();
-      await prepareLocalSessionData(user);
+      const hydratedUser = await hydrateStoredAvatar(user);
+      await prepareLocalSessionData(hydratedUser);
 
       let syncError: string | null = null;
 
-      if (shouldSyncRemote(get().isOnline, user)) {
+      if (shouldSyncRemote(get().isOnline, hydratedUser)) {
         try {
-          await syncFirebaseUserData(user);
+          await syncFirebaseUserData(hydratedUser);
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Entrou na conta, mas a sincronização ainda não aconteceu.',
+            'Entrou na conta, mas a sincronizaÃ§Ã£o ainda nÃ£o aconteceu.',
           );
         }
       }
 
-      const data = await loadAllData(user.id);
+      const data = await loadAllData(hydratedUser.id);
 
       set({
         ...data,
-        session: createSession(user),
+        session: createSession(hydratedUser),
         error: syncError,
       });
     } catch (error) {
@@ -218,23 +237,24 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const capabilities = getAuthCapabilities();
 
       if (!capabilities.allowDevLogin) {
-        throw new Error('Modo DEV local indisponível nesta build.');
+        throw new Error('Modo DEV local indisponÃ­vel nesta build.');
       }
 
       const user = await signInWithDevelopmentAccount();
-      await prepareLocalSessionData(user);
+      const hydratedUser = await hydrateStoredAvatar(user);
+      await prepareLocalSessionData(hydratedUser);
 
-      const data = await loadAllData(user.id);
+      const data = await loadAllData(hydratedUser.id);
 
       set({
         ...data,
-        session: createSession(user),
+        session: createSession(hydratedUser),
         error: null,
       });
     } catch (error) {
       const message = toUserMessage(
         error,
-        'Falha ao abrir a sessão de desenvolvimento.',
+        'Falha ao abrir a sessÃ£o de desenvolvimento.',
       );
       set({error: message});
       throw new Error(message);
@@ -244,26 +264,27 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   signInWithCredentials: async (email, password) => {
     try {
       const user = await signInWithEmailAccount({email, password});
-      await prepareLocalSessionData(user);
+      const hydratedUser = await hydrateStoredAvatar(user);
+      await prepareLocalSessionData(hydratedUser);
 
       let syncError: string | null = null;
 
-      if (shouldSyncRemote(get().isOnline, user)) {
+      if (shouldSyncRemote(get().isOnline, hydratedUser)) {
         try {
-          await syncFirebaseUserData(user);
+          await syncFirebaseUserData(hydratedUser);
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'Entrou na conta, mas a sincronização ainda não aconteceu.',
+            'Entrou na conta, mas a sincronizaÃ§Ã£o ainda nÃ£o aconteceu.',
           );
         }
       }
 
-      const data = await loadAllData(user.id);
+      const data = await loadAllData(hydratedUser.id);
 
       set({
         ...data,
-        session: createSession(user),
+        session: createSession(hydratedUser),
         error: syncError,
       });
     } catch (error) {
@@ -297,22 +318,22 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } catch (error) {
       const message = toUserMessage(
         error,
-        'Falha ao enviar o e-mail de redefinição.',
+        'Falha ao enviar o e-mail de redefiniÃ§Ã£o.',
       );
       set({error: message});
       throw new Error(message);
     }
   },
 
-  updateProfilePhoto: async photoDataUrl => {
+  updateProfileAvatar: async avatarId => {
     const session = get().session;
 
     if (!session) {
-      throw new Error('Nenhuma sessão ativa para atualizar a foto.');
+      throw new Error('Nenhuma sessão ativa para atualizar o avatar.');
     }
 
     try {
-      const updatedUser = await persistProfilePhoto(session.user, photoDataUrl);
+      const updatedUser = await persistProfileAvatar(session.user, avatarId);
       await ensureUserRecord(updatedUser);
 
       let syncError: string | null = null;
@@ -323,7 +344,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         } catch (error) {
           syncError = toUserMessage(
             error,
-            'A foto foi atualizada, mas a sincronização ainda não aconteceu.',
+            'O avatar foi atualizado, mas a sincronização ainda não aconteceu.',
           );
         }
       }
@@ -335,7 +356,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } catch (error) {
       const message = toUserMessage(
         error,
-        'Não foi possível atualizar a foto de perfil.',
+        'Não foi possível atualizar o avatar do perfil.',
       );
       set({error: message});
       throw new Error(message);
@@ -347,6 +368,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     if (session) {
       await signOutFromProvider(session.provider);
+      await deleteAllTrainingDraftAutosaves(session.user.id);
     }
 
     set({

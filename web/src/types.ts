@@ -2,6 +2,20 @@ export type AuthMode = 'signin' | 'signup' | 'forgot';
 export type WorkspaceView = 'dashboard' | 'workouts' | 'history' | 'profile';
 export type AuthProvider = 'google' | 'password' | 'dev-local';
 
+export type UserProfileDocument = {
+  uid: string;
+  email: string;
+  name: string;
+  photo: string | null;
+  avatarId: string;
+  givenName: string | null;
+  familyName: string | null;
+  provider: AuthProvider;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string;
+};
+
 export type WorkoutExerciseInput = {
   id: string;
   name: string;

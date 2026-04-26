@@ -56,6 +56,7 @@ export type FirebaseUserProfileDocument = {
   email: string;
   name: string;
   photo: string | null;
+  avatarId: string;
   givenName: string | null;
   familyName: string | null;
   provider: AuthProvider;

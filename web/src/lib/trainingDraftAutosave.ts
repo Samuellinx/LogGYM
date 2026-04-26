@@ -27,6 +27,7 @@ const createBlankSet = (): TrainingDraftSet => ({
 
 const getDraftStorageKey = (userId: string, workoutId: string) =>
   `loggym:training-draft:${userId}:${workoutId}`;
+const getDraftStorageKeyPrefix = (userId: string) => `loggym:training-draft:${userId}:`;
 
 export const createTrainingDraftSnapshot = (
   input: SnapshotInput,
@@ -143,6 +144,21 @@ export const deleteTrainingDraftAutosave = (
   workoutId: string,
 ) => {
   window.localStorage.removeItem(getDraftStorageKey(userId, workoutId));
+};
+
+export const deleteAllTrainingDraftAutosavesForUser = (userId: string) => {
+  const keyPrefix = getDraftStorageKeyPrefix(userId);
+  const keysToDelete: string[] = [];
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+
+    if (key?.startsWith(keyPrefix)) {
+      keysToDelete.push(key);
+    }
+  }
+
+  keysToDelete.forEach(key => window.localStorage.removeItem(key));
 };
 
 export const hasStartedTrainingDraft = (

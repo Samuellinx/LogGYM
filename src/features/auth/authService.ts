@@ -6,11 +6,21 @@ import {
   isErrorWithCode,
 } from '@react-native-google-signin/google-signin';
 
-import {getFirebaseAuth, initializeFirebaseServices} from '@/features/firebase/firebaseClient';
+import {
+  defaultProfileAvatarId,
+  normalizeProfileAvatarId,
+} from '@/features/auth/profileAvatarCatalog';
+import {
+  getFirebaseAuth,
+  getFirebaseFirestore,
+  initializeFirebaseServices,
+} from '@/features/firebase/firebaseClient';
 import type {AuthProvider, SessionUser} from '@/types/domain';
 
 const googleWebClientId = Config.LOGGYM_GOOGLE_WEB_CLIENT_ID?.trim();
 const googleIosClientId = Config.LOGGYM_GOOGLE_IOS_CLIENT_ID?.trim();
+const isDevLoginFlagEnabled = Config.LOGGYM_ENABLE_DEV_LOGIN?.trim() === 'true';
+const isDevLoginAllowed = __DEV__ && isDevLoginFlagEnabled;
 
 let googleConfigured = false;
 
@@ -61,11 +71,24 @@ const toIsoDate = (value?: string | null) => {
   return timestamp.toISOString();
 };
 
-const mapFirebaseUser = (user: FirebaseAuthTypes.User): SessionUser => {
-  const name =
-    user.displayName?.trim() ||
-    user.email?.split('@')[0]?.trim() ||
-    'Atleta';
+const getRemoteAvatarId = async (userId: string) => {
+  try {
+    initializeFirebaseServices();
+    const snapshot = await getFirebaseFirestore()
+      .collection('users')
+      .doc(userId)
+      .get();
+
+    return normalizeProfileAvatarId(snapshot.get('avatarId'));
+  } catch {
+    return defaultProfileAvatarId;
+  }
+};
+
+const mapFirebaseUser = async (
+  user: FirebaseAuthTypes.User,
+): Promise<SessionUser> => {
+  const name = user.displayName?.trim() || user.email?.split('@')[0]?.trim() || 'Atleta';
 
   if (!user.email) {
     throw new Error(
@@ -73,11 +96,14 @@ const mapFirebaseUser = (user: FirebaseAuthTypes.User): SessionUser => {
     );
   }
 
+  const avatarId = await getRemoteAvatarId(user.uid);
+
   return {
     id: user.uid,
     name,
     email: user.email.trim().toLowerCase(),
-    photo: user.photoURL,
+    photo: null,
+    avatarId,
     givenName: user.displayName?.trim().split(/\s+/)[0] ?? null,
     familyName:
       user.displayName?.trim().split(/\s+/).slice(1).join(' ').trim() || null,
@@ -109,7 +135,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
     }
 
     if (code.toLowerCase().includes('cancel')) {
-      return new Error('Operacao cancelada.');
+      return new Error('Operação cancelada.');
     }
   }
 
@@ -133,9 +159,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
     case 'auth/user-disabled':
       return new Error('Não foi possível concluir a autenticação desta conta.');
     case 'auth/operation-not-allowed':
-      return new Error(
-        'Esse método de entrada ainda não foi habilitado no Firebase.',
-      );
+      return new Error('Esse método de entrada ainda não foi habilitado no Firebase.');
     default:
       break;
   }
@@ -144,7 +168,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
     const lowered = error.message.toLowerCase();
 
     if (lowered.includes('cancel')) {
-      return new Error('Operacao cancelada.');
+      return new Error('Operação cancelada.');
     }
   }
 
@@ -154,7 +178,7 @@ const mapAuthError = (error: unknown, fallbackMessage: string) => {
 export const getAuthCapabilities = () => ({
   isGoogleConfigured: Boolean(googleWebClientId),
   hasWebClientId: Boolean(googleWebClientId),
-  allowDevLogin: __DEV__ && Config.LOGGYM_ENABLE_DEV_LOGIN === 'true',
+  allowDevLogin: isDevLoginAllowed,
 });
 
 export const restoreFirebaseSession = async () => {
@@ -165,16 +189,14 @@ export const restoreFirebaseSession = async () => {
     return mapFirebaseUser(firebaseAuth.currentUser);
   }
 
-  const restoredUser = await new Promise<FirebaseAuthTypes.User | null>(
-    resolve => {
-      let unsubscribe: (() => void) | undefined;
+  const restoredUser = await new Promise<FirebaseAuthTypes.User | null>(resolve => {
+    let unsubscribe: (() => void) | undefined;
 
-      unsubscribe = firebaseAuth.onAuthStateChanged(user => {
-        unsubscribe?.();
-        resolve(user);
-      });
-    },
-  );
+    unsubscribe = firebaseAuth.onAuthStateChanged(user => {
+      unsubscribe?.();
+      resolve(user);
+    });
+  });
 
   return restoredUser ? mapFirebaseUser(restoredUser) : null;
 };
@@ -185,9 +207,7 @@ export const signInWithGoogleAccount = async () => {
     configureGoogleSignin();
 
     if (!googleWebClientId) {
-      throw new Error(
-        'O cliente web do Google não foi configurado para esta build.',
-      );
+      throw new Error('O cliente web do Google não foi configurado para esta build.');
     }
 
     await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
@@ -284,6 +304,7 @@ export const signInWithDevelopmentAccount = async () => {
     name: 'Atleta DEV',
     email: 'dev@loggym.local',
     photo: null,
+    avatarId: defaultProfileAvatarId,
     familyName: 'DEV',
     givenName: 'Atleta',
     provider: 'dev-local' as const,
@@ -306,36 +327,11 @@ export const signOutFromProvider = async (provider: AuthProvider) => {
   await getFirebaseAuth().signOut();
 };
 
-export const updateProfilePhoto = async (
+export const updateProfileAvatar = async (
   currentUser: SessionUser,
-  photoDataUrl: string,
-) => {
-  if (currentUser.provider === 'dev-local') {
-    return {
-      ...currentUser,
-      photo: photoDataUrl,
-    };
-  }
-
-  try {
-    initializeFirebaseServices();
-    const firebaseUser = getFirebaseAuth().currentUser;
-
-    if (!firebaseUser) {
-      throw new Error('Sua sessão não está pronta para atualizar a foto agora.');
-    }
-
-    await firebaseUser.updateProfile({photoURL: photoDataUrl});
-    await firebaseUser.reload();
-
-    const reloadedUser = getFirebaseAuth().currentUser;
-
-    if (!reloadedUser) {
-      throw new Error('Sua sessão não está pronta para atualizar a foto agora.');
-    }
-
-    return mapFirebaseUser(reloadedUser);
-  } catch (error) {
-    throw mapAuthError(error, 'Não foi possível atualizar a foto de perfil agora.');
-  }
-};
+  avatarId: string,
+) => ({
+  ...currentUser,
+  photo: null,
+  avatarId: normalizeProfileAvatarId(avatarId),
+});
