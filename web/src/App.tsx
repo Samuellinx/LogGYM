@@ -2055,6 +2055,7 @@ function App() {
           <span>Senha da cópia</span>
           <input
             type="password"
+            autoComplete="new-password"
             value={backupPassword}
             onChange={event => setBackupPassword(event.target.value)}
             disabled={Boolean(busyAction)}
@@ -2064,6 +2065,7 @@ function App() {
           <span>Confirmar senha da cópia</span>
           <input
             type="password"
+            autoComplete="new-password"
             value={backupPasswordConfirm}
             onChange={event => setBackupPasswordConfirm(event.target.value)}
             disabled={Boolean(busyAction)}
@@ -2349,13 +2351,18 @@ function App() {
               <form className="auth-form" onSubmit={handleEmailLogin}>
                 <label>
                   <span>E-mail</span>
-                  <input placeholder="você@exemplo.com" {...signInForm.register('email')} />
+                  <input
+                    autoComplete="email"
+                    placeholder="você@exemplo.com"
+                    {...signInForm.register('email')}
+                  />
                   <small>{signInForm.formState.errors.email?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>Senha</span>
                   <input
                     type="password"
+                    autoComplete="current-password"
                     placeholder="Sua senha"
                     {...signInForm.register('password')}
                   />
@@ -2376,18 +2383,27 @@ function App() {
               <form className="auth-form" onSubmit={handleSignUp}>
                 <label>
                   <span>Nome</span>
-                  <input placeholder="Seu nome" {...signUpForm.register('name')} />
+                  <input
+                    autoComplete="name"
+                    placeholder="Seu nome"
+                    {...signUpForm.register('name')}
+                  />
                   <small>{signUpForm.formState.errors.name?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>E-mail</span>
-                  <input placeholder="você@exemplo.com" {...signUpForm.register('email')} />
+                  <input
+                    autoComplete="email"
+                    placeholder="você@exemplo.com"
+                    {...signUpForm.register('email')}
+                  />
                   <small>{signUpForm.formState.errors.email?.message ?? ''}</small>
                 </label>
                 <label>
                   <span>Senha</span>
                   <input
                     type="password"
+                    autoComplete="new-password"
                     placeholder="Mínimo de 8 caracteres"
                     {...signUpForm.register('password')}
                   />
@@ -2397,6 +2413,7 @@ function App() {
                   <span>Confirmar senha</span>
                   <input
                     type="password"
+                    autoComplete="new-password"
                     placeholder="Repita a senha"
                     {...signUpForm.register('confirmPassword')}
                   />
@@ -2417,7 +2434,11 @@ function App() {
               <form className="auth-form" onSubmit={handleResetPassword}>
                 <label>
                   <span>E-mail</span>
-                  <input placeholder="você@exemplo.com" {...resetForm.register('email')} />
+                  <input
+                    autoComplete="email"
+                    placeholder="você@exemplo.com"
+                    {...resetForm.register('email')}
+                  />
                   <small>{resetForm.formState.errors.email?.message ?? ''}</small>
                 </label>
                 <button className="secondary-button wide" type="submit">
