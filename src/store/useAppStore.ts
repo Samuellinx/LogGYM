@@ -53,6 +53,7 @@ interface AppStoreState {
   sendPasswordReset: (email: string) => Promise<void>;
   updateProfileAvatar: (avatarId: string) => Promise<void>;
   signOut: () => Promise<void>;
+  showError: (message: string) => void;
   clearError: () => void;
   setOnline: (isOnline: boolean) => void;
 }
@@ -380,6 +381,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     });
   },
 
+  showError: message => set({error: message}),
   clearError: () => set({error: null}),
   setOnline: isOnline => set({isOnline}),
 }));

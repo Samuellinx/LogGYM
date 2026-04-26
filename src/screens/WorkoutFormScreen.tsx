@@ -29,6 +29,7 @@ import {theme} from '@/theme';
 import {composeBaseLoad, formatBaseLoadLabel, parseBaseLoad} from '@/utils/baseLoad';
 import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
 import {toUserMessage} from '@/utils/errors';
+import {maskDecimalInput, maskRepRangeInput} from '@/utils/inputMasks';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutForm'>;
 
@@ -57,6 +58,7 @@ const defaultValues: WorkoutFormValues = {
 export const WorkoutFormScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
   const refreshData = useAppStore(state => state.refreshData);
+  const showError = useAppStore(state => state.showError);
   const [isLoading, setIsLoading] = useState(Boolean(route.params?.workoutId));
   const [isSaving, setIsSaving] = useState(false);
   const [exerciseBatchCount, setExerciseBatchCount] = useState(1);
@@ -83,6 +85,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
 
   const selectedAccent = watch('accentColor');
   const selectedDay = watch('scheduledDay');
+  const isEditingWorkout = Boolean(route.params?.workoutId);
 
   useEffect(() => {
     let active = true;
@@ -123,7 +126,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
         });
       } catch (error) {
         if (active) {
-          Alert.alert('Editar treino', toUserMessage(error));
+          showError(toUserMessage(error));
         }
       } finally {
         if (active) {
@@ -137,7 +140,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     return () => {
       active = false;
     };
-  }, [reset, route.params?.workoutId, session]);
+  }, [reset, route.params?.workoutId, session, showError]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', event => {
@@ -183,9 +186,16 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
       );
 
       await refreshData();
-      navigation.replace('WorkoutDetail', {workoutId});
+      if (isEditingWorkout) {
+        navigation.replace('WorkoutDetail', {workoutId});
+        return;
+      }
+
+      reset(defaultValues);
+      setExerciseBatchCount(1);
+      navigation.navigate('MainTabs', {screen: 'Workouts'});
     } catch (error) {
-      Alert.alert('Salvar treino', toUserMessage(error));
+      showError(toUserMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -444,7 +454,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                     label="Carga em Kg"
                     placeholder="Ex: 20"
                     value={field.value}
-                    onChangeText={field.onChange}
+                    onChangeText={value => field.onChange(maskDecimalInput(value))}
                     keyboardType="decimal-pad"
                     error={errors.exercises?.[index]?.baseLoadKg?.message}
                   />
@@ -459,7 +469,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                     label="Carga em Plates"
                     placeholder="Ex: 2"
                     value={field.value}
-                    onChangeText={field.onChange}
+                    onChangeText={value => field.onChange(maskDecimalInput(value))}
                     keyboardType="decimal-pad"
                     error={errors.exercises?.[index]?.baseLoadPlates?.message}
                   />
@@ -492,7 +502,8 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                     label="Faixa de repeticoes"
                     placeholder="Ex: 8-10"
                     value={field.value}
-                    onChangeText={field.onChange}
+                    onChangeText={value => field.onChange(maskRepRangeInput(value))}
+                    keyboardType="numbers-and-punctuation"
                     error={errors.exercises?.[index]?.targetReps?.message}
                   />
                 )}

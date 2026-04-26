@@ -1,0 +1,8 @@
+# LogGYM - bundle manual para diagnostico
+# Ambiente alvo: Windows / PowerShell
+
+## Gerar bundle manual Android
+
+```powershell
+npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output .\.tmp-bundle\index.android.bundle --assets-dest .\.tmp-bundle\assets
+```

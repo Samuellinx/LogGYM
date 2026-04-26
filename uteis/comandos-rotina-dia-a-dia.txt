@@ -1,0 +1,38 @@
+# LogGYM - ordem recomendada no dia a dia
+# Ambiente alvo: Windows / PowerShell
+
+## 1. Garantir dependencias
+
+```powershell
+npm install
+```
+
+## 2. Corrigir o adb e conferir dispositivo
+
+```powershell
+npm run adb:fix
+```
+
+## 3. Se for dispositivo fisico, fazer reverse
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb reverse tcp:8081 tcp:8081
+```
+
+## 4. Subir Metro
+
+```powershell
+npm run start:reset
+```
+
+## 5. Rodar app no Android
+
+```powershell
+npm run android:dev
+```
+
+## 6. Se estiver usando o painel web no mesmo dia
+
+```powershell
+npm run web:dev
+```

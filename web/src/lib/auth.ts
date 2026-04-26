@@ -10,7 +10,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 
-import {firebaseAuth, googleProvider} from './firebase';
+import {firebaseAuth, firebaseAuthPersistenceReady, googleProvider} from './firebase';
 
 const toAuthMessage = (error: unknown, fallback: string) => {
   if (!(error instanceof FirebaseError)) {
@@ -47,11 +47,27 @@ const toAuthMessage = (error: unknown, fallback: string) => {
   }
 };
 
-export const observeAuthState = (listener: (user: User | null) => void) =>
-  onAuthStateChanged(firebaseAuth, listener);
+export const observeAuthState = (listener: (user: User | null) => void) => {
+  let unsubscribe: (() => void) | null = null;
+  let isActive = true;
+
+  void firebaseAuthPersistenceReady.finally(() => {
+    if (!isActive) {
+      return;
+    }
+
+    unsubscribe = onAuthStateChanged(firebaseAuth, listener);
+  });
+
+  return () => {
+    isActive = false;
+    unsubscribe?.();
+  };
+};
 
 export const signInWithGooglePopup = async () => {
   try {
+    await firebaseAuthPersistenceReady;
     await signInWithPopup(firebaseAuth, googleProvider);
   } catch (error) {
     throw toAuthMessage(error, 'Não foi possível entrar com Google agora.');
@@ -60,6 +76,7 @@ export const signInWithGooglePopup = async () => {
 
 export const signInWithEmailPassword = async (email: string, password: string) => {
   try {
+    await firebaseAuthPersistenceReady;
     await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password);
   } catch (error) {
     throw toAuthMessage(error, 'Não foi possível entrar com e-mail agora.');
@@ -72,6 +89,7 @@ export const signUpWithEmailPassword = async (
   password: string,
 ) => {
   try {
+    await firebaseAuthPersistenceReady;
     const credential = await createUserWithEmailAndPassword(
       firebaseAuth,
       email.trim().toLowerCase(),

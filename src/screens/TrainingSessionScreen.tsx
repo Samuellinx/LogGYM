@@ -1,6 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
 import {
-  Alert,
   LayoutChangeEvent,
   Pressable,
   ScrollView,
@@ -45,6 +44,7 @@ import type {WorkoutDetail} from '@/types/domain';
 import {formatBaseLoadLabel} from '@/utils/baseLoad';
 import {toUserMessage} from '@/utils/errors';
 import {formatDateLong} from '@/utils/formatters';
+import {maskDecimalInput, maskIntegerInput} from '@/utils/inputMasks';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainingSession'>;
 
@@ -172,6 +172,7 @@ const buildCompletionSummary = (
 export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
   const refreshData = useAppStore(state => state.refreshData);
+  const showError = useAppStore(state => state.showError);
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [drafts, setDrafts] = useState<TrainingDraftExercise[]>([]);
   const [performedAt, setPerformedAt] = useState(new Date());
@@ -217,7 +218,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         setHasLoadedDraft(true);
       } catch (error) {
         if (active) {
-          Alert.alert('Executar treino', toUserMessage(error));
+          showError(toUserMessage(error));
         }
       } finally {
         if (active) {
@@ -231,7 +232,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     return () => {
       active = false;
     };
-  }, [route.params.workoutId, session]);
+  }, [route.params.workoutId, session, showError]);
 
   useEffect(() => {
     if (!session || !workout || !hasLoadedDraft) {
@@ -375,7 +376,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
       await refreshData();
       setCompletionSummary(summary);
     } catch (error) {
-      Alert.alert('Salvar execução', toUserMessage(error));
+      showError(toUserMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -496,7 +497,12 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                           }}
                           value={set.load}
                           onChangeText={value =>
-                            updateSet(exerciseIndex, setIndex, 'load', value)
+                            updateSet(
+                              exerciseIndex,
+                              setIndex,
+                              'load',
+                              maskDecimalInput(value),
+                            )
                           }
                           keyboardType="decimal-pad"
                           placeholder="0"
@@ -510,7 +516,12 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                         <TextInput
                           value={set.reps}
                           onChangeText={value =>
-                            updateSet(exerciseIndex, setIndex, 'reps', value)
+                            updateSet(
+                              exerciseIndex,
+                              setIndex,
+                              'reps',
+                              maskIntegerInput(value),
+                            )
                           }
                           keyboardType="number-pad"
                           placeholder="0"

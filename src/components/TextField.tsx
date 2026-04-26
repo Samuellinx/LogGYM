@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
+    minHeight: 50,
     ...theme.typography.body,
   },
   multiline: {

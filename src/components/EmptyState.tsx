@@ -18,9 +18,9 @@ export const EmptyState = ({title, description}: EmptyStateProps) => (
 
 const styles = StyleSheet.create({
   container: {
-    padding: theme.spacing.xl,
+    padding: theme.spacing.lg,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     alignItems: 'center',
@@ -34,5 +34,6 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
+    maxWidth: 320,
   },
 });

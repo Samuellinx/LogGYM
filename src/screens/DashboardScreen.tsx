@@ -1,6 +1,5 @@
 import {useDeferredValue, useState} from 'react';
 import {Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import Animated, {FadeInDown} from 'react-native-reanimated';
 
@@ -61,46 +60,53 @@ export const DashboardScreen = () => {
           onRefresh={refreshData}
         />
       }>
-      <LinearGradient
-        colors={['#121A24', '#0C1017', '#122014']}
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 1}}
-        style={styles.hero}>
-        <Text style={styles.heroEyebrow}>BEM-VINDO DE VOLTA</Text>
-        <Text style={styles.heroTitle}>
-          {session?.user.givenName || session?.user.name}
-        </Text>
+      <View style={styles.hero}>
+        <View style={styles.heroHeader}>
+          <Text style={styles.heroEyebrow}>Dashboard</Text>
+          <Text style={styles.heroTitle}>
+            {session?.user.givenName || session?.user.name}
+          </Text>
+        </View>
         <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
-      </LinearGradient>
-
-      <View style={styles.statsRow}>
-        <StatCard
-          label="Semana"
-          value={String(dashboard?.weeklySessions ?? 0)}
-          helper="Sessões registradas"
-          onPress={() => navigation.navigate('History')}
-        />
-        <StatCard
-          label="Sets"
-          value={formatCompactNumber(dashboard?.totalTrackedSets ?? 0)}
-          helper="Sessões salvas"
-          onPress={() => navigation.navigate('History')}
-        />
       </View>
 
-      <View style={styles.statsRow}>
-        <StatCard
-          label="Templates"
-          value={String(dashboard?.totalTemplates ?? 0)}
-          helper="Treinos ativos"
-          onPress={() => navigation.navigate('Workouts')}
-        />
-        <StatCard
-          label="Histórico"
-          value={String(dashboard?.totalSessions ?? 0)}
-          helper="Execuções totais"
-          onPress={() => navigation.navigate('History')}
-        />
+      <View style={styles.statsGrid}>
+        <View style={styles.statsGridItem}>
+          <StatCard
+            compact
+            label="Semana"
+            value={String(dashboard?.weeklySessions ?? 0)}
+            helper="Sessões registradas"
+            onPress={() => navigation.navigate('History')}
+          />
+        </View>
+        <View style={styles.statsGridItem}>
+          <StatCard
+            compact
+            label="Sets"
+            value={formatCompactNumber(dashboard?.totalTrackedSets ?? 0)}
+            helper="Sessões salvas"
+            onPress={() => navigation.navigate('History')}
+          />
+        </View>
+        <View style={styles.statsGridItem}>
+          <StatCard
+            compact
+            label="Templates"
+            value={String(dashboard?.totalTemplates ?? 0)}
+            helper="Treinos ativos"
+            onPress={() => navigation.navigate('Workouts')}
+          />
+        </View>
+        <View style={styles.statsGridItem}>
+          <StatCard
+            compact
+            label="Histórico"
+            value={String(dashboard?.totalSessions ?? 0)}
+            helper="Execuções totais"
+            onPress={() => navigation.navigate('History')}
+          />
+        </View>
       </View>
 
       <TextField
@@ -207,11 +213,15 @@ export const DashboardScreen = () => {
 
 const styles = StyleSheet.create({
   hero: {
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: theme.spacing.sm,
+  },
+  heroHeader: {
+    gap: 4,
   },
   heroEyebrow: {
     ...theme.typography.caption,
@@ -220,23 +230,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   heroTitle: {
-    ...theme.typography.display,
+    ...theme.typography.title,
     color: theme.colors.text,
   },
   heroSubtitle: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
   },
-  statsRow: {
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.md,
+    justifyContent: 'space-between',
+  },
+  statsGridItem: {
+    width: '47%',
   },
   recordList: {
     gap: theme.spacing.sm,
   },
   recordCard: {
     padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -257,7 +272,7 @@ const styles = StyleSheet.create({
   },
   exerciseCard: {
     padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,

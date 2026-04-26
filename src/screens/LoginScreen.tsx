@@ -61,6 +61,7 @@ export const LoginScreen = () => {
   const signUpWithCredentials = useAppStore(state => state.signUpWithCredentials);
   const sendPasswordReset = useAppStore(state => state.sendPasswordReset);
   const isOnline = useAppStore(state => state.isOnline);
+  const showError = useAppStore(state => state.showError);
   const [mode, setMode] = useState<AuthMode>('signin');
   const [pending, setPending] = useState<PendingAction>(null);
 
@@ -84,7 +85,7 @@ export const LoginScreen = () => {
       setPending('google');
       await signInWithGoogle();
     } catch (error) {
-      Alert.alert('Entrar com Google', toUserMessage(error));
+      showError(toUserMessage(error));
     } finally {
       setPending(null);
     }
@@ -95,7 +96,7 @@ export const LoginScreen = () => {
       setPending('signin');
       await signInWithCredentials(values.email, values.password);
     } catch (error) {
-      Alert.alert('Entrar', toUserMessage(error));
+      showError(toUserMessage(error));
     } finally {
       setPending(null);
     }
@@ -122,7 +123,7 @@ export const LoginScreen = () => {
         'Sua conta foi criada. Agora entre com e-mail e senha para sincronizar seus treinos.',
       );
     } catch (error) {
-      Alert.alert('Criar conta', toUserMessage(error));
+      showError(toUserMessage(error));
     } finally {
       setPending(null);
     }
@@ -140,7 +141,7 @@ export const LoginScreen = () => {
         'Se existir uma conta com esse e-mail, você receberá um link para redefinir a senha.',
       );
     } catch (error) {
-      Alert.alert('Esqueci a senha', toUserMessage(error));
+      showError(toUserMessage(error));
     } finally {
       setPending(null);
     }

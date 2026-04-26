@@ -1,0 +1,42 @@
+# LogGYM - rodar o projeto em DEV
+# Ambiente alvo: Windows / PowerShell
+
+## Mobile React Native
+
+### Terminal 1 - subir o Metro
+
+```powershell
+npm run start
+```
+
+### Terminal 1 - subir o Metro limpando cache
+
+```powershell
+npm run start:reset
+```
+
+### Terminal 2 - instalar e rodar no Android em debug
+
+```powershell
+npm run android:dev
+```
+
+### Corrigir conflito de versao do adb no Windows antes de rodar
+
+```powershell
+npm run adb:fix
+```
+
+### Alternativa direta do React Native CLI
+
+```powershell
+npm run android
+```
+
+## Web React
+
+### Painel web React
+
+```powershell
+npm run web:dev
+```

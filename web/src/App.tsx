@@ -1,4 +1,6 @@
 ﻿import {useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react';
+import {Component} from 'react';
+import type {ErrorInfo, ReactNode} from 'react';
 import type {User} from 'firebase/auth';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -38,6 +40,7 @@ import {
   signOutFromPanel,
   signUpWithEmailPassword,
 } from './lib/auth';
+import {resolveAuthView} from './lib/authGate';
 import {
   exportBackupForCurrentUser,
   getUserAuthProvider,
@@ -53,9 +56,18 @@ import {
   formatVolume,
 } from './lib/dashboard';
 import {
+  getDeleteConfirmation,
+  type DeleteConfirmationCopy,
+} from './lib/deleteConfirmation';
+import {
   buildExerciseProgressData,
   buildSparklinePath,
 } from './lib/exerciseProgress';
+import {
+  maskDecimalInput,
+  maskIntegerInput,
+  maskRepRangeInput,
+} from './lib/inputMasks';
 import {
   defaultProfileAvatarId,
   profileAvatarCatalog,
@@ -91,6 +103,7 @@ import {
   watchRecentSessions,
   watchWorkouts,
 } from './lib/workouts';
+import {resolveWorkoutSaveCompletion} from './lib/workoutSaveFlow';
 import type {
   AuthMode,
   ExerciseProgressData,
@@ -161,7 +174,7 @@ const modeDescriptions: Record<
   signup: {
     title: 'Crie sua conta',
     description: 'Monte sua base de treinos e deixe tudo pronto para o próximo ciclo.',
-    actionLabel: 'Criar conta',
+    actionLabel: 'Criar conta com e-mail',
   },
   forgot: {
     title: 'Recupere o acesso',
@@ -300,6 +313,9 @@ type WorkspaceDetailView =
       returnTo: WorkspaceView;
     }
   | null;
+type PendingDeleteConfirmation = DeleteConfirmationCopy & {
+  onConfirm: () => void;
+};
 
 const normalizeToken = (value: string) =>
   value
@@ -310,16 +326,140 @@ const normalizeToken = (value: string) =>
 
 const formatDateInputValue = (value: string) => value.slice(0, 10);
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
+
+const ErrorModal = ({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) => (
+  <div className="error-modal-backdrop" role="presentation">
+    <section
+      aria-labelledby="error-modal-title"
+      aria-modal="true"
+      className="error-modal"
+      role="dialog">
+      <p className="eyebrow">Erro</p>
+      <h2 id="error-modal-title">Não foi possível concluir a ação</h2>
+      <p>{message}</p>
+      <button className="primary-button wide" type="button" onClick={onClose}>
+        Entendi
+      </button>
+    </section>
+  </div>
+);
+
+const SuccessModal = ({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) => (
+  <div className="error-modal-backdrop" role="presentation">
+    <section
+      aria-labelledby="success-modal-title"
+      aria-modal="true"
+      className="error-modal success-modal"
+      role="dialog">
+      <p className="eyebrow">Sucesso</p>
+      <h2 id="success-modal-title">Tudo certo</h2>
+      <p>{message}</p>
+      <button className="primary-button wide" type="button" onClick={onClose}>
+        Continuar
+      </button>
+    </section>
+  </div>
+);
+
+const DeleteConfirmationModal = ({
+  title,
+  description,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: DeleteConfirmationCopy & {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) => (
+  <div className="error-modal-backdrop" role="presentation">
+    <section
+      aria-labelledby="delete-confirmation-title"
+      aria-modal="true"
+      className="error-modal delete-confirmation-modal"
+      role="dialog">
+      <p className="eyebrow">Confirmação</p>
+      <h2 id="delete-confirmation-title">{title}</h2>
+      <p>{description}</p>
+      <div className="modal-actions">
+        <button className="secondary-button" type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button className="danger-button" type="button" onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+      </div>
+    </section>
+  </div>
+);
+
+class AppErrorBoundary extends Component<
+  {children: ReactNode},
+  {errorMessage: string | null}
+> {
+  state = {
+    errorMessage: null,
+  };
+
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      errorMessage: getErrorMessage(
+        error,
+        'O app encontrou uma falha inesperada ao montar esta tela.',
+      ),
+    };
+  }
+
+  componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
+    console.error('Erro capturado pelo LogGYM:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.errorMessage) {
+      return (
+        <div className="panel-shell panel-shell--auth">
+          <ErrorModal
+            message={this.state.errorMessage}
+            onClose={() => this.setState({errorMessage: null})}
+          />
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('dashboard');
   const [user, setUser] = useState<User | null>(null);
   const [profileAvatarId, setProfileAvatarId] = useState<string>(defaultProfileAvatarId);
+  const [profileAvatarDraftId, setProfileAvatarDraftId] =
+    useState<string>(defaultProfileAvatarId);
+  const [isAvatarPickerCollapsed, setIsAvatarPickerCollapsed] = useState(false);
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === 'undefined' ? true : navigator.onLine,
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successModalMessage, setSuccessModalMessage] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] =
+    useState<PendingDeleteConfirmation | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [backupPassword, setBackupPassword] = useState('');
   const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('');
@@ -332,6 +472,7 @@ function App() {
   const [editorWorkout, setEditorWorkout] = useState<WorkoutDocument>(() =>
     createWorkoutDraft(),
   );
+  const [isWorkoutEditorOpen, setIsWorkoutEditorOpen] = useState(false);
   const [trainingDrafts, setTrainingDrafts] = useState<TrainingDraftExercise[]>([]);
   const [trainingPerformedAt, setTrainingPerformedAt] = useState(
     formatDateInputValue(new Date().toISOString()),
@@ -371,12 +512,16 @@ function App() {
     () =>
       observeAuthState(nextUser => {
         setUser(nextUser);
+        setIsAuthReady(true);
         setProfileAvatarId(defaultProfileAvatarId);
+        setProfileAvatarDraftId(defaultProfileAvatarId);
+        setIsAvatarPickerCollapsed(false);
 
         if (!nextUser) {
           setWorkouts([]);
           setSessions([]);
           setEditorWorkout(createWorkoutDraft());
+          setIsWorkoutEditorOpen(false);
           setWorkspaceView('dashboard');
           setDetailView(null);
           setTrainingDrafts([]);
@@ -395,7 +540,11 @@ function App() {
     void ensureUserProfileDocument(user).catch(() => undefined);
 
     const unsubscribeProfile = watchUserProfile(user.uid, profile => {
-      setProfileAvatarId(profile?.avatarId ?? defaultProfileAvatarId);
+      const nextAvatarId = profile?.avatarId ?? defaultProfileAvatarId;
+
+      setProfileAvatarId(nextAvatarId);
+      setProfileAvatarDraftId(nextAvatarId);
+      setIsAvatarPickerCollapsed(true);
     });
 
     return () => {
@@ -614,11 +763,75 @@ function App() {
 
   const modeContent = modeDescriptions[authMode];
   const isBusy = busyAction !== null;
+  const selectedProfileAvatar =
+    profileAvatarCatalog.find(avatar => avatar.id === profileAvatarDraftId) ??
+    profileAvatarCatalog.find(avatar => avatar.id === profileAvatarId) ??
+    profileAvatarCatalog[0];
+  const authView = resolveAuthView({isAuthReady, user});
+  const visibleProfileAvatars = isAvatarPickerCollapsed
+    ? selectedProfileAvatar
+      ? [selectedProfileAvatar]
+      : []
+    : profileAvatarCatalog;
 
   const clearFeedback = () => {
     setErrorMessage(null);
+    setSuccessModalMessage(null);
+    setDeleteConfirmation(null);
     setStatusMessage(null);
   };
+
+  const showError = (error: unknown, fallback: string) => {
+    setErrorMessage(getErrorMessage(error, fallback));
+  };
+
+  const requestDeleteConfirmation = (
+    confirmation: DeleteConfirmationCopy,
+    onConfirm: () => void,
+  ) => {
+    setDeleteConfirmation({...confirmation, onConfirm});
+  };
+
+  const confirmDeleteAction = () => {
+    const pendingConfirmation = deleteConfirmation;
+
+    if (!pendingConfirmation) {
+      return;
+    }
+
+    setDeleteConfirmation(null);
+    pendingConfirmation.onConfirm();
+  };
+
+  useEffect(() => {
+    const handleWindowError = (event: ErrorEvent) => {
+      setErrorMessage(
+        getErrorMessage(
+          event.error,
+          event.message || 'O app encontrou uma falha inesperada na tela atual.',
+        ),
+      );
+      event.preventDefault();
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      setErrorMessage(
+        getErrorMessage(
+          event.reason,
+          'Uma operação do app falhou antes de ser concluída. Tente novamente.',
+        ),
+      );
+      event.preventDefault();
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
   const handleGoogleLogin = async () => {
     clearFeedback();
@@ -627,9 +840,7 @@ function App() {
     try {
       await signInWithGooglePopup();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível entrar agora.',
-      );
+      showError(error, 'Não foi possível entrar agora.');
     } finally {
       setBusyAction(null);
     }
@@ -642,9 +853,7 @@ function App() {
     try {
       await signInWithEmailPassword(values.email, values.password);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível entrar agora.',
-      );
+      showError(error, 'Não foi possível entrar agora.');
     } finally {
       setBusyAction(null);
     }
@@ -660,9 +869,7 @@ function App() {
       setAuthMode('signin');
       setStatusMessage('Conta criada. Agora sua área já está pronta para receber treinos.');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível criar sua conta.',
-      );
+      showError(error, 'Não foi possível criar sua conta.');
     } finally {
       setBusyAction(null);
     }
@@ -680,9 +887,7 @@ function App() {
         'Se existir uma conta com esse e-mail, o link de redefinição foi enviado.',
       );
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível enviar o link agora.',
-      );
+      showError(error, 'Não foi possível enviar o link agora.');
     } finally {
       setBusyAction(null);
     }
@@ -701,9 +906,7 @@ function App() {
       deleteAllTrainingDraftAutosavesForUser(user.uid);
       setStatusMessage(null);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível sair da conta.',
-      );
+      showError(error, 'Não foi possível sair da conta.');
     } finally {
       setBusyAction(null);
     }
@@ -723,9 +926,7 @@ function App() {
       setSessions(data.sessions);
       setStatusMessage('Dados atualizados com sucesso.');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível atualizar os dados agora.',
-      );
+      showError(error, 'Não foi possível atualizar os dados agora.');
     } finally {
       setBusyAction(null);
     }
@@ -751,9 +952,7 @@ function App() {
         `Download da cópia protegida iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries.`,
       );
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível exportar seus treinos agora.',
-      );
+      showError(error, 'Não foi possível exportar seus treinos agora.');
     } finally {
       setBusyAction(null);
     }
@@ -764,15 +963,15 @@ function App() {
       return;
     }
 
-    const confirmed = window.confirm(
-      'Isso vai substituir os treinos e o histórico atuais pelos dados do arquivo selecionado. Deseja continuar',
+    requestDeleteConfirmation(
+      {
+        title: 'Restaurar cópia?',
+        description:
+          'Isso vai substituir os treinos e o histórico atuais pelos dados do arquivo selecionado.',
+        confirmLabel: 'Restaurar cópia',
+      },
+      () => backupInputRef.current?.click(),
     );
-
-    if (!confirmed) {
-      return;
-    }
-
-    backupInputRef.current?.click();
   };
 
   const handleBackupFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -789,6 +988,7 @@ function App() {
     try {
       const result = await importBackupFileForCurrentUser(user, file, backupPassword);
       setBackupPassword('');
+      setBackupPasswordConfirm('');
       const refreshed = await refreshWorkspaceData(user.uid);
       setWorkouts(refreshed.workouts);
       setSessions(refreshed.sessions);
@@ -796,9 +996,7 @@ function App() {
         `Restauração concluída com sucesso. Foram aplicados ${result.workouts} treinos, ${result.workoutExercises} exercícios, ${result.workoutSessions} sessões e ${result.sessionSets} séries. Os dados atuais da conta foram substituídos pelo conteúdo do arquivo.`,
       );
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível restaurar sua cópia agora.',
-      );
+      showError(error, 'Não foi possível restaurar sua cópia agora.');
     } finally {
       setBusyAction(null);
     }
@@ -824,9 +1022,7 @@ function App() {
         `Importação concluída com sucesso. Arquivo: ${result.fileName}. Resultado: ${result.workouts} treinos e ${result.exercises} exercícios importados.${result.skippedWorkouts > 0 ? ` ${result.skippedWorkouts} treino(s) incompleto(s) foram ignorados.` : ''}`,
       );
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível importar o arquivo agora.',
-      );
+      showError(error, 'Não foi possível importar o arquivo agora.');
     } finally {
       setBusyAction(null);
     }
@@ -869,9 +1065,26 @@ function App() {
     }));
   };
 
-  const resetEditor = () => {
+  const requestRemoveExercise = (exercise: WorkoutExerciseInput, index: number) => {
+    requestDeleteConfirmation(
+      getDeleteConfirmation({
+        type: 'exercise',
+        name: exercise.name || `Exercício ${index + 1}`,
+      }),
+      () => removeExercise(exercise.id),
+    );
+  };
+
+  const openWorkoutCreationEditor = () => {
+    clearFeedback();
     setEditorWorkout(createWorkoutDraft(user?.uid ?? ''));
+    setIsWorkoutEditorOpen(true);
     setWorkspaceView('workouts');
+  };
+
+  const closeWorkoutEditor = () => {
+    setEditorWorkout(createWorkoutDraft(user?.uid ?? ''));
+    setIsWorkoutEditorOpen(false);
   };
 
   const handleSaveWorkout = async () => {
@@ -893,14 +1106,23 @@ function App() {
         throw new Error('Adicione pelo menos um exercício antes de salvar.');
       }
 
+      const saveCompletion = resolveWorkoutSaveCompletion({
+        savedWorkoutId: normalizedWorkout.id,
+        existingWorkoutIds: workouts.map(workout => workout.id),
+      });
+
       await saveWorkoutFromPanel(user, normalizedWorkout);
-      setStatusMessage('Treino salvo com sucesso.');
-      setEditorWorkout(normalizedWorkout);
+      if (saveCompletion.shouldCloseEditor) {
+        setSuccessModalMessage(saveCompletion.successMessage);
+        closeWorkoutEditor();
+      } else {
+        setStatusMessage(saveCompletion.successMessage);
+        setEditorWorkout(normalizedWorkout);
+        setIsWorkoutEditorOpen(true);
+      }
       setWorkspaceView('workouts');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível salvar o treino.',
-      );
+      showError(error, 'Não foi possível salvar o treino.');
     } finally {
       setBusyAction(null);
     }
@@ -909,6 +1131,7 @@ function App() {
   const handleEditWorkout = (workout: WorkoutDocument) => {
     clearFeedback();
     setWorkspaceView('workouts');
+    setIsWorkoutEditorOpen(true);
     setEditorWorkout({
       ...workout,
       scheduledDay: workout.scheduledDay ?? 'Livre',
@@ -916,12 +1139,8 @@ function App() {
     });
   };
 
-  const handleDeleteWorkout = async (workoutId: string) => {
+  const executeDeleteWorkout = async (workoutId: string) => {
     if (!user) {
-      return;
-    }
-
-    if (!window.confirm('Tem certeza que deseja excluir este treino')) {
       return;
     }
 
@@ -931,23 +1150,32 @@ function App() {
     try {
       await deleteWorkoutFromPanel(user.uid, workoutId);
 
-      if (editorWorkout.id === workoutId) {
-        resetEditor();
+      if (editorWorkout.id === workoutId && isWorkoutEditorOpen) {
+        closeWorkoutEditor();
       }
 
       setStatusMessage('Treino removido da sua rotina.');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível excluir o treino.',
-      );
+      showError(error, 'Não foi possível excluir o treino.');
     } finally {
       setBusyAction(null);
     }
   };
 
+  const requestDeleteWorkout = (workout: WorkoutDocument) => {
+    requestDeleteConfirmation(
+      getDeleteConfirmation({
+        type: 'workout',
+        name: workout.name || 'este treino',
+      }),
+      () => void executeDeleteWorkout(workout.id),
+    );
+  };
+
   const handleSelectTab = (view: WorkspaceView) => {
     setDetailView(null);
     setWorkspaceView(view);
+    setIsWorkoutEditorOpen(false);
   };
 
   const openExerciseProgress = (exerciseName: string, returnTo: WorkspaceView) => {
@@ -986,18 +1214,8 @@ function App() {
     setWorkspaceView(detailView.returnTo);
   };
 
-  const handleDeleteSession = async (sessionItem: WorkoutSessionDocument) => {
+  const executeDeleteSession = async (sessionItem: WorkoutSessionDocument) => {
     if (!user) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Excluir a execução ${sessionItem.workoutName} de ${formatSessionDate(
-        sessionItem.performedAt,
-      )}`,
-    );
-
-    if (!confirmed) {
       return;
     }
 
@@ -1008,12 +1226,20 @@ function App() {
       await deleteSessionFromPanel(user.uid, sessionItem.id);
       setStatusMessage('Execução removida do histórico.');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível excluir a execução.',
-      );
+      showError(error, 'Não foi possível excluir a execução.');
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const requestDeleteSession = (sessionItem: WorkoutSessionDocument) => {
+    requestDeleteConfirmation(
+      getDeleteConfirmation({
+        type: 'session',
+        name: `${sessionItem.workoutName} de ${formatSessionDate(sessionItem.performedAt)}`,
+      }),
+      () => void executeDeleteSession(sessionItem),
+    );
   };
 
   const handleSaveTrainingSession = async () => {
@@ -1040,36 +1266,60 @@ function App() {
       setWorkspaceView('history');
       setHistorySearch('');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível salvar a execução.',
-      );
+      showError(error, 'Não foi possível salvar a execução.');
     } finally {
       setBusyAction(null);
     }
   };
 
-  const handleProfileAvatarSelected = async (avatarId: string) => {
-    if (!user || isBusy || avatarId === profileAvatarId) {
+  const handleProfileAvatarSelected = (avatarId: string) => {
+    if (!user || isBusy) {
       return;
     }
 
     clearFeedback();
+    setProfileAvatarDraftId(avatarId);
+  };
+
+  const handleEditProfileAvatar = () => {
+    if (!user || isBusy) {
+      return;
+    }
+
+    clearFeedback();
+    setProfileAvatarDraftId(profileAvatarId);
+    setIsAvatarPickerCollapsed(false);
+  };
+
+  const handleConfirmProfileAvatar = async () => {
+    if (!user || isBusy) {
+      return;
+    }
+
+    clearFeedback();
+
+    if (profileAvatarDraftId === profileAvatarId) {
+      setIsAvatarPickerCollapsed(true);
+      setStatusMessage('Avatar confirmado.');
+      return;
+    }
+
     setBusyAction('profile-avatar');
 
     try {
-      const updatedProfile = await updateUserProfileAvatar(user, avatarId);
+      const updatedProfile = await updateUserProfileAvatar(user, profileAvatarDraftId);
       setProfileAvatarId(updatedProfile.avatarId);
+      setProfileAvatarDraftId(updatedProfile.avatarId);
+      setIsAvatarPickerCollapsed(true);
       setStatusMessage('Avatar atualizado com sucesso.');
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Não foi possível atualizar o avatar agora.',
-      );
+      showError(error, 'Não foi possível atualizar o avatar agora.');
     } finally {
       setBusyAction(null);
     }
   };
 
-  const handleClearTrainingDraft = (workoutId: string) => {
+  const executeClearTrainingDraft = (workoutId: string) => {
     if (!user) {
       return;
     }
@@ -1077,6 +1327,33 @@ function App() {
     clearFeedback();
     deleteTrainingDraftAutosave(user.uid, workoutId);
     setStatusMessage('Rascunho do treino limpo.');
+  };
+
+  const requestClearTrainingDraft = (workout: WorkoutDocument) => {
+    requestDeleteConfirmation(
+      getDeleteConfirmation({
+        type: 'training-draft',
+        name: workout.name || 'este treino',
+      }),
+      () => executeClearTrainingDraft(workout.id),
+    );
+  };
+
+  const requestRemoveDraftSet = (
+    exerciseName: string,
+    exerciseIndex: number,
+    setIndex: number,
+  ) => {
+    requestDeleteConfirmation(
+      getDeleteConfirmation({
+        type: 'training-set',
+        name: `${setIndex + 1} de ${exerciseName || 'exercício'}`,
+      }),
+      () =>
+        setTrainingDrafts(current =>
+          removeDraftSet(current, exerciseIndex, setIndex),
+        ),
+    );
   };
 
   const getHistorySecondaryText = (sessionItem: WorkoutSessionDocument) => {
@@ -1149,7 +1426,7 @@ function App() {
           <p className="editor-support">
             {dashboardSearch.trim()
               ? 'Consulte os treinos encontrados pela busca.'
-              : 'Os treinos mais recentes ficam sempre prontos para consulta rapida.'}
+              : 'Os treinos mais recentes ficam sempre prontos para consulta rápida.'}
           </p>
 
           <div className="workout-list">
@@ -1276,7 +1553,7 @@ function App() {
         <article className="metric-card">
           <span>Exercícios no plano</span>
           <strong>{totalExercises}</strong>
-          <small>Distribuidos entre todas as rotinas.</small>
+          <small>Distribuídos entre todas as rotinas.</small>
         </article>
         <article className="metric-card">
           <span>Últimas séries</span>
@@ -1285,7 +1562,10 @@ function App() {
         </article>
       </section>
 
-      <section className="workspace-grid">
+      <section
+        className={
+          isWorkoutEditorOpen ? 'workspace-grid' : 'workspace-grid workspace-grid--single'
+        }>
         <div className="column-panel">
           <div className="panel-head">
             <div>
@@ -1355,7 +1635,7 @@ function App() {
                       type="button"
                       className="danger-button"
                       disabled={!startedWorkoutIds.has(workout.id)}
-                      onClick={() => handleClearTrainingDraft(workout.id)}>
+                      onClick={() => requestClearTrainingDraft(workout)}>
                       <Trash2 size={16} />
                       Limpar treino
                     </button>
@@ -1370,7 +1650,7 @@ function App() {
                       type="button"
                       className="danger-button"
                       disabled={busyAction === `delete-${workout.id}`}
-                      onClick={() => handleDeleteWorkout(workout.id)}>
+                      onClick={() => requestDeleteWorkout(workout)}>
                       {busyAction === `delete-${workout.id}` ? (
                         <LoaderCircle className="spin" size={16} />
                       ) : (
@@ -1383,7 +1663,7 @@ function App() {
               ))
             ) : (
               <div className="empty-card">
-                Sua biblioteca ainda esta vazia. Crie o primeiro treino para comecar.
+                Sua biblioteca ainda está vazia. Crie o primeiro treino para começar.
               </div>
             )}
           </div>
@@ -1401,7 +1681,7 @@ function App() {
                 <article className="session-card" key={sessionItem.id}>
                   <div className="session-card-top">
                     <strong>{sessionItem.workoutName}</strong>
-                    <span>{new Date(sessionItem.performedAt).toLocaleDateString('pt-BR')}</span>
+                    <span>{formatSessionDate(sessionItem.performedAt)}</span>
                   </div>
                   <p>
                     {sessionItem.totalSets} séries - pico de {formatLoad(sessionItem.topLoad)}
@@ -1416,16 +1696,17 @@ function App() {
           </div>
         </div>
 
-        <div className="column-panel editor">
-          <div className="panel-head">
-            <div>
-              <p className="eyebrow">Editor</p>
-              <h2>{editorTitle}</h2>
+        {isWorkoutEditorOpen ? (
+          <div className="column-panel editor">
+            <div className="panel-head">
+              <div>
+                <p className="eyebrow">Editor</p>
+                <h2>{editorTitle}</h2>
+              </div>
+              <button type="button" className="ghost-button" onClick={closeWorkoutEditor}>
+                Fechar
+              </button>
             </div>
-            <button type="button" className="ghost-button" onClick={resetEditor}>
-              Limpar
-            </button>
-          </div>
 
           <p className="editor-support">
             Preencha o essencial e refine os detalhes na ordem que fizer mais sentido para você.
@@ -1511,7 +1792,7 @@ function App() {
                     <button
                       type="button"
                       className="danger-button subtle"
-                      onClick={() => removeExercise(exercise.id)}>
+                      onClick={() => requestRemoveExercise(exercise, index)}>
                       <Trash2 size={14} />
                       Remover
                     </button>
@@ -1542,9 +1823,14 @@ function App() {
                     <input
                       value={exercise.baseLoad}
                       onChange={event =>
-                        updateExercise(exercise.id, 'baseLoad', event.target.value)
+                        updateExercise(
+                          exercise.id,
+                          'baseLoad',
+                          maskDecimalInput(event.target.value),
+                        )
                       }
-                      placeholder="Ex: 20 kg"
+                      inputMode="decimal"
+                      placeholder="Ex: 20"
                     />
                   </label>
                   <label>
@@ -1552,15 +1838,20 @@ function App() {
                     <input
                       value={exercise.targetReps}
                       onChange={event =>
-                        updateExercise(exercise.id, 'targetReps', event.target.value)
+                        updateExercise(
+                          exercise.id,
+                          'targetReps',
+                          maskRepRangeInput(event.target.value),
+                        )
                       }
+                      inputMode="numeric"
                       placeholder="Ex: 8-10"
                     />
                   </label>
                 </div>
 
                 <label className="stacked-field">
-                  <span>Observacao</span>
+                  <span>Observação</span>
                   <textarea
                     value={exercise.note}
                     onChange={event => updateExercise(exercise.id, 'note', event.target.value)}
@@ -1572,19 +1863,20 @@ function App() {
             ))}
           </div>
 
-          <button
-            type="button"
-            className="primary-button wide"
-            disabled={busyAction === 'save-workout'}
-            onClick={handleSaveWorkout}>
-            {busyAction === 'save-workout' ? (
-              <LoaderCircle className="spin" size={16} />
-            ) : (
-              <Mail size={16} />
-            )}
-            Salvar treino
-          </button>
-        </div>
+            <button
+              type="button"
+              className="primary-button wide"
+              disabled={busyAction === 'save-workout'}
+              onClick={handleSaveWorkout}>
+              {busyAction === 'save-workout' ? (
+                <LoaderCircle className="spin" size={16} />
+              ) : (
+                <Mail size={16} />
+              )}
+              Salvar treino
+            </button>
+          </div>
+        ) : null}
       </section>
     </>
   );
@@ -1629,7 +1921,7 @@ function App() {
                       type="button"
                       className="danger-button subtle"
                       disabled={busyAction === `delete-session-${sessionItem.id}`}
-                      onClick={() => handleDeleteSession(sessionItem)}>
+                      onClick={() => requestDeleteSession(sessionItem)}>
                       {busyAction === `delete-session-${sessionItem.id}` ? (
                         <LoaderCircle className="spin" size={16} />
                       ) : (
@@ -1694,7 +1986,7 @@ function App() {
             <article className="metric-card">
               <span>Volume</span>
               <strong>{formatVolume(exerciseProgress.totalVolume)}</strong>
-              <small>soma de carga x repeticoes</small>
+              <small>soma de carga x repetições</small>
             </article>
           </section>
 
@@ -1831,8 +2123,10 @@ function App() {
                           type="button"
                           className="danger-button subtle"
                           onClick={() =>
-                            setTrainingDrafts(current =>
-                              removeDraftSet(current, exerciseIndex, setIndex),
+                            requestRemoveDraftSet(
+                              exercise.exerciseName,
+                              exerciseIndex,
+                              setIndex,
                             )
                           }>
                           <Trash2 size={14} />
@@ -1857,10 +2151,11 @@ function App() {
                                   exerciseIndex,
                                   setIndex,
                                   'load',
-                                  event.target.value,
+                                  maskDecimalInput(event.target.value),
                                 ),
                               )
                             }
+                            inputMode="decimal"
                             placeholder="0"
                           />
                         </label>
@@ -1875,10 +2170,11 @@ function App() {
                                   exerciseIndex,
                                   setIndex,
                                   'reps',
-                                  event.target.value,
+                                  maskIntegerInput(event.target.value),
                                 ),
                               )
                             }
+                            inputMode="numeric"
                             placeholder="0"
                           />
                         </label>
@@ -1959,7 +2255,7 @@ function App() {
     <section className="profile-layout">
       <div className="profile-card">
         <div className="profile-avatar">
-          <ProfileAvatar avatarId={profileAvatarId} size={88} />
+          <ProfileAvatar avatarId={profileAvatarDraftId} size={88} />
         </div>
 
         <div className="profile-copy">
@@ -1969,7 +2265,9 @@ function App() {
           <span className="profile-avatar-support">
             {busyAction === 'profile-avatar'
               ? 'Salvando avatar...'
-              : 'Escolha um personagem para representar sua conta.'}
+              : isAvatarPickerCollapsed
+                ? 'Avatar confirmado para esta conta.'
+                : 'Escolha um personagem e confirme para salvar.'}
           </span>
         </div>
       </div>
@@ -1977,12 +2275,16 @@ function App() {
       <div className="profile-avatar-picker">
         <div className="profile-avatar-picker-copy">
           <strong>Seu avatar</strong>
-          <span>Toque em um personagem para salvar a seleção.</span>
+          <span>
+            {isAvatarPickerCollapsed
+              ? 'Apenas o avatar confirmado fica visível. Edite para trocar.'
+              : 'Toque em um personagem e valide a escolha para salvar.'}
+          </span>
         </div>
 
         <div className="profile-avatar-grid">
-          {profileAvatarCatalog.map(avatar => {
-            const isSelected = avatar.id === profileAvatarId;
+          {visibleProfileAvatars.map(avatar => {
+            const isSelected = avatar.id === profileAvatarDraftId;
 
             return (
               <button
@@ -1998,6 +2300,29 @@ function App() {
               </button>
             );
           })}
+        </div>
+
+        <div className="profile-avatar-actions">
+          {isAvatarPickerCollapsed ? (
+            <button
+              type="button"
+              className="secondary-button wide"
+              disabled={!user || isBusy}
+              onClick={handleEditProfileAvatar}>
+              Trocar avatar
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="primary-button wide"
+              disabled={!user || isBusy}
+              onClick={handleConfirmProfileAvatar}>
+              {busyAction === 'profile-avatar' ? (
+                <LoaderCircle className="spin" size={16} />
+              ) : null}
+              {busyAction === 'profile-avatar' ? 'Validando avatar...' : 'Validar avatar'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -2178,8 +2503,45 @@ function App() {
     </section>
   );
   return (
-    <div className={user ? 'panel-shell panel-shell--workspace' : 'panel-shell panel-shell--auth'}>
-      {user ? (
+    <div
+      className={
+        authView === 'workspace'
+          ? 'panel-shell panel-shell--workspace'
+          : 'panel-shell panel-shell--auth'
+      }>
+      {errorMessage ? (
+        <ErrorModal message={errorMessage} onClose={() => setErrorMessage(null)} />
+      ) : null}
+      {successModalMessage ? (
+        <SuccessModal
+          message={successModalMessage}
+          onClose={() => setSuccessModalMessage(null)}
+        />
+      ) : null}
+      {deleteConfirmation ? (
+        <DeleteConfirmationModal
+          title={deleteConfirmation.title}
+          description={deleteConfirmation.description}
+          confirmLabel={deleteConfirmation.confirmLabel}
+          onConfirm={confirmDeleteAction}
+          onCancel={() => setDeleteConfirmation(null)}
+        />
+      ) : null}
+      {authView === 'loading' ? (
+        <main className="auth-stage">
+          <section className="auth-panel auth-panel--loading" aria-live="polite">
+            <div className="auth-brand">
+              <BrandMark compact />
+              <div>
+                <p className="eyebrow">LogGYM</p>
+                <h2>Restaurando sua sessão</h2>
+              </div>
+            </div>
+            <p className="support-copy">Carregando seus treinos salvos.</p>
+            <LoaderCircle className="spin auth-loading-icon" size={28} />
+          </section>
+        </main>
+      ) : authView === 'workspace' ? (
         <main className="workspace-panel">
           <section className="workspace-hero">
             <div className="workspace-hero-copy">
@@ -2224,7 +2586,10 @@ function App() {
                   Voltar
                 </button>
               ) : workspaceView === 'workouts' ? (
-                <button className="ghost-button" type="button" onClick={resetEditor}>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={openWorkoutCreationEditor}>
                   <Plus size={16} />
                   Novo treino
                 </button>
@@ -2257,7 +2622,6 @@ function App() {
             </div>
           </section>
 
-          {errorMessage ? <div className="feedback error">{errorMessage}</div> : null}
           {statusMessage ? <div className="feedback success">{statusMessage}</div> : null}
 
           {!detailView ? (
@@ -2315,7 +2679,6 @@ function App() {
               <p className="support-copy">{modeContent.description}</p>
             </div>
 
-            {errorMessage ? <div className="feedback error">{errorMessage}</div> : null}
             {statusMessage ? <div className="feedback success">{statusMessage}</div> : null}
 
             <div className="auth-tabs">
@@ -2463,4 +2826,10 @@ function App() {
   );
 }
 
-export default App;
+const AppWithErrorBoundary = () => (
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>
+);
+
+export default AppWithErrorBoundary;

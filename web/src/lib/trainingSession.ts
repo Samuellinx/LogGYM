@@ -4,6 +4,7 @@ import type {
   WorkoutDocument,
   WorkoutSessionDocument,
 } from '../types';
+import {normalizeSessionDateInput} from './sessionDate';
 
 const createBlankSet = (): TrainingDraftSet => ({
   load: '',
@@ -141,7 +142,7 @@ export const buildTrainingSessionDocument = ({
     workoutName: workout.name,
     focus: workout.focus,
     overallNotes: overallNotes.trim(),
-    performedAt: new Date(performedAt).toISOString(),
+    performedAt: normalizeSessionDateInput(performedAt),
     createdAt,
     exercises: validExercises,
     totalSets,

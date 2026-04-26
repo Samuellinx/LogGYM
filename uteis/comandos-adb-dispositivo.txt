@@ -1,0 +1,65 @@
+# LogGYM - ADB e dispositivo
+# Ambiente alvo: Windows / PowerShell
+
+## Diagnosticar conflito de versao do adb
+
+```powershell
+where.exe adb
+```
+
+## Corrigir e validar o adb usado pelo projeto
+
+```powershell
+npm run adb:fix
+```
+
+## Observacao sobre Minimal ADB and Fastboot
+
+Se aparecer "Minimal ADB and Fastboot", remova este caminho do PATH do Windows ou desinstale esse pacote:
+
+```text
+C:\Program Files (x86)\Minimal ADB and Fastboot
+```
+
+## Listar dispositivos conectados
+
+```powershell
+npm run adb:fix
+```
+
+## Usar diretamente o adb correto do SDK
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb devices
+```
+
+## Reiniciar o servidor ADB
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb kill-server
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb start-server
+```
+
+## Fazer reverse da porta do Metro para dispositivo fisico
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb reverse tcp:8081 tcp:8081
+```
+
+## Ver logs do app e do React Native
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb logcat *:S ReactNative:V ReactNativeJS:V
+```
+
+## Limpar dados do app instalado
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb shell pm clear com.loggym
+```
+
+## Desinstalar o app
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb uninstall com.loggym
+```

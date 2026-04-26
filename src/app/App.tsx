@@ -1,15 +1,17 @@
-import {useEffect} from 'react';
-import {StatusBar, StyleSheet, Text, View} from 'react-native';
+import {useEffect, useState} from 'react';
+import {StatusBar, StyleSheet, View} from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {enableScreens} from 'react-native-screens';
 
 import {OfflineBanner} from '@/components/OfflineBanner';
+import {ErrorModal} from '@/components/ErrorModal';
 import {RootNavigator} from '@/navigation/RootNavigator';
 import {SplashScreen} from '@/screens/SplashScreen';
 import {theme} from '@/theme';
 import {useAppStore} from '@/store/useAppStore';
+import {toUserMessage} from '@/utils/errors';
 
 enableScreens();
 
@@ -21,6 +23,8 @@ const App = () => {
   const session = useAppStore(state => state.session);
   const setOnline = useAppStore(state => state.setOnline);
   const refreshData = useAppStore(state => state.refreshData);
+  const clearError = useAppStore(state => state.clearError);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   useEffect(() => {
     bootstrap().catch(() => {
@@ -37,6 +41,38 @@ const App = () => {
   }, [bootstrap, setOnline]);
 
   useEffect(() => {
+    const errorUtils = (
+      globalThis as typeof globalThis & {
+        ErrorUtils?: {
+          getGlobalHandler?: () => (error: unknown, isFatal?: boolean) => void;
+          setGlobalHandler?: (
+            handler: (error: unknown, isFatal?: boolean) => void,
+          ) => void;
+        };
+      }
+    ).ErrorUtils;
+    const previousHandler = errorUtils?.getGlobalHandler?.();
+
+    errorUtils?.setGlobalHandler?.((runtimeFailure, isFatal) => {
+      setRuntimeError(
+        toUserMessage(
+          runtimeFailure,
+          isFatal
+            ? 'O app encontrou uma falha inesperada.'
+            : 'Uma operação falhou antes de ser concluída.',
+        ),
+      );
+      previousHandler?.(runtimeFailure, isFatal);
+    });
+
+    return () => {
+      if (previousHandler) {
+        errorUtils?.setGlobalHandler?.(previousHandler);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isOnline || !session) {
       return;
     }
@@ -45,6 +81,8 @@ const App = () => {
       // O erro de sincronização já é refletido pelo store.
     });
   }, [isOnline, refreshData, session]);
+
+  const modalError = runtimeError ?? (session ? error : null);
 
   if (isBootstrapping || (!session && error)) {
     return (
@@ -68,14 +106,20 @@ const App = () => {
         />
         <View style={styles.root}>
           <OfflineBanner visible={!isOnline && Boolean(session)} />
-          {error && session ? (
-            <Text style={styles.errorLabel}>
-              Algumas informações não foram atualizadas agora. Tente novamente em instantes.
-            </Text>
-          ) : null}
           <View style={styles.navigatorWrap}>
             <RootNavigator />
           </View>
+          <ErrorModal
+            visible={Boolean(modalError)}
+            message={
+              modalError ??
+              'O app encontrou uma falha inesperada. Tente novamente em instantes.'
+            }
+            onClose={() => {
+              setRuntimeError(null);
+              clearError();
+            }}
+          />
         </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -89,12 +133,6 @@ const styles = StyleSheet.create({
   },
   navigatorWrap: {
     flex: 1,
-  },
-  errorLabel: {
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    color: theme.colors.warning,
-    ...theme.typography.caption,
   },
 });
 

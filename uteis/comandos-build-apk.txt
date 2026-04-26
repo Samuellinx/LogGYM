@@ -1,0 +1,32 @@
+# LogGYM - build APK para testes
+# Ambiente alvo: Windows / PowerShell
+
+## Gerar APK debug
+
+```powershell
+npm run apk:debug
+```
+
+## Gerar APK release
+
+```powershell
+npm run apk:release
+```
+
+## Validar se a assinatura release esta pronta antes do build
+
+```powershell
+npm run release:check
+```
+
+## Validar se o Firebase esta configurado para mobile + web
+
+```powershell
+npm run firebase:doctor
+```
+
+## Instalar manualmente o APK debug no dispositivo
+
+```powershell
+C:\Users\Samuel\AppData\Local\Android\Sdk\platform-tools\adb install -r .\android\app\build\outputs\apk\debug\app-debug.apk
+```

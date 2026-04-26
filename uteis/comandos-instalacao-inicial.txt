@@ -1,0 +1,8 @@
+# LogGYM - instalacao inicial
+# Ambiente alvo: Windows / PowerShell
+
+## Instalar dependencias
+
+```powershell
+npm install
+```

@@ -1,0 +1,14 @@
+# LogGYM - build e deploy web para producao
+# Ambiente alvo: Windows / PowerShell
+
+## Gerar build web
+
+```powershell
+npm --prefix web run build
+```
+
+## Subir alteracoes web para producao
+
+```powershell
+firebase deploy --project loggym-abe83 --only hosting
+```

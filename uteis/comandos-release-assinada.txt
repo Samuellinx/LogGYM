@@ -1,0 +1,32 @@
+# LogGYM - release assinada
+# Ambiente alvo: Windows / PowerShell
+
+## 1. Gerar a keystore de release
+
+```powershell
+keytool -genkeypair -v -storetype PKCS12 -keystore ".\android\keystores\loggym-upload.jks" -alias loggym-upload -keyalg RSA -keysize 2048 -validity 9125
+```
+
+## 2. Abrir o modelo e usar como base
+
+```powershell
+notepad .\android\release-signing.example.properties
+```
+
+## 3. Adicionar as chaves LOGGYM_* ao gradle.properties do usuario
+
+```powershell
+notepad "$env:USERPROFILE\.gradle\gradle.properties"
+```
+
+## 4. Validar a configuracao release
+
+```powershell
+npm run release:check
+```
+
+## 5. Gerar a APK release assinada
+
+```powershell
+npm run apk:release
+```

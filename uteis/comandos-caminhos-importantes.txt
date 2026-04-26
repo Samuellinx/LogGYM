@@ -1,0 +1,44 @@
+# LogGYM - caminhos importantes
+# Ambiente alvo: Windows / PowerShell
+
+## APK debug gerado em
+
+```text
+.\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+## Arquivo de ambiente
+
+```text
+.\.env
+```
+
+## Arquivo de ambiente do painel web
+
+```text
+.\web\.env
+```
+
+## Config Android principal
+
+```text
+.\android\app\build.gradle
+```
+
+## Regras do Firestore
+
+```text
+.\firestore.rules
+```
+
+## Modelo de propriedades da release
+
+```text
+.\android\release-signing.example.properties
+```
+
+## APK release gerada em
+
+```text
+.\android\app\build\outputs\apk\release\app-release.apk
+```

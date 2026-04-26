@@ -1,0 +1,38 @@
+# LogGYM - validacao de codigo
+# Ambiente alvo: Windows / PowerShell
+
+## TypeScript
+
+```powershell
+npm run typecheck
+```
+
+## ESLint
+
+```powershell
+npm run lint
+```
+
+## ESLint com autofix
+
+```powershell
+npm run lint:fix
+```
+
+## Verificacao completa do projeto
+
+```powershell
+npm run verify
+```
+
+## Jest
+
+```powershell
+npm test
+```
+
+## Lint do painel web
+
+```powershell
+npm run web:lint
+```

@@ -26,7 +26,14 @@ export const WorkoutCard = ({
   startLabel = 'Iniciar treino',
   isResume = false,
 }: WorkoutCardProps) => (
-  <Pressable onPress={onPress} style={[styles.card, {borderLeftColor: workout.accentColor}]}>
+  <Pressable
+    accessibilityRole="button"
+    onPress={onPress}
+    style={({pressed}) => [
+      styles.card,
+      {borderLeftColor: workout.accentColor},
+      pressed ? styles.cardPressed : null,
+    ]}>
     <View style={styles.header}>
       <View style={styles.copy}>
         <Text style={styles.title}>{workout.name}</Text>
@@ -92,7 +99,7 @@ export const WorkoutCard = ({
 const styles = StyleSheet.create({
   card: {
     padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -136,8 +143,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionPill: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: theme.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -153,6 +160,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.accent,
     minHeight: 38,
+    minWidth: 128,
     flexShrink: 1,
     maxWidth: '100%',
   },
@@ -181,6 +189,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,111,125,0.18)',
     minHeight: 38,
+    minWidth: 128,
     flexShrink: 1,
     maxWidth: '100%',
   },
@@ -193,5 +202,9 @@ const styles = StyleSheet.create({
   },
   clearButtonDisabled: {
     opacity: 0.45,
+  },
+  cardPressed: {
+    opacity: 0.94,
+    transform: [{scale: 0.99}],
   },
 });

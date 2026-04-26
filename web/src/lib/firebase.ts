@@ -1,8 +1,10 @@
 import {initializeApp} from 'firebase/app';
 import {
+  browserLocalPersistence,
   GoogleAuthProvider,
   connectAuthEmulator,
   getAuth,
+  setPersistence,
 } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
@@ -70,6 +72,10 @@ const app = initializeApp({
 export const firebaseAuth = getAuth(app);
 export const firebaseDb = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+export const firebaseAuthPersistenceReady = setPersistence(
+  firebaseAuth,
+  browserLocalPersistence,
+).catch(() => undefined);
 
 googleProvider.setCustomParameters({
   prompt: 'select_account',

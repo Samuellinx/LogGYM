@@ -1,0 +1,31 @@
+# LogGYM - limpeza quando der problema de cache/build
+# Ambiente alvo: Windows / PowerShell
+
+## Limpar build Android
+
+```powershell
+cd .\android
+.\gradlew.bat clean
+cd ..
+```
+
+## Rodar Metro com cache zerado
+
+```powershell
+npm run start:reset
+```
+
+## Reinstalar dependencias do zero
+
+```powershell
+Remove-Item -LiteralPath .\node_modules -Recurse -Force
+Remove-Item -LiteralPath .\package-lock.json -Force
+npm install
+```
+
+## Limpar caches comuns do Metro/Watchman no Windows
+
+```powershell
+Remove-Item -LiteralPath .\node_modules\.cache -Recurse -Force -ErrorAction SilentlyContinue
+npm run start:reset
+```

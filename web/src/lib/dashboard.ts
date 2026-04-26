@@ -5,6 +5,7 @@ import type {
   WorkoutDocument,
   WorkoutSessionDocument,
 } from '../types';
+import {toSessionDate} from './sessionDate';
 
 const compactFormatter = new Intl.NumberFormat('pt-BR', {
   notation: 'compact',
@@ -30,7 +31,8 @@ const normalizeText = (value: string) => value.trim().toLowerCase();
 const sortByPerformedAtDesc = (sessions: WorkoutSessionDocument[]) =>
   [...sessions].sort(
     (left, right) =>
-      new Date(right.performedAt).getTime() - new Date(left.performedAt).getTime(),
+      toSessionDate(right.performedAt).getTime() -
+      toSessionDate(left.performedAt).getTime(),
   );
 
 const getWeekStart = (reference: Date) => {
@@ -84,7 +86,7 @@ const getWeeklySessionsCount = (
   const weekStart = getWeekStart(now).getTime();
 
   return sessions.filter(
-    session => new Date(session.performedAt).getTime() >= weekStart,
+    session => toSessionDate(session.performedAt).getTime() >= weekStart,
   ).length;
 };
 
@@ -177,4 +179,4 @@ export const formatVolume = (value: number) =>
   `${volumeFormatter.format(value)} kg`;
 
 export const formatSessionDate = (value: string) =>
-  dateFormatter.format(new Date(value));
+  dateFormatter.format(toSessionDate(value));

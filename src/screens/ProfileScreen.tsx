@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {Alert, Pressable, StyleSheet, Text, View} from 'react-native';
 import {Wifi, WifiOff} from 'lucide-react-native';
 
@@ -36,8 +36,25 @@ export const ProfileScreen = () => {
   const refreshData = useAppStore(state => state.refreshData);
   const signOut = useAppStore(state => state.signOut);
   const updateProfileAvatar = useAppStore(state => state.updateProfileAvatar);
+  const showError = useAppStore(state => state.showError);
   const isBusy = activeAction !== null;
   const selectedAvatarId = session?.user.avatarId ?? defaultProfileAvatarId;
+  const [avatarDraftId, setAvatarDraftId] = useState(selectedAvatarId);
+  const [isAvatarPickerCollapsed, setIsAvatarPickerCollapsed] = useState(true);
+  const selectedAvatar =
+    profileAvatarCatalog.find(avatar => avatar.id === avatarDraftId) ??
+    profileAvatarCatalog.find(avatar => avatar.id === selectedAvatarId) ??
+    profileAvatarCatalog[0];
+  const visibleAvatars = isAvatarPickerCollapsed
+    ? selectedAvatar
+      ? [selectedAvatar]
+      : []
+    : profileAvatarCatalog;
+
+  useEffect(() => {
+    setAvatarDraftId(selectedAvatarId);
+    setIsAvatarPickerCollapsed(true);
+  }, [selectedAvatarId]);
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja realmente sair do LogGYM?', [
@@ -83,8 +100,7 @@ export const ProfileScreen = () => {
         ].join(' '),
       );
     } catch (error) {
-      Alert.alert(
-        'Não foi possível salvar sua cópia',
+      showError(
         toUserMessage(error, 'Não foi possível exportar seus treinos agora.'),
       );
     } finally {
@@ -118,8 +134,7 @@ export const ProfileScreen = () => {
         ].join(' '),
       );
     } catch (error) {
-      Alert.alert(
-        'Não foi possível restaurar sua cópia',
+      showError(
         toUserMessage(error, 'Não foi possível restaurar seus treinos agora.'),
       );
     } finally {
@@ -172,8 +187,7 @@ export const ProfileScreen = () => {
         ].join(' '),
       );
     } catch (error) {
-      Alert.alert(
-        'Não foi possível importar o arquivo',
+      showError(
         toUserMessage(
           error,
           'Não foi possível converter esse arquivo em estrutura de treino agora.',
@@ -184,22 +198,44 @@ export const ProfileScreen = () => {
     }
   };
 
-  const handleSelectAvatar = async (avatarId: string) => {
-    if (!session?.user || isBusy || avatarId === selectedAvatarId) {
+  const handleSelectAvatar = (avatarId: string) => {
+    if (!session?.user || isBusy) {
+      return;
+    }
+
+    setAvatarDraftId(avatarId);
+  };
+
+  const handleEditAvatar = () => {
+    if (!session?.user || isBusy) {
+      return;
+    }
+
+    setAvatarDraftId(selectedAvatarId);
+    setIsAvatarPickerCollapsed(false);
+  };
+
+  const handleConfirmAvatar = async () => {
+    if (!session?.user || isBusy) {
+      return;
+    }
+
+    if (avatarDraftId === selectedAvatarId) {
+      setIsAvatarPickerCollapsed(true);
       return;
     }
 
     setActiveAction('profile-avatar');
 
     try {
-      await updateProfileAvatar(avatarId);
+      await updateProfileAvatar(avatarDraftId);
+      setIsAvatarPickerCollapsed(true);
       Alert.alert(
         'Avatar atualizado',
         'Seu personagem de perfil foi salvo com sucesso nesta conta.',
       );
     } catch (error) {
-      Alert.alert(
-        'Não foi possível atualizar o avatar',
+      showError(
         toUserMessage(error, 'Não foi possível atualizar o avatar do perfil agora.'),
       );
     } finally {
@@ -210,7 +246,7 @@ export const ProfileScreen = () => {
   return (
     <Screen>
       <View style={styles.profileCard}>
-        <ProfileAvatar avatarId={selectedAvatarId} size={86} />
+        <ProfileAvatar avatarId={avatarDraftId} size={86} />
 
         <View style={styles.profileCopy}>
           <Text style={styles.name}>{session?.user.name}</Text>
@@ -219,7 +255,9 @@ export const ProfileScreen = () => {
             Último login {formatSessionDate(session?.user.lastLoginAt ?? null)}
           </Text>
           <Text style={styles.avatarHint}>
-            Escolha um personagem para representar sua conta no app.
+            {isAvatarPickerCollapsed
+              ? 'Avatar confirmado para esta conta.'
+              : 'Escolha um personagem e confirme para salvar.'}
           </Text>
         </View>
       </View>
@@ -227,12 +265,14 @@ export const ProfileScreen = () => {
       <View style={styles.avatarPickerCard}>
         <Text style={styles.avatarPickerTitle}>Seu avatar</Text>
         <Text style={styles.avatarPickerText}>
-          Toque em um personagem para salvar a seleção.
+          {isAvatarPickerCollapsed
+            ? 'Apenas o avatar confirmado fica visível. Edite para trocar.'
+            : 'Toque em um personagem e valide a escolha para salvar.'}
         </Text>
 
         <View style={styles.avatarGrid}>
-          {profileAvatarCatalog.map(avatar => {
-            const isSelected = avatar.id === selectedAvatarId;
+          {visibleAvatars.map(avatar => {
+            const isSelected = avatar.id === avatarDraftId;
 
             return (
               <Pressable
@@ -254,6 +294,26 @@ export const ProfileScreen = () => {
             );
           })}
         </View>
+
+        {isAvatarPickerCollapsed ? (
+          <Button
+            variant="secondary"
+            label="Trocar avatar"
+            onPress={handleEditAvatar}
+            disabled={!session || isBusy}
+          />
+        ) : (
+          <Button
+            variant="primary"
+            label={
+              activeAction === 'profile-avatar'
+                ? 'Validando avatar...'
+                : 'Validar avatar'
+            }
+            onPress={handleConfirmAvatar}
+            disabled={!session || isBusy}
+          />
+        )}
       </View>
 
       <View style={styles.statusRow}>

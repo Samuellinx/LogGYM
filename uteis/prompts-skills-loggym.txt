@@ -1,0 +1,31 @@
+PROMPTS PARA USAR AS SKILLS NO DIA A DIA
+
+Use $loggym-feature-engineer para implementar esta melhoria no LogGYM: [descreva a melhoria]. Aplique no mobile e no web quando fizer sentido, preserve os fluxos atuais e rode as validacoes.
+
+Use $loggym-feature-engineer para corrigir este bug: [descreva o bug]. Primeiro encontre a causa no codigo, depois ajuste e valide com testes/build/lint.
+
+Use $loggym-feature-engineer para revisar o fluxo de criacao de treino no mobile e web. Corrija inconsistencias, validacoes, mensagens e limpeza de formulario apos salvar.
+
+Use $loggym-feature-engineer para padronizar todos os modais de erro, sucesso e confirmacao no LogGYM, mantendo o visual atual e sem quebrar os fluxos.
+
+Use $loggym-qa-tester para agir como um usuario novo no LogGYM web. Teste login, avatar, dashboard, criacao de treino, execucao, historico, perfil e exclusoes. Liste bugs e corrija os pequenos.
+
+Use $loggym-qa-tester para fazer uma regressao geral antes do deploy. Valide mobile e web, estados de erro/sucesso/loading/vazio, responsividade e acoes destrutivas.
+
+Use $loggym-qa-tester para testar especificamente o fluxo de treino: criar, editar, executar, finalizar, salvar no historico e excluir. Informe qualquer inconsistencia.
+
+Use $loggym-qa-tester para validar se nenhum erro nao tratado aparece para o usuario. Todo erro deve aparecer em modal claro no web e no mobile.
+
+Use $loggym-web-firebase-deploy para validar o web antes de producao. Rode build, lint, confira Firebase Hosting e me diga se esta pronto para deploy.
+
+Use $loggym-web-firebase-deploy para fazer deploy do web do LogGYM em producao no Firebase Hosting.
+
+Use $loggym-web-firebase-deploy para diagnosticar este erro de deploy Firebase: [cole o erro].
+
+Use $loggym-web-firebase-deploy para me passar os comandos exatos de build, preview e deploy do web do LogGYM.
+
+Use $ui-ux-specialist e $loggym-feature-engineer para melhorar a tela [nome da tela] no mobile e web, mantendo o estilo minimalista atual e rodando validacoes.
+
+Use $loggym-qa-tester e $loggym-web-firebase-deploy para validar o LogGYM web e publicar em producao se tudo estiver correto.
+
+Use $loggym-feature-engineer e $loggym-qa-tester para implementar [funcionalidade] e depois testar o fluxo completo como usuario real.

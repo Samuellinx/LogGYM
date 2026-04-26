@@ -1,5 +1,5 @@
 import {useDeferredValue, useEffect, useState} from 'react';
-import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -8,6 +8,7 @@ import {CalendarDays, Check, X} from 'lucide-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 import {Button} from '@/components/Button';
+import {ConfirmModal} from '@/components/ConfirmModal';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
@@ -25,6 +26,10 @@ import {toUserMessage} from '@/utils/errors';
 import {useAppStore} from '@/store/useAppStore';
 
 type AppNavigation = NavigationProp<MainTabParamList & RootStackParamList>;
+type DraftToClear = {
+  workoutId: string;
+  workoutName: string;
+} | null;
 
 export const WorkoutsScreen = () => {
   const navigation = useNavigation<AppNavigation>();
@@ -33,10 +38,12 @@ export const WorkoutsScreen = () => {
   const refreshData = useAppStore(state => state.refreshData);
   const isRefreshing = useAppStore(state => state.isRefreshing);
   const session = useAppStore(state => state.session);
+  const showError = useAppStore(state => state.showError);
   const [search, setSearch] = useState('');
   const [startedWorkoutIds, setStartedWorkoutIds] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [draftToClear, setDraftToClear] = useState<DraftToClear>(null);
   const deferredSearch = useDeferredValue(search);
 
   const normalized = deferredSearch.trim().toLowerCase();
@@ -88,7 +95,7 @@ export const WorkoutsScreen = () => {
       await refreshData();
       navigation.navigate('WorkoutDetail', {workoutId: duplicatedId});
     } catch (error) {
-      Alert.alert('Duplicar treino', toUserMessage(error));
+      showError(toUserMessage(error));
     }
   };
 
@@ -100,16 +107,19 @@ export const WorkoutsScreen = () => {
     }
   };
 
-  const handleClearTrainingDraft = async (workoutId: string) => {
-    if (!session) {
+  const handleClearTrainingDraft = async () => {
+    if (!session || !draftToClear) {
       return;
     }
 
     try {
-      await deleteTrainingDraftAutosave(session.user.id, workoutId);
-      setStartedWorkoutIds(current => current.filter(id => id !== workoutId));
+      await deleteTrainingDraftAutosave(session.user.id, draftToClear.workoutId);
+      setStartedWorkoutIds(current =>
+        current.filter(id => id !== draftToClear.workoutId),
+      );
+      setDraftToClear(null);
     } catch (error) {
-      Alert.alert('Limpar treino', toUserMessage(error));
+      showError(toUserMessage(error));
     }
   };
 
@@ -235,7 +245,12 @@ export const WorkoutsScreen = () => {
                   navigation.navigate('TrainingSession', {workoutId: workout.id})
                 }
                 onDuplicate={() => handleDuplicate(workout.id)}
-                onClearTraining={() => handleClearTrainingDraft(workout.id)}
+                onClearTraining={() =>
+                  setDraftToClear({
+                    workoutId: workout.id,
+                    workoutName: workout.name,
+                  })
+                }
                 clearTrainingDisabled={!startedWorkoutIds.includes(workout.id)}
                 startLabel={startAction.label}
                 isResume={startAction.variant === 'resume'}
@@ -258,6 +273,21 @@ export const WorkoutsScreen = () => {
         Dica: duplique um treino e ajuste pequenos detalhes para montar splits
         diferentes sem recomecar do zero.
       </Text>
+
+      <ConfirmModal
+        visible={draftToClear !== null}
+        title="Limpar treino?"
+        description={
+          draftToClear
+            ? `O rascunho em andamento de ${draftToClear.workoutName} será apagado. As sessões já salvas continuam preservadas.`
+            : ''
+        }
+        confirmLabel="Limpar treino"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={handleClearTrainingDraft}
+        onCancel={() => setDraftToClear(null)}
+      />
     </Screen>
   );
 };

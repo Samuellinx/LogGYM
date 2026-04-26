@@ -1,3 +1,5 @@
+import type {NavigatorScreenParams} from '@react-navigation/native';
+
 export type MainTabParamList = {
   Dashboard: undefined;
   Workouts: undefined;
@@ -6,7 +8,7 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   WorkoutForm: { workoutId?: string } | undefined;
   WorkoutDetail: { workoutId: string };
   TrainingSession: { workoutId: string };

@@ -32,7 +32,7 @@ export const ConfirmModal = ({
     <View style={styles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
 
-      <View style={styles.modalCard}>
+      <View accessibilityRole="alert" style={styles.modalCard}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.description}>{description}</Text>
 
@@ -53,6 +53,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.overlay,
   },
   modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
     padding: theme.spacing.lg,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,

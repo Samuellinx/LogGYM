@@ -60,6 +60,7 @@ export const Button = ({
 
   return (
     <Pressable
+      accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
       style={({pressed}) => [
@@ -120,12 +121,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    minHeight: 46,
+    justifyContent: 'center',
     ...cardShadow,
   },
   flat: {
     borderRadius: theme.radius.md,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    minHeight: 46,
+    justifyContent: 'center',
     borderWidth: 1,
   },
   content: {
@@ -140,6 +145,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '600',
     flexShrink: 1,
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.9,

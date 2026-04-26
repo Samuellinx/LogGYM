@@ -1,5 +1,5 @@
 import {useDeferredValue, useState} from 'react';
-import {Alert, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import {Trash2} from 'lucide-react-native';
 
@@ -25,6 +25,7 @@ export const HistoryScreen = () => {
   const history = useAppStore(state => state.history);
   const refreshData = useAppStore(state => state.refreshData);
   const isRefreshing = useAppStore(state => state.isRefreshing);
+  const showError = useAppStore(state => state.showError);
   const [search, setSearch] = useState('');
   const [sessionToDelete, setSessionToDelete] = useState<WorkoutHistoryItem | null>(
     null,
@@ -57,8 +58,7 @@ export const HistoryScreen = () => {
       setSessionToDelete(null);
       await refreshData();
     } catch (error) {
-      Alert.alert(
-        'Excluir execução',
+      showError(
         toUserMessage(error, 'Não foi possível excluir a execução agora.'),
       );
     } finally {

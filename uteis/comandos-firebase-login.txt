@@ -1,0 +1,38 @@
+# LogGYM - Firebase / login compartilhado
+# Ambiente alvo: Windows / PowerShell
+
+## Gerar SHA-1 e SHA-256 debug/release do Android
+
+```powershell
+npm run android:signingReport
+```
+
+## Ver o SHA-1 da keystore release local
+
+```powershell
+keytool -list -v -keystore ".\android\keystores\loggym-upload.jks" -alias loggym-upload
+```
+
+## Validar a presenca dos arquivos/configs do Firebase
+
+```powershell
+npm run firebase:doctor
+```
+
+## Depois de alterar o .env do mobile, reinicie o Metro
+
+```powershell
+npm run start:reset
+```
+
+## Rodar o painel web
+
+```powershell
+npm run web:dev
+```
+
+## Gerar build web
+
+```powershell
+npm run web:build
+```

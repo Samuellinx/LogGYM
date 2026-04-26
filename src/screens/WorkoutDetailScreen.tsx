@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {Alert, StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Repeat2, Trash2} from 'lucide-react-native';
 
@@ -30,9 +30,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutDetail'>;
 export const WorkoutDetailScreen = ({navigation, route}: Props) => {
   const session = useAppStore(state => state.session);
   const refreshData = useAppStore(state => state.refreshData);
+  const showError = useAppStore(state => state.showError);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getWorkoutDetail>>>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showClearDraftModal, setShowClearDraftModal] = useState(false);
   const [hasStartedDraft, setHasStartedDraft] = useState(false);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
         }
       } catch (error) {
         if (active) {
-          Alert.alert('Detalhe do treino', toUserMessage(error));
+          showError(toUserMessage(error));
         }
       } finally {
         if (active) {
@@ -73,7 +75,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
       active = false;
       unsubscribe();
     };
-  }, [navigation, route.params.workoutId, session]);
+  }, [navigation, route.params.workoutId, session, showError]);
 
   const handleDelete = async () => {
     if (!session || !detail) {
@@ -86,7 +88,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
       setShowDeleteModal(false);
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Excluir treino', toUserMessage(error));
+      showError(toUserMessage(error));
     }
   };
 
@@ -100,7 +102,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
       await refreshData();
       navigation.replace('WorkoutDetail', {workoutId: duplicatedId});
     } catch (error) {
-      Alert.alert('Duplicar treino', toUserMessage(error));
+      showError(toUserMessage(error));
     }
   };
 
@@ -112,8 +114,9 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
     try {
       await deleteTrainingDraftAutosave(session.user.id, detail.id);
       setHasStartedDraft(false);
+      setShowClearDraftModal(false);
     } catch (error) {
-      Alert.alert('Limpar treino', toUserMessage(error));
+      showError(toUserMessage(error));
     }
   };
 
@@ -153,7 +156,7 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
                 variant="danger"
                 label="Limpar treino"
                 disabled={!hasStartedDraft}
-                onPress={handleClearTrainingDraft}
+                onPress={() => setShowClearDraftModal(true)}
               />
               <Button
                 fullWidth={false}
@@ -236,6 +239,20 @@ export const WorkoutDetailScreen = ({navigation, route}: Props) => {
         confirmVariant="danger"
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteModal(false)}
+      />
+      <ConfirmModal
+        visible={showClearDraftModal}
+        title="Limpar treino?"
+        description={
+          detail
+            ? `O rascunho em andamento de ${detail.name} será apagado. As sessões já salvas continuam preservadas.`
+            : ''
+        }
+        confirmLabel="Limpar treino"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={handleClearTrainingDraft}
+        onCancel={() => setShowClearDraftModal(false)}
       />
     </Screen>
   );

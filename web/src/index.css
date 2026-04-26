@@ -13,6 +13,7 @@
   --accent-strong: #55df7b;
   --accent-secondary: #51c7ff;
   --danger: #ff6f7d;
+  --focus-ring: rgba(124, 255, 79, 0.24);
   --success-bg: rgba(57, 217, 138, 0.14);
   --danger-bg: rgba(255, 111, 125, 0.14);
   --card-shadow: 0 26px 70px rgba(0, 0, 0, 0.32);
@@ -58,6 +59,14 @@ button {
   cursor: pointer;
 }
 
+button,
+a,
+input,
+textarea,
+select {
+  min-width: 0;
+}
+
 h1,
 h2,
 h3,
@@ -72,7 +81,7 @@ h3,
 h4,
 strong {
   font-family: 'Sora', 'Manrope', sans-serif;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 #root {
@@ -215,9 +224,11 @@ strong {
 
 .eyebrow {
   margin-bottom: 5px;
-  font-size: 2rem;
-  letter-spacing: 0.05em;
-  color: rgb(2, 221, 68);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .hero-copy,
@@ -240,7 +251,7 @@ label small,
 }
 
 h1 {
-  font-size: clamp(2.6rem, 4vw, 4.3rem);
+  font-size: clamp(2.3rem, 4vw, 4rem);
   line-height: 1;
 }
 
@@ -426,6 +437,14 @@ h3 {
   box-shadow: var(--card-shadow);
 }
 
+.auth-panel--loading {
+  justify-items: flex-start;
+}
+
+.auth-loading-icon {
+  color: var(--accent);
+}
+
 .auth-head,
 .auth-form,
 .column-panel,
@@ -501,11 +520,11 @@ h3 {
 }
 
 .metric-card {
-  min-height: 146px;
+  min-height: 132px;
 }
 
 .metric-card strong {
-  font-size: 2.15rem;
+  font-size: clamp(1.75rem, 3vw, 2.1rem);
   color: var(--text);
 }
 
@@ -722,6 +741,10 @@ h3 {
   align-items: start;
 }
 
+.workspace-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .column-panel {
   gap: 18px;
   background: rgba(15, 19, 26, 0.86);
@@ -854,6 +877,10 @@ h3 {
   display: block;
 }
 
+.profile-avatar-actions {
+  display: grid;
+}
+
 .profile-section-head {
   display: grid;
   gap: 10px;
@@ -903,6 +930,10 @@ h3 {
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(9, 13, 18, 0.92);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
 }
 
 .search-box svg {
@@ -916,6 +947,12 @@ h3 {
   color: var(--text);
   outline: none;
   padding: 0;
+}
+
+.search-box:focus-within {
+  border-color: rgba(124, 255, 79, 0.48);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  background: rgba(9, 13, 18, 0.98);
 }
 
 label {
@@ -940,7 +977,12 @@ select {
   color: var(--text);
   border-radius: 18px;
   padding: 15px 16px;
+  min-height: 46px;
   outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
 }
 
 textarea {
@@ -951,7 +993,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: rgba(124, 255, 79, 0.52);
-  box-shadow: 0 0 0 3px rgba(124, 255, 79, 0.11);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .editor-support {
@@ -1081,12 +1123,23 @@ select:focus {
   background: transparent;
   color: var(--text);
   font-size: 0.9rem;
+  min-height: 46px;
+  text-align: center;
   white-space: nowrap;
+  overflow-wrap: anywhere;
   transition:
     transform 160ms ease,
     opacity 160ms ease,
     border-color 160ms ease,
     background-color 160ms ease;
+}
+
+.primary-button svg,
+.secondary-button svg,
+.ghost-button svg,
+.danger-button svg,
+.tab-chip svg {
+  flex: 0 0 auto;
 }
 
 .primary-button {
@@ -1151,7 +1204,17 @@ select:focus {
 .ghost-button:disabled,
 .danger-button:disabled {
   opacity: 0.72;
-  cursor: wait;
+  cursor: not-allowed;
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.ghost-button:focus-visible,
+.danger-button:focus-visible,
+.tab-chip:focus-visible,
+.color-swatch:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .feedback.error {
@@ -1167,6 +1230,70 @@ select:focus {
 .feedback,
 .empty-card {
   padding: 16px 18px;
+}
+
+.error-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(5, 7, 11, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.error-modal {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 111, 125, 0.28);
+  background:
+    linear-gradient(180deg, rgba(28, 14, 20, 0.98), rgba(12, 16, 22, 0.98)),
+    var(--surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+.error-modal h2 {
+  font-size: 1.3rem;
+}
+
+.error-modal p:not(.eyebrow) {
+  color: #ffd6db;
+  line-height: 1.55;
+}
+
+.success-modal {
+  border-color: rgba(57, 217, 138, 0.35);
+  background:
+    linear-gradient(180deg, rgba(16, 30, 24, 0.98), rgba(11, 16, 22, 0.98)),
+    rgba(15, 19, 26, 0.96);
+}
+
+.success-modal .eyebrow {
+  color: #39d98a;
+}
+
+.success-modal p:not(.eyebrow) {
+  color: #d6ffeb;
+}
+
+.delete-confirmation-modal {
+  border-color: rgba(255, 111, 125, 0.32);
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modal-actions .primary-button,
+.modal-actions .secondary-button,
+.modal-actions .danger-button {
+  width: 100%;
 }
 
 .brand-mark {
@@ -1299,10 +1426,19 @@ select:focus {
   }
 
   .auth-tabs,
-  .workspace-tabs,
   .editor-grid,
   .accent-palette,
   .device-mini-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-tabs,
+  .modal-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-actions {
+    display: grid;
     grid-template-columns: 1fr;
   }
 
