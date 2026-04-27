@@ -99,6 +99,7 @@ export const signUpWithEmailPassword = async (
     await updateProfile(credential.user, {
       displayName: name.trim(),
     });
+    await credential.user.reload();
   } catch (error) {
     throw toAuthMessage(error, 'Não foi possível criar a conta agora.');
   }

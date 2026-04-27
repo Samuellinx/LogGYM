@@ -15,6 +15,7 @@ import {
   getFirebaseFirestore,
   initializeFirebaseServices,
 } from '@/features/firebase/firebaseClient';
+import type {FirebaseUserProfileDocument} from '@/features/sync/firebaseTypes';
 import type {AuthProvider, SessionUser} from '@/types/domain';
 
 const googleWebClientId = Config.LOGGYM_GOOGLE_WEB_CLIENT_ID?.trim();
@@ -71,7 +72,39 @@ const toIsoDate = (value?: string | null) => {
   return timestamp.toISOString();
 };
 
-const getRemoteAvatarId = async (userId: string) => {
+const splitDisplayName = (name: string) => {
+  const trimmedName = name.trim();
+  const [givenName, ...familyNameParts] = trimmedName.split(/\s+/).filter(Boolean);
+
+  return {
+    name: trimmedName || 'Atleta',
+    givenName: givenName ?? 'Atleta',
+    familyName: familyNameParts.join(' ').trim() || null,
+  };
+};
+
+const resolveDisplayName = ({
+  remoteName,
+  authDisplayName,
+  email,
+}: {
+  remoteName?: string | null;
+  authDisplayName?: string | null;
+  email?: string | null;
+}) =>
+  remoteName?.trim() ||
+  authDisplayName?.trim() ||
+  email?.split('@')[0]?.trim() ||
+  'Atleta';
+
+const getRemoteUserProfile = async (
+  userId: string,
+): Promise<
+  Pick<
+    FirebaseUserProfileDocument,
+    'avatarId' | 'name' | 'givenName' | 'familyName'
+  > | null
+> => {
   try {
     initializeFirebaseServices();
     const snapshot = await getFirebaseFirestore()
@@ -79,16 +112,78 @@ const getRemoteAvatarId = async (userId: string) => {
       .doc(userId)
       .get();
 
-    return normalizeProfileAvatarId(snapshot.get('avatarId'));
+    if (!snapshot.exists) {
+      return null;
+    }
+
+    return {
+      avatarId: normalizeProfileAvatarId(snapshot.get('avatarId')),
+      name: typeof snapshot.get('name') === 'string' ? String(snapshot.get('name')) : '',
+      givenName:
+        typeof snapshot.get('givenName') === 'string'
+          ? String(snapshot.get('givenName'))
+          : null,
+      familyName:
+        typeof snapshot.get('familyName') === 'string'
+          ? String(snapshot.get('familyName'))
+          : null,
+    };
   } catch {
-    return defaultProfileAvatarId;
+    return null;
   }
+};
+
+const upsertRemoteUserProfile = async (
+  user: FirebaseAuthTypes.User,
+  preferredName?: string | null,
+) => {
+  if (!user.email) {
+    return null;
+  }
+
+  initializeFirebaseServices();
+  const now = new Date().toISOString();
+  const resolvedName = splitDisplayName(
+    resolveDisplayName({
+      remoteName: preferredName,
+      authDisplayName: user.displayName,
+      email: user.email,
+    }),
+  );
+
+  const payload: FirebaseUserProfileDocument = {
+    uid: user.uid,
+    email: user.email.trim().toLowerCase(),
+    name: resolvedName.name,
+    photo: null,
+    avatarId: defaultProfileAvatarId,
+    givenName: resolvedName.givenName,
+    familyName: resolvedName.familyName,
+    provider: getProviderFromFirebaseUser(user),
+    createdAt: now,
+    updatedAt: now,
+    lastLoginAt: toIsoDate(user.metadata.lastSignInTime),
+  };
+
+  await getFirebaseFirestore()
+    .collection('users')
+    .doc(user.uid)
+    .set(payload, {merge: true});
+
+  return payload;
 };
 
 const mapFirebaseUser = async (
   user: FirebaseAuthTypes.User,
 ): Promise<SessionUser> => {
-  const name = user.displayName?.trim() || user.email?.split('@')[0]?.trim() || 'Atleta';
+  const remoteProfile = await getRemoteUserProfile(user.uid);
+  const nameParts = splitDisplayName(
+    resolveDisplayName({
+      remoteName: remoteProfile?.name,
+      authDisplayName: user.displayName,
+      email: user.email,
+    }),
+  );
 
   if (!user.email) {
     throw new Error(
@@ -96,17 +191,14 @@ const mapFirebaseUser = async (
     );
   }
 
-  const avatarId = await getRemoteAvatarId(user.uid);
-
   return {
     id: user.uid,
-    name,
+    name: nameParts.name,
     email: user.email.trim().toLowerCase(),
     photo: null,
-    avatarId,
-    givenName: user.displayName?.trim().split(/\s+/)[0] ?? null,
-    familyName:
-      user.displayName?.trim().split(/\s+/).slice(1).join(' ').trim() || null,
+    avatarId: remoteProfile?.avatarId ?? defaultProfileAvatarId,
+    givenName: remoteProfile?.givenName?.trim() || nameParts.givenName,
+    familyName: remoteProfile?.familyName?.trim() || nameParts.familyName,
     provider: getProviderFromFirebaseUser(user),
     lastLoginAt: toIsoDate(user.metadata.lastSignInTime),
   };
@@ -268,6 +360,8 @@ export const signUpWithEmailAccount = async ({
     await userCredential.user.updateProfile({
       displayName: name.trim(),
     });
+    await userCredential.user.reload();
+    await upsertRemoteUserProfile(userCredential.user, name.trim());
 
     await getFirebaseAuth().signOut();
 

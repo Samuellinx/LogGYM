@@ -4,6 +4,7 @@ import {z} from 'zod';
 
 import type {AuthProvider, UserProfileDocument} from '../types';
 import {firebaseDb} from './firebase';
+import {buildProfileNameParts, resolveProfileDisplayName} from './profileIdentity';
 import {
   defaultProfileAvatarId,
   normalizeProfileAvatarId,
@@ -44,9 +45,6 @@ const getUserProvider = (user: User): AuthProvider => {
   return 'password';
 };
 
-const getDisplayName = (user: User) =>
-  user.displayName?.trim() || user.email?.split('@')[0]?.trim() || 'Atleta';
-
 const parseProfile = (value: unknown): UserProfileDocument | null => {
   const parsed = userProfileDocumentSchema.safeParse(value);
 
@@ -64,19 +62,26 @@ const buildUserProfileDocument = (
   user: User,
   avatarId: string,
   currentProfile?: UserProfileDocument | null,
+  preferredName?: string | null,
 ): UserProfileDocument => {
   const now = new Date().toISOString();
-  const name = getDisplayName(user);
+  const nameParts = buildProfileNameParts(
+    resolveProfileDisplayName({
+      user,
+      currentProfile,
+      preferredName,
+    }),
+  );
   const normalizedAvatarId = normalizeProfileAvatarId(avatarId);
 
   return {
     uid: user.uid,
     email: user.email?.trim().toLowerCase() || currentProfile?.email || 'athlete@loggym.local',
-    name,
+    name: nameParts.name,
     photo: null,
     avatarId: normalizedAvatarId,
-    givenName: name.split(/\s+/)[0] ?? null,
-    familyName: name.split(/\s+/).slice(1).join(' ').trim() || null,
+    givenName: nameParts.givenName,
+    familyName: nameParts.familyName,
     provider: getUserProvider(user),
     createdAt: currentProfile?.createdAt ?? now,
     updatedAt: now,
@@ -99,12 +104,14 @@ export const loadUserProfile = async (userId: string) => {
 export const ensureUserProfileDocument = async (
   user: User,
   preferredAvatarId = defaultProfileAvatarId,
+  preferredName?: string | null,
 ) => {
   const currentProfile = await loadUserProfile(user.uid);
   const payload = buildUserProfileDocument(
     user,
     currentProfile?.avatarId ?? preferredAvatarId,
     currentProfile,
+    preferredName,
   );
 
   await setDoc(getUserProfileRef(user.uid), payload, {merge: true});

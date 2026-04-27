@@ -77,6 +77,7 @@ import {
   updateUserProfileAvatar,
   watchUserProfile,
 } from './lib/profile';
+import {firebaseAuth} from './lib/firebase';
 import {getNextTrainingExerciseIndex} from './lib/trainingSessionNavigation';
 import {importTrainingFileForCurrentUser} from './lib/trainingImport';
 import {
@@ -108,6 +109,7 @@ import type {
   AuthMode,
   ExerciseProgressData,
   TrainingDraftExercise,
+  UserProfileDocument,
   WorkspaceView,
   WorkoutDocument,
   WorkoutExerciseInput,
@@ -448,6 +450,7 @@ function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('dashboard');
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileDocument | null>(null);
   const [profileAvatarId, setProfileAvatarId] = useState<string>(defaultProfileAvatarId);
   const [profileAvatarDraftId, setProfileAvatarDraftId] =
     useState<string>(defaultProfileAvatarId);
@@ -513,6 +516,7 @@ function App() {
       observeAuthState(nextUser => {
         setUser(nextUser);
         setIsAuthReady(true);
+        setUserProfile(null);
         setProfileAvatarId(defaultProfileAvatarId);
         setProfileAvatarDraftId(defaultProfileAvatarId);
         setIsAvatarPickerCollapsed(false);
@@ -540,6 +544,7 @@ function App() {
     void ensureUserProfileDocument(user).catch(() => undefined);
 
     const unsubscribeProfile = watchUserProfile(user.uid, profile => {
+      setUserProfile(profile);
       const nextAvatarId = profile?.avatarId ?? defaultProfileAvatarId;
 
       setProfileAvatarId(nextAvatarId);
@@ -673,11 +678,13 @@ function App() {
     }
 
     return (
+      userProfile?.givenName?.trim() ||
+      userProfile?.name?.trim().split(/\s+/)[0] ||
       user.displayName?.trim().split(/\s+/)[0] ||
       user.email?.split('@')[0] ||
       'Atleta'
     );
-  }, [user]);
+  }, [user, userProfile]);
 
   const accountProviderLabel = useMemo(() => {
     if (!user) {
@@ -865,6 +872,14 @@ function App() {
 
     try {
       await signUpWithEmailPassword(values.name, values.email, values.password);
+      if (firebaseAuth.currentUser) {
+        const profile = await ensureUserProfileDocument(
+          firebaseAuth.currentUser,
+          defaultProfileAvatarId,
+          values.name,
+        );
+        setUserProfile(profile);
+      }
       signUpForm.reset();
       setAuthMode('signin');
       setStatusMessage('Conta criada. Agora sua área já está pronta para receber treinos.');
@@ -2259,7 +2274,7 @@ function App() {
         </div>
 
         <div className="profile-copy">
-          <strong>{user?.displayName?.trim() || user?.email || 'Atleta'}</strong>
+          <strong>{userProfile?.name?.trim() || user?.displayName?.trim() || user?.email || 'Atleta'}</strong>
           <p>{user?.email}</p>
           <span>Último login {lastLoginLabel}</span>
           <span className="profile-avatar-support">
