@@ -672,20 +672,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   exerciseHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   exerciseHeaderCopy: {
-    flex: 1,
     gap: 2,
   },
   exerciseHeaderActions: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: theme.spacing.sm,
   },
   exerciseName: {
@@ -725,10 +721,12 @@ const styles = StyleSheet.create({
   },
   metricsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.md,
   },
   metricField: {
     flex: 1,
+    minWidth: 132,
     gap: 6,
   },
   metricLabel: {
