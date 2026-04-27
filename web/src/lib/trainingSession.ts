@@ -1,12 +1,34 @@
 import type {
   TrainingDraftExercise,
+  TrainingDraftExerciseState,
   TrainingDraftSet,
   WorkoutDocument,
   WorkoutSessionDocument,
 } from '../types';
 import {normalizeSessionDateInput} from './sessionDate';
 
+export type TrainingCompletionGroupStat = {
+  label: string;
+  count: number;
+};
+
+export type TrainingCompletionSummary = {
+  workoutName: string;
+  totalSets: number;
+  seriesByGroup: TrainingCompletionGroupStat[];
+  maxLoad: number;
+  minLoad: number;
+  maxReps: number;
+  minReps: number;
+};
+
+const createDraftSetId = () =>
+  `draft-set-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const createSessionDocumentId = () =>
+  `training-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
 const createBlankSet = (): TrainingDraftSet => ({
+  id: createDraftSetId(),
   load: '',
   reps: '',
   note: '',
@@ -14,11 +36,55 @@ const createBlankSet = (): TrainingDraftSet => ({
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 
+export const buildTrainingCompletionSummary = (
+  workoutName: string,
+  exercises: TrainingDraftExercise[],
+): TrainingCompletionSummary => {
+  const validSets = exercises.flatMap(exercise =>
+    exercise.sets
+      .map(setItem => ({
+        groupLabel: exercise.muscleGroup.trim() || 'Outros',
+        load: parseNumber(setItem.load),
+        reps: parseNumber(setItem.reps),
+      }))
+      .filter(
+        setItem =>
+          Number.isFinite(setItem.load) &&
+          Number.isFinite(setItem.reps) &&
+          setItem.load > 0 &&
+          setItem.reps > 0,
+      ),
+  );
+
+  if (!validSets.length) {
+    throw new Error('Adicione pelo menos uma série válida antes de salvar.');
+  }
+
+  const groupCounters = new Map<string, number>();
+
+  validSets.forEach(setItem => {
+    groupCounters.set(setItem.groupLabel, (groupCounters.get(setItem.groupLabel) ?? 0) + 1);
+  });
+
+  return {
+    workoutName,
+    totalSets: validSets.length,
+    seriesByGroup: Array.from(groupCounters.entries())
+      .map(([label, count]) => ({label, count}))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+    maxLoad: Math.max(...validSets.map(setItem => setItem.load)),
+    minLoad: Math.min(...validSets.map(setItem => setItem.load)),
+    maxReps: Math.max(...validSets.map(setItem => setItem.reps)),
+    minReps: Math.min(...validSets.map(setItem => setItem.reps)),
+  };
+};
+
 export const createTrainingDraftFromWorkout = (
   workout: WorkoutDocument,
 ): TrainingDraftExercise[] =>
   workout.exercises.map(exercise => ({
     workoutExerciseId: exercise.id,
+    orderIndex: exercise.orderIndex,
     exerciseName: exercise.name,
     muscleGroup: exercise.muscleGroup,
     baseLoad: exercise.baseLoad,
@@ -30,8 +96,45 @@ export const createTrainingDraftFromWorkout = (
 export const addDraftSet = (exercises: TrainingDraftExercise[], exerciseIndex: number) =>
   exercises.map((exercise, currentExerciseIndex) =>
     currentExerciseIndex === exerciseIndex
-      ? {...exercise, sets: [...exercise.sets, createBlankSet()]}
+      ? {...exercise, sets: [createBlankSet(), ...exercise.sets]}
       : exercise,
+  );
+
+export const isTrainingDraftSetCompleted = (setItem: TrainingDraftSet) =>
+  Number.isFinite(parseNumber(setItem.load)) &&
+  Number.isFinite(parseNumber(setItem.reps)) &&
+  parseNumber(setItem.load) > 0 &&
+  parseNumber(setItem.reps) > 0;
+
+export const canFinalizeTrainingDraftExercise = (
+  exercise: TrainingDraftExercise,
+) => exercise.sets.length > 0 && exercise.sets.every(isTrainingDraftSetCompleted);
+
+export const finalizeTrainingDraftExercise = (
+  draftState: TrainingDraftExerciseState,
+  exerciseIndex: number,
+): TrainingDraftExerciseState | null => {
+  const exercise = draftState.pendingExercises[exerciseIndex];
+
+  if (!exercise || !canFinalizeTrainingDraftExercise(exercise)) {
+    return null;
+  }
+
+  return {
+    pendingExercises: draftState.pendingExercises.filter(
+      (_, currentExerciseIndex) => currentExerciseIndex !== exerciseIndex,
+    ),
+    completedExercises: [...draftState.completedExercises, exercise].sort(
+      (left, right) => left.orderIndex - right.orderIndex,
+    ),
+  };
+};
+
+export const mergeTrainingDraftExercisesForSave = (
+  draftState: TrainingDraftExerciseState,
+) =>
+  [...draftState.completedExercises, ...draftState.pendingExercises].sort(
+    (left, right) => left.orderIndex - right.orderIndex,
   );
 
 export const removeDraftSet = (
@@ -136,7 +239,7 @@ export const buildTrainingSessionDocument = ({
   );
 
   return {
-    id: crypto.randomUUID(),
+    id: createSessionDocumentId(),
     userId,
     workoutId: workout.id,
     workoutName: workout.name,

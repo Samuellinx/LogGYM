@@ -703,6 +703,15 @@ h3 {
   max-width: 1080px;
 }
 
+.training-session-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-left: auto;
+}
+
 .training-date-field {
   display: grid;
   grid-template-columns: auto minmax(220px, 1fr);
@@ -710,7 +719,6 @@ h3 {
   justify-content: end;
   gap: 12px;
   width: fit-content;
-  margin-left: auto;
 }
 
 .training-date-field input {
@@ -730,8 +738,12 @@ h3 {
   color: var(--accent);
 }
 
-.training-next-button {
-  justify-self: end;
+.training-exercise-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .workspace-grid {
@@ -1280,6 +1292,100 @@ select:focus {
   color: #d6ffeb;
 }
 
+.training-completion-modal {
+  width: min(100%, 520px);
+  gap: 16px;
+  border-color: rgba(57, 217, 138, 0.38);
+}
+
+.training-completion-badge {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #06210e;
+  background: rgba(57, 217, 138, 0.92);
+  box-shadow: 0 12px 28px rgba(57, 217, 138, 0.24);
+}
+
+.training-completion-copy {
+  text-align: center;
+}
+
+.training-completion-name {
+  color: var(--accent);
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+.training-completion-highlight,
+.training-completion-card,
+.training-completion-groups {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: rgba(8, 12, 17, 0.72);
+}
+
+.training-completion-highlight {
+  padding: 18px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.training-completion-highlight span,
+.training-completion-card span,
+.training-completion-groups > span,
+.training-completion-pill small {
+  color: var(--text-muted);
+}
+
+.training-completion-highlight strong {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.training-completion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.training-completion-card {
+  padding: 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.training-completion-card strong,
+.training-completion-pill strong {
+  color: var(--text);
+}
+
+.training-completion-groups {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.training-completion-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.training-completion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .delete-confirmation-modal {
   border-color: rgba(255, 111, 125, 0.32);
 }
@@ -1422,6 +1528,10 @@ select:focus {
   .training-date-field {
     grid-template-columns: 1fr;
     width: 100%;
+  }
+
+  .training-session-actions {
+    width: 100%;
     margin-left: 0;
   }
 
@@ -1435,6 +1545,10 @@ select:focus {
   .workspace-tabs,
   .modal-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .training-completion-grid {
+    grid-template-columns: 1fr;
   }
 
   .card-actions {

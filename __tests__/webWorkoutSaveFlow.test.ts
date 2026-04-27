@@ -19,7 +19,7 @@ describe('web workout save flow', () => {
     });
   });
 
-  it('keeps the editor populated when an existing workout is updated', () => {
+  it('closes the editor and keeps the update success message when an existing workout is updated', () => {
     expect(
       resolveWorkoutSaveCompletion({
         savedWorkoutId: 'existing-workout',
@@ -28,7 +28,7 @@ describe('web workout save flow', () => {
     ).toEqual({
       isCreation: false,
       shouldResetEditor: false,
-      shouldCloseEditor: false,
+      shouldCloseEditor: true,
       successMessage: workoutUpdatedSuccessMessage,
     });
   });
