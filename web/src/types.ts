@@ -109,6 +109,7 @@ export type ExerciseProgressData = {
 };
 
 export type TrainingDraftSet = {
+  id: string;
   load: string;
   reps: string;
   note: string;
@@ -116,10 +117,16 @@ export type TrainingDraftSet = {
 
 export type TrainingDraftExercise = {
   workoutExerciseId: string;
+  orderIndex: number;
   exerciseName: string;
   muscleGroup: string;
   baseLoad: string;
   targetReps: string;
   hint: string;
   sets: TrainingDraftSet[];
+};
+
+export type TrainingDraftExerciseState = {
+  pendingExercises: TrainingDraftExercise[];
+  completedExercises: TrainingDraftExercise[];
 };

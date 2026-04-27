@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   BarChart3,
   CalendarDays,
+  Check,
   ChevronRight,
   Clock3,
   Download,
@@ -78,7 +79,6 @@ import {
   watchUserProfile,
 } from './lib/profile';
 import {firebaseAuth} from './lib/firebase';
-import {getNextTrainingExerciseIndex} from './lib/trainingSessionNavigation';
 import {importTrainingFileForCurrentUser} from './lib/trainingImport';
 import {
   createTrainingDraftSnapshot,
@@ -86,14 +86,19 @@ import {
   deleteTrainingDraftAutosave,
   getTrainingDraftAutosave,
   hasStartedTrainingDraft,
-  restoreTrainingDraftExercises,
+  restoreTrainingDraftState,
   saveTrainingDraftAutosave,
 } from './lib/trainingDraftAutosave';
 import {
   addDraftSet,
+  buildTrainingCompletionSummary,
   buildTrainingSessionDocument,
+  canFinalizeTrainingDraftExercise,
+  finalizeTrainingDraftExercise,
+  mergeTrainingDraftExercisesForSave,
   removeDraftSet,
   updateDraftSet,
+  type TrainingCompletionSummary,
 } from './lib/trainingSession';
 import {
   deleteSessionFromPanel,
@@ -108,8 +113,8 @@ import {resolveWorkoutSaveCompletion} from './lib/workoutSaveFlow';
 import type {
   AuthMode,
   ExerciseProgressData,
-  TrainingDraftExercise,
   UserProfileDocument,
+  TrainingDraftExerciseState,
   WorkspaceView,
   WorkoutDocument,
   WorkoutExerciseInput,
@@ -377,6 +382,80 @@ const SuccessModal = ({
   </div>
 );
 
+const formatTrainingMetric = (value: number, suffix = '') => {
+  const formatted = Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(1).replace('.', ',');
+
+  return `${formatted}${suffix}`;
+};
+
+const TrainingCompletionModal = ({
+  summary,
+  onClose,
+}: {
+  summary: TrainingCompletionSummary;
+  onClose: () => void;
+}) => (
+  <div className="error-modal-backdrop" role="presentation">
+    <section
+      aria-labelledby="training-completion-title"
+      aria-modal="true"
+      className="error-modal success-modal training-completion-modal"
+      role="dialog">
+      <div className="training-completion-badge">
+        <Check size={28} />
+      </div>
+      <p className="eyebrow">Treino finalizado</p>
+      <h2 id="training-completion-title">Seu treino foi salvo</h2>
+      <p className="training-completion-copy">
+        O histórico já foi atualizado com as séries válidas desta execução.
+      </p>
+      <strong className="training-completion-name">{summary.workoutName}</strong>
+
+      <div className="training-completion-highlight">
+        <span>Séries registradas</span>
+        <strong>{summary.totalSets}</strong>
+      </div>
+
+      <div className="training-completion-grid">
+        <div className="training-completion-card">
+          <span>Maior carga</span>
+          <strong>{formatTrainingMetric(summary.maxLoad, ' kg')}</strong>
+        </div>
+        <div className="training-completion-card">
+          <span>Menor carga</span>
+          <strong>{formatTrainingMetric(summary.minLoad, ' kg')}</strong>
+        </div>
+        <div className="training-completion-card">
+          <span>Maior repetição</span>
+          <strong>{formatTrainingMetric(summary.maxReps)}</strong>
+        </div>
+        <div className="training-completion-card">
+          <span>Menor repetição</span>
+          <strong>{formatTrainingMetric(summary.minReps)}</strong>
+        </div>
+      </div>
+
+      <div className="training-completion-groups">
+        <span>Séries por grupo muscular</span>
+        <div className="training-completion-pills">
+          {summary.seriesByGroup.map(group => (
+            <div key={group.label} className="training-completion-pill">
+              <small>{group.label}</small>
+              <strong>{group.count}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button className="primary-button wide" type="button" onClick={onClose}>
+        Continuar
+      </button>
+    </section>
+  </div>
+);
+
 const DeleteConfirmationModal = ({
   title,
   description,
@@ -464,6 +543,8 @@ function App() {
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<PendingDeleteConfirmation | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [trainingCompletionSummary, setTrainingCompletionSummary] =
+    useState<TrainingCompletionSummary | null>(null);
   const [backupPassword, setBackupPassword] = useState('');
   const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('');
   const [dashboardSearch, setDashboardSearch] = useState('');
@@ -476,7 +557,15 @@ function App() {
     createWorkoutDraft(),
   );
   const [isWorkoutEditorOpen, setIsWorkoutEditorOpen] = useState(false);
-  const [trainingDrafts, setTrainingDrafts] = useState<TrainingDraftExercise[]>([]);
+  const [trainingPendingDrafts, setTrainingPendingDrafts] = useState<
+    TrainingDraftExerciseState['pendingExercises']
+  >([]);
+  const [trainingCompletedDrafts, setTrainingCompletedDrafts] = useState<
+    TrainingDraftExerciseState['completedExercises']
+  >([]);
+  const [trainingPendingFocusIndex, setTrainingPendingFocusIndex] = useState<number | null>(
+    null,
+  );
   const [trainingPerformedAt, setTrainingPerformedAt] = useState(
     formatDateInputValue(new Date().toISOString()),
   );
@@ -528,7 +617,9 @@ function App() {
           setIsWorkoutEditorOpen(false);
           setWorkspaceView('dashboard');
           setDetailView(null);
-          setTrainingDrafts([]);
+          setTrainingPendingDrafts([]);
+          setTrainingCompletedDrafts([]);
+          setTrainingPendingFocusIndex(null);
           setTrainingOverallNotes('');
           setTrainingPerformedAt(formatDateInputValue(new Date().toISOString()));
         }
@@ -638,7 +729,8 @@ function App() {
           workoutId: activeTrainingWorkout.id,
           performedAt: trainingPerformedAt,
           overallNotes: trainingOverallNotes,
-          exercises: trainingDrafts,
+          pendingExercises: trainingPendingDrafts,
+          completedExercises: trainingCompletedDrafts,
           updatedAt: new Date().toISOString(),
         }),
       );
@@ -648,11 +740,36 @@ function App() {
   }, [
     activeTrainingWorkout,
     detailView,
-    trainingDrafts,
+    trainingCompletedDrafts,
     trainingOverallNotes,
+    trainingPendingDrafts,
     trainingPerformedAt,
     user,
   ]);
+
+  useEffect(() => {
+    if (trainingPendingFocusIndex === null) {
+      return;
+    }
+
+    const targetExercise = trainingExerciseRefs.current[trainingPendingFocusIndex];
+
+    if (!targetExercise) {
+      return;
+    }
+
+    targetExercise.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+
+    const focusTimeoutId = window.setTimeout(() => {
+      trainingExerciseLoadInputRefs.current[trainingPendingFocusIndex]?.focus();
+      setTrainingPendingFocusIndex(null);
+    }, 180);
+
+    return () => window.clearTimeout(focusTimeoutId);
+  }, [trainingPendingFocusIndex, trainingPendingDrafts]);
 
   const historyTotalVolume = useMemo(
     () => filteredHistory.reduce((sum, sessionItem) => sum + sessionItem.totalVolume, 0),
@@ -1205,8 +1322,10 @@ function App() {
   const openTrainingSession = (workout: WorkoutDocument, returnTo: WorkspaceView) => {
     clearFeedback();
     const savedDraft = user ? getTrainingDraftAutosave(user.uid, workout.id) : null;
+    const restoredDraftState = restoreTrainingDraftState(workout, savedDraft);
 
-    setTrainingDrafts(restoreTrainingDraftExercises(workout, savedDraft));
+    setTrainingPendingDrafts(restoredDraftState.pendingExercises);
+    setTrainingCompletedDrafts(restoredDraftState.completedExercises);
     setTrainingOverallNotes(savedDraft?.overallNotes ?? '');
     setTrainingPerformedAt(
       savedDraft
@@ -1266,25 +1385,77 @@ function App() {
     setBusyAction('save-session');
 
     try {
+      const exercisesForSave = mergeTrainingDraftExercisesForSave({
+        pendingExercises: trainingPendingDrafts,
+        completedExercises: trainingCompletedDrafts,
+      });
+      const summary = buildTrainingCompletionSummary(
+        activeTrainingWorkout.name,
+        exercisesForSave,
+      );
       const sessionDocument = buildTrainingSessionDocument({
         userId: user.uid,
         workout: activeTrainingWorkout,
         performedAt: trainingPerformedAt,
         overallNotes: trainingOverallNotes,
-        exercises: trainingDrafts,
+        exercises: exercisesForSave,
       });
 
       await saveTrainingSessionFromPanel(user.uid, sessionDocument);
-      deleteTrainingDraftAutosave(user.uid, activeTrainingWorkout.id);
-      setStatusMessage('Execução salva com sucesso.');
-      setDetailView(null);
-      setWorkspaceView('history');
-      setHistorySearch('');
+      await deleteTrainingDraftAutosave(user.uid, activeTrainingWorkout.id);
+      setTrainingCompletionSummary(summary);
     } catch (error) {
       showError(error, 'Não foi possível salvar a execução.');
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const handleCloseTrainingCompletionModal = () => {
+    setTrainingCompletionSummary(null);
+    setStatusMessage('Execução salva com sucesso.');
+    setDetailView(null);
+    setWorkspaceView('history');
+    setHistorySearch('');
+  };
+
+  const handleFinishTrainingExercise = (exerciseIndex: number) => {
+    clearFeedback();
+
+    const exercise = trainingPendingDrafts[exerciseIndex];
+
+    if (!exercise || !canFinalizeTrainingDraftExercise(exercise)) {
+      setErrorMessage(
+        'Preencha carga e reps válidos em todas as séries antes de finalizar o exercício.',
+      );
+      return;
+    }
+
+    const nextDraftState = finalizeTrainingDraftExercise(
+      {
+        pendingExercises: trainingPendingDrafts,
+        completedExercises: trainingCompletedDrafts,
+      },
+      exerciseIndex,
+    );
+
+    if (!nextDraftState) {
+      return;
+    }
+
+    setTrainingPendingDrafts(nextDraftState.pendingExercises);
+    setTrainingCompletedDrafts(nextDraftState.completedExercises);
+
+    if (nextDraftState.pendingExercises.length === 0) {
+      return;
+    }
+
+    const targetExerciseIndex = Math.min(
+      exerciseIndex,
+      nextDraftState.pendingExercises.length - 1,
+    );
+
+    setTrainingPendingFocusIndex(targetExerciseIndex);
   };
 
   const handleProfileAvatarSelected = (avatarId: string) => {
@@ -1365,7 +1536,7 @@ function App() {
         name: `${setIndex + 1} de ${exerciseName || 'exercício'}`,
       }),
       () =>
-        setTrainingDrafts(current =>
+        setTrainingPendingDrafts(current =>
           removeDraftSet(current, exerciseIndex, setIndex),
         ),
     );
@@ -2070,14 +2241,28 @@ function App() {
               <h2>{activeTrainingWorkout.name}</h2>
             </div>
 
-            <label className="training-date-field">
-              <span>Data</span>
-              <input
-                type="date"
-                value={trainingPerformedAt}
-                onChange={event => setTrainingPerformedAt(event.target.value)}
-              />
-            </label>
+            <div className="training-session-actions">
+              <label className="training-date-field">
+                <span>Data</span>
+                <input
+                  type="date"
+                  value={trainingPerformedAt}
+                  onChange={event => setTrainingPerformedAt(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={busyAction === 'save-session'}
+                onClick={handleSaveTrainingSession}>
+                {busyAction === 'save-session' ? (
+                  <LoaderCircle className="spin" size={16} />
+                ) : (
+                  <Play size={16} />
+                )}
+                {busyAction === 'save-session' ? 'Salvando treino...' : 'Salvar treino'}
+              </button>
+            </div>
           </div>
 
           <p className="editor-support">
@@ -2095,158 +2280,147 @@ function App() {
           </label>
 
           <div className="exercise-stack">
-            {trainingDrafts.map((exercise, exerciseIndex) => (
-              <article
-                className="exercise-card training-exercise-card"
-                key={exercise.workoutExerciseId}
-                ref={element => {
-                  trainingExerciseRefs.current[exerciseIndex] = element;
-                }}>
-                <div className="exercise-card-head">
-                  <div>
-                    <strong>{exercise.exerciseName}</strong>
-                    <p className="exercise-meta-text">
-                      {exercise.muscleGroup} - alvo {exercise.targetReps}
-                    </p>
+            {trainingPendingDrafts.length ? (
+              trainingPendingDrafts.map((exercise, exerciseIndex) => (
+                <article
+                  className="exercise-card training-exercise-card"
+                  key={exercise.workoutExerciseId}
+                  ref={element => {
+                    trainingExerciseRefs.current[exerciseIndex] = element;
+                  }}>
+                  <div className="exercise-card-head">
+                    <div>
+                      <strong>{exercise.exerciseName}</strong>
+                      <p className="exercise-meta-text">
+                        {exercise.muscleGroup} - alvo {exercise.targetReps}
+                      </p>
+                    </div>
+                    <div className="training-exercise-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => handleFinishTrainingExercise(exerciseIndex)}>
+                        <ChevronRight size={16} />
+                        Finalizar exercício
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() =>
+                          setTrainingPendingDrafts(current =>
+                            addDraftSet(current, exerciseIndex),
+                          )
+                        }>
+                        <Plus size={16} />
+                        Nova série
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() =>
-                      setTrainingDrafts(current => addDraftSet(current, exerciseIndex))
-                    }>
-                    <Plus size={16} />
-                    Nova série
-                  </button>
-                </div>
 
-                {exercise.hint ? <p className="training-support-text">{exercise.hint}</p> : null}
-                {exercise.baseLoad ? (
-                  <p className="training-support-text training-support-text--accent">
-                    Carga sugerida: {exercise.baseLoad}
-                  </p>
-                ) : null}
+                  {exercise.hint ? (
+                    <p className="training-support-text">{exercise.hint}</p>
+                  ) : null}
+                  {exercise.baseLoad ? (
+                    <p className="training-support-text training-support-text--accent">
+                      Carga sugerida: {exercise.baseLoad}
+                    </p>
+                  ) : null}
 
-                <div className="training-set-stack">
-                  {exercise.sets.map((setItem, setIndex) => (
-                    <div
-                      className="training-set-card"
-                      key={`${exercise.workoutExerciseId}-${setIndex}`}>
-                      <div className="exercise-card-head">
-                        <strong>Série - {setIndex + 1}</strong>
-                        <button
-                          type="button"
-                          className="danger-button subtle"
-                          onClick={() =>
-                            requestRemoveDraftSet(
-                              exercise.exerciseName,
-                              exerciseIndex,
-                              setIndex,
-                            )
-                          }>
-                          <Trash2 size={14} />
-                          Remover
-                        </button>
-                      </div>
-
-                      <div className="editor-grid">
-                        <label>
-                          <span>Carga</span>
-                          <input
-                            ref={element => {
-                              if (setIndex === 0) {
-                                trainingExerciseLoadInputRefs.current[exerciseIndex] = element;
-                              }
-                            }}
-                            value={setItem.load}
-                            onChange={event =>
-                              setTrainingDrafts(current =>
-                                updateDraftSet(
-                                  current,
-                                  exerciseIndex,
-                                  setIndex,
-                                  'load',
-                                  maskDecimalInput(event.target.value),
-                                ),
-                              )
-                            }
-                            inputMode="decimal"
-                            placeholder="0"
-                          />
-                        </label>
-                        <label>
-                          <span>Reps</span>
-                          <input
-                            value={setItem.reps}
-                            onChange={event =>
-                              setTrainingDrafts(current =>
-                                updateDraftSet(
-                                  current,
-                                  exerciseIndex,
-                                  setIndex,
-                                  'reps',
-                                  maskIntegerInput(event.target.value),
-                                ),
-                              )
-                            }
-                            inputMode="numeric"
-                            placeholder="0"
-                          />
-                        </label>
-                      </div>
-
-                      <label className="stacked-field">
-                        <span>Anotação da série</span>
-                        <textarea
-                          value={setItem.note}
-                          onChange={event =>
-                            setTrainingDrafts(current =>
-                              updateDraftSet(
-                                current,
+                  <div className="training-set-stack">
+                    {exercise.sets.map((setItem, setIndex) => (
+                      <div className="training-set-card" key={setItem.id}>
+                        <div className="exercise-card-head">
+                          <strong>Série - {setIndex + 1}</strong>
+                          <button
+                            type="button"
+                            className="danger-button subtle"
+                            onClick={() =>
+                              requestRemoveDraftSet(
+                                exercise.exerciseName,
                                 exerciseIndex,
                                 setIndex,
-                                'note',
-                                event.target.value,
-                              ),
-                            )
-                          }
-                          rows={3}
-                          placeholder="Ex: última repetição travou."
-                        />
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                              )
+                            }>
+                            <Trash2 size={14} />
+                            Remover
+                          </button>
+                        </div>
 
-                {getNextTrainingExerciseIndex(exerciseIndex, trainingDrafts.length) !== null ? (
-                  <button
-                    type="button"
-                    className="secondary-button training-next-button"
-                    onClick={() => {
-                      const nextExerciseIndex = getNextTrainingExerciseIndex(
-                        exerciseIndex,
-                        trainingDrafts.length,
-                      );
+                        <div className="editor-grid">
+                          <label>
+                            <span>Carga</span>
+                            <input
+                              ref={element => {
+                                if (setIndex === 0) {
+                                  trainingExerciseLoadInputRefs.current[exerciseIndex] = element;
+                                }
+                              }}
+                              value={setItem.load}
+                              onChange={event =>
+                                setTrainingPendingDrafts(current =>
+                                  updateDraftSet(
+                                    current,
+                                    exerciseIndex,
+                                    setIndex,
+                                    'load',
+                                    maskDecimalInput(event.target.value),
+                                  ),
+                                )
+                              }
+                              inputMode="decimal"
+                              placeholder="0"
+                            />
+                          </label>
+                          <label>
+                            <span>Reps</span>
+                            <input
+                              value={setItem.reps}
+                              onChange={event =>
+                                setTrainingPendingDrafts(current =>
+                                  updateDraftSet(
+                                    current,
+                                    exerciseIndex,
+                                    setIndex,
+                                    'reps',
+                                    maskIntegerInput(event.target.value),
+                                  ),
+                                )
+                              }
+                              inputMode="numeric"
+                              placeholder="0"
+                            />
+                          </label>
+                        </div>
 
-                      if (nextExerciseIndex === null) {
-                        return;
-                      }
-
-                      trainingExerciseRefs.current[nextExerciseIndex]?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start',
-                      });
-
-                      window.setTimeout(() => {
-                        trainingExerciseLoadInputRefs.current[nextExerciseIndex]?.focus();
-                      }, 180);
-                    }}>
-                    <ChevronRight size={16} />
-                    Finalizar exercício
-                  </button>
-                ) : null}
-              </article>
-            ))}
+                        <label className="stacked-field">
+                          <span>Anotação da série</span>
+                          <textarea
+                            value={setItem.note}
+                            onChange={event =>
+                              setTrainingPendingDrafts(current =>
+                                updateDraftSet(
+                                  current,
+                                  exerciseIndex,
+                                  setIndex,
+                                  'note',
+                                  event.target.value,
+                                ),
+                              )
+                            }
+                            rows={3}
+                            placeholder="Ex: última repetição travou."
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="empty-card">
+                Todos os exercícios foram finalizados. Salve o treino para concluir a sessão.
+              </div>
+            )}
           </div>
 
           <button
@@ -2259,7 +2433,7 @@ function App() {
             ) : (
               <Play size={16} />
             )}
-            {busyAction === 'save-session' ? 'Salvando execução...' : 'Salvar execução'}
+            {busyAction === 'save-session' ? 'Salvando treino...' : 'Salvar treino'}
           </button>
         </div>
       )}
@@ -2678,7 +2852,14 @@ function App() {
                   ? renderWorkoutsWorkspace()
                   : workspaceView === 'history'
                     ? renderHistoryWorkspace()
-                    : renderProfileWorkspace()}
+                  : renderProfileWorkspace()}
+
+          {trainingCompletionSummary ? (
+            <TrainingCompletionModal
+              summary={trainingCompletionSummary}
+              onClose={handleCloseTrainingCompletionModal}
+            />
+          ) : null}
         </main>
       ) : (
         <main className="auth-stage">

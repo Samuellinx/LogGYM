@@ -12,7 +12,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ChevronRight, Plus, Trash2} from 'lucide-react-native';
+import {ChevronRight, Play, Plus, Trash2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {ConfirmModal} from '@/components/ConfirmModal';
@@ -31,12 +31,20 @@ import {
   saveTrainingDraftAutosave,
 } from '@/features/workouts/workoutRepository';
 import {
+  addDraftSetToExercise,
+  createEmptyTrainingDraftState,
+  createBlankSet,
   createTrainingDraftSnapshot,
-  restoreTrainingDraftExercises,
+  restoreTrainingDraftState,
   type TrainingDraftExercise,
+  type TrainingDraftExerciseState,
   type TrainingDraftSet,
 } from '@/features/workouts/trainingDraftAutosave';
-import {getNextTrainingExerciseIndex} from '@/features/workouts/trainingSessionUi';
+import {
+  canFinalizeTrainingDraftExercise,
+  finalizeTrainingDraftExercise,
+  mergeTrainingDraftExercisesForSave,
+} from '@/features/workouts/trainingSessionUi';
 import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
@@ -52,12 +60,6 @@ type PendingSetDeletion = {
   exerciseIndex: number;
   setIndex: number;
 } | null;
-
-const createBlankSet = (): TrainingDraftSet => ({
-  load: '',
-  reps: '',
-  note: '',
-});
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 
@@ -174,7 +176,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const refreshData = useAppStore(state => state.refreshData);
   const showError = useAppStore(state => state.showError);
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
-  const [drafts, setDrafts] = useState<TrainingDraftExercise[]>([]);
+  const [draftState, setDraftState] = useState<TrainingDraftExerciseState>(
+    createEmptyTrainingDraftState(),
+  );
   const [performedAt, setPerformedAt] = useState(new Date());
   const [overallNotes, setOverallNotes] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -208,7 +212,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         }
 
         setWorkout(detail);
-        setDrafts(restoreTrainingDraftExercises(detail, savedDraft));
+        setDraftState(restoreTrainingDraftState(detail, savedDraft));
 
         if (savedDraft) {
           setOverallNotes(savedDraft.overallNotes);
@@ -246,14 +250,15 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           workoutId: workout.id,
           performedAt: performedAt.toISOString(),
           overallNotes,
-          exercises: drafts,
+          pendingExercises: draftState.pendingExercises,
+          completedExercises: draftState.completedExercises,
           updatedAt: new Date().toISOString(),
         }),
       ).catch(() => undefined);
     }, 350);
 
     return () => clearTimeout(timeoutId);
-  }, [drafts, hasLoadedDraft, overallNotes, performedAt, session, workout]);
+  }, [draftState, hasLoadedDraft, overallNotes, performedAt, session, workout]);
 
   const updateSet = (
     exerciseIndex: number,
@@ -261,8 +266,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     field: keyof TrainingDraftSet,
     value: string,
   ) => {
-    setDrafts(current =>
-      current.map((exercise, currentExerciseIndex) => {
+    setDraftState(current => ({
+      ...current,
+      pendingExercises: current.pendingExercises.map((exercise, currentExerciseIndex) => {
         if (currentExerciseIndex !== exerciseIndex) {
           return exercise;
         }
@@ -274,22 +280,23 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           ),
         };
       }),
-    );
+    }));
   };
 
   const addSet = (exerciseIndex: number) => {
-    setDrafts(current =>
-      current.map((exercise, currentExerciseIndex) =>
-        currentExerciseIndex === exerciseIndex
-          ? {...exercise, sets: [...exercise.sets, createBlankSet()]}
-          : exercise,
+    setDraftState(current => ({
+      ...current,
+      pendingExercises: addDraftSetToExercise(
+        current.pendingExercises,
+        exerciseIndex,
       ),
-    );
+    }));
   };
 
   const removeSet = (exerciseIndex: number, setIndex: number) => {
-    setDrafts(current =>
-      current.map((exercise, currentExerciseIndex) => {
+    setDraftState(current => ({
+      ...current,
+      pendingExercises: current.pendingExercises.map((exercise, currentExerciseIndex) => {
         if (currentExerciseIndex !== exerciseIndex) {
           return exercise;
         }
@@ -306,7 +313,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           sets: nextSets,
         };
       }),
-    );
+    }));
   };
 
   const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -323,26 +330,45 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     };
 
   const handleFinishExercise = (exerciseIndex: number) => {
-    const nextExerciseIndex = getNextTrainingExerciseIndex(
-      exerciseIndex,
-      drafts.length,
-    );
+    const exercise = draftState.pendingExercises[exerciseIndex];
 
-    if (nextExerciseIndex === null) {
+    if (!exercise || !canFinalizeTrainingDraftExercise(exercise)) {
+      showError(
+        'Preencha carga e reps válidos em todas as séries antes de finalizar o exercício.',
+      );
       return;
     }
 
-    scrollViewRef.current?.scrollTo({
-      y: Math.max(
-        (exercisePositions.current[nextExerciseIndex] ?? 0) - theme.spacing.md,
-        0,
-      ),
-      animated: true,
-    });
+    const nextDraftState = finalizeTrainingDraftExercise(draftState, exerciseIndex);
+
+    if (!nextDraftState) {
+      return;
+    }
+
+    setDraftState(nextDraftState);
+
+    if (nextDraftState.pendingExercises.length === 0) {
+      return;
+    }
+
+    const targetExerciseIndex = Math.min(
+      exerciseIndex,
+      nextDraftState.pendingExercises.length - 1,
+    );
 
     setTimeout(() => {
-      exerciseLoadInputRefs.current[nextExerciseIndex]?.focus();
-    }, 220);
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(
+          (exercisePositions.current[targetExerciseIndex] ?? 0) - theme.spacing.md,
+          0,
+        ),
+        animated: true,
+      });
+
+      setTimeout(() => {
+        exerciseLoadInputRefs.current[targetExerciseIndex]?.focus();
+      }, 220);
+    }, 40);
   };
 
   const handleSave = async () => {
@@ -352,7 +378,12 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
     try {
       setIsSaving(true);
-      const summary = buildCompletionSummary(workout.name, workout.focus, drafts);
+      const exercisesForSave = mergeTrainingDraftExercisesForSave(draftState);
+      const summary = buildCompletionSummary(
+        workout.name,
+        workout.focus,
+        exercisesForSave,
+      );
 
       await saveTrainingSession(session.user.id, {
         workoutId: workout.id,
@@ -360,7 +391,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         focus: workout.focus,
         overallNotes,
         performedAt: performedAt.toISOString(),
-        exercises: drafts.map(exercise => ({
+        exercises: exercisesForSave.map(exercise => ({
           workoutExerciseId: exercise.workoutExerciseId,
           exerciseName: exercise.exerciseName,
           muscleGroup: exercise.muscleGroup,
@@ -412,12 +443,21 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
             <Text style={styles.subtitle}>
               {workout.focus} - {workout.exerciseCount} exercícios
             </Text>
-            <Button
-              fullWidth={false}
-              variant="secondary"
-              label={formatDateLong(performedAt.toISOString())}
-              onPress={() => setShowDatePicker(true)}
-            />
+            <View style={styles.heroActions}>
+              <Button
+                fullWidth={false}
+                variant="secondary"
+                label={formatDateLong(performedAt.toISOString())}
+                onPress={() => setShowDatePicker(true)}
+              />
+              <Button
+                fullWidth={false}
+                label={isSaving ? 'Salvando treino...' : 'Salvar treino'}
+                icon={isSaving ? undefined : <Play color="#04110A" size={15} />}
+                onPress={handleSave}
+                disabled={isSaving}
+              />
+            </View>
           </View>
 
           {showDatePicker ? (
@@ -437,8 +477,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
             multiline
           />
 
-          <View style={styles.exerciseList}>
-            {drafts.map((exercise, exerciseIndex) => (
+            <View style={styles.exerciseList}>
+            {draftState.pendingExercises.length ? (
+              draftState.pendingExercises.map((exercise, exerciseIndex) => (
               <View
                 key={exercise.workoutExerciseId}
                 style={styles.exerciseCard}
@@ -450,13 +491,22 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                       {exercise.muscleGroup} - alvo {exercise.targetReps}
                     </Text>
                   </View>
-                  <Button
-                    fullWidth={false}
-                    variant="secondary"
-                    label="Nova série"
-                    icon={<Plus color={theme.colors.text} size={15} />}
-                    onPress={() => addSet(exerciseIndex)}
-                  />
+                  <View style={styles.exerciseHeaderActions}>
+                    <Button
+                      fullWidth={false}
+                      variant="secondary"
+                      label="Finalizar exercício"
+                      icon={<ChevronRight color={theme.colors.text} size={15} />}
+                      onPress={() => handleFinishExercise(exerciseIndex)}
+                    />
+                    <Button
+                      fullWidth={false}
+                      variant="secondary"
+                      label="Nova série"
+                      icon={<Plus color={theme.colors.text} size={15} />}
+                      onPress={() => addSet(exerciseIndex)}
+                    />
+                  </View>
                 </View>
 
                 {exercise.hint ? (
@@ -470,7 +520,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                 ) : null}
 
                 {exercise.sets.map((set, setIndex) => (
-                  <View key={`${exercise.workoutExerciseId}-${setIndex}`} style={styles.setCard}>
+                  <View key={set.id} style={styles.setCard}>
                     <View style={styles.setHeader}>
                       <Text style={styles.setTitle}>Série - {setIndex + 1}</Text>
                       <Pressable
@@ -542,23 +592,19 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   </View>
                 ))}
 
-                {getNextTrainingExerciseIndex(exerciseIndex, drafts.length) !== null ? (
-                  <View style={styles.finishExerciseAction}>
-                    <Button
-                      fullWidth={false}
-                      variant="secondary"
-                      label="Finalizar exercício"
-                      icon={<ChevronRight color={theme.colors.text} size={15} />}
-                      onPress={() => handleFinishExercise(exerciseIndex)}
-                    />
-                  </View>
-                ) : null}
               </View>
-            ))}
+              ))
+            ) : (
+              <EmptyState
+                title="Exercícios finalizados"
+                description="Agora restam apenas as anotações gerais e o botão de salvar treino."
+              />
+            )}
           </View>
 
           <Button
-            label={isSaving ? 'Salvando execução...' : 'Salvar execução'}
+            label={isSaving ? 'Salvando treino...' : 'Salvar treino'}
+            icon={isSaving ? undefined : <Play color="#04110A" size={15} />}
             onPress={handleSave}
             disabled={isSaving}
           />
@@ -608,6 +654,12 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textMuted,
   },
+  heroActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
   exerciseList: {
     gap: theme.spacing.md,
   },
@@ -621,13 +673,20 @@ const styles = StyleSheet.create({
   },
   exerciseHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: theme.spacing.md,
   },
   exerciseHeaderCopy: {
     flex: 1,
     gap: 2,
+  },
+  exerciseHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: theme.spacing.sm,
   },
   exerciseName: {
     ...theme.typography.subtitle,
@@ -644,9 +703,6 @@ const styles = StyleSheet.create({
   exerciseLoadHint: {
     ...theme.typography.caption,
     color: theme.colors.accent,
-  },
-  finishExerciseAction: {
-    alignItems: 'flex-end',
   },
   setCard: {
     padding: theme.spacing.md,

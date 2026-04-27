@@ -164,7 +164,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     try {
       setIsSaving(true);
       const resolvedFocus = values.name.trim().slice(0, 30);
-      const workoutId = await saveWorkout(
+      await saveWorkout(
         session.user.id,
         {
           ...values,
@@ -187,7 +187,12 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
 
       await refreshData();
       if (isEditingWorkout) {
-        navigation.replace('WorkoutDetail', {workoutId});
+        Alert.alert('Treino salvo com sucesso', '', [
+          {
+            text: 'Continuar',
+            onPress: () => navigation.navigate('MainTabs', {screen: 'Workouts'}),
+          },
+        ]);
         return;
       }
 

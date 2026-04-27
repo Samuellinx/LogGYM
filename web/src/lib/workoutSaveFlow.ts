@@ -15,7 +15,7 @@ export const resolveWorkoutSaveCompletion = ({
   return {
     isCreation,
     shouldResetEditor: isCreation,
-    shouldCloseEditor: isCreation,
+    shouldCloseEditor: true,
     successMessage: isCreation
       ? workoutCreatedSuccessMessage
       : workoutUpdatedSuccessMessage,

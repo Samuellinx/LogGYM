@@ -1,58 +1,53 @@
 import {
+  addDraftSet,
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
-  getNextTrainingExerciseIndex,
-  getTrainingStartActionConfig,
-  isTrainingDraftSetCompleted,
   mergeTrainingDraftExercisesForSave,
-} from '@/features/workouts/trainingSessionUi';
-import type {TrainingDraftExerciseState} from '@/features/workouts/trainingDraftAutosave';
+} from '../web/src/lib/trainingSession';
+import type {TrainingDraftExercise, TrainingDraftExerciseState} from '../web/src/types';
 
-describe('training session ui helpers', () => {
-  it('uses continue state when the workout draft was started', () => {
-    expect(getTrainingStartActionConfig(true)).toEqual({
-      label: 'Continuar treino',
-      variant: 'resume',
+describe('web training session draft sets', () => {
+  it('adds a new blank set to the top of the selected exercise', () => {
+    const drafts: TrainingDraftExercise[] = [
+      {
+        workoutExerciseId: 'exercise-1',
+        orderIndex: 0,
+        exerciseName: 'Supino',
+        muscleGroup: 'Peito',
+        baseLoad: '40',
+        targetReps: '8-10',
+        hint: '',
+        sets: [
+          {id: 'set-1', load: '50', reps: '8', note: 'forte'},
+          {id: 'set-2', load: '52,5', reps: '6', note: ''},
+        ],
+      },
+    ];
+
+    const updated = addDraftSet(drafts, 0);
+
+    expect(updated[0]?.sets).toHaveLength(3);
+    expect(updated[0]?.sets[0]).toMatchObject({
+      load: '',
+      reps: '',
+      note: '',
+    });
+    expect(updated[0]?.sets[0]?.id).toEqual(expect.any(String));
+    expect(updated[0]?.sets[1]).toEqual({
+      id: 'set-1',
+      load: '50',
+      reps: '8',
+      note: 'forte',
+    });
+    expect(updated[0]?.sets[2]).toEqual({
+      id: 'set-2',
+      load: '52,5',
+      reps: '6',
+      note: '',
     });
   });
 
-  it('uses start state when the workout draft was not started', () => {
-    expect(getTrainingStartActionConfig(false)).toEqual({
-      label: 'Iniciar treino',
-      variant: 'primary',
-    });
-  });
-
-  it('returns the next exercise index when there is another exercise', () => {
-    expect(getNextTrainingExerciseIndex(0, 3)).toBe(1);
-    expect(getNextTrainingExerciseIndex(1, 3)).toBe(2);
-  });
-
-  it('returns null for the last exercise', () => {
-    expect(getNextTrainingExerciseIndex(2, 3)).toBeNull();
-    expect(getNextTrainingExerciseIndex(0, 1)).toBeNull();
-  });
-
-  it('treats a set as completed only when load and reps are valid', () => {
-    expect(
-      isTrainingDraftSetCompleted({
-        id: 'set-1',
-        load: '40',
-        reps: '8',
-        note: '',
-      }),
-    ).toBe(true);
-    expect(
-      isTrainingDraftSetCompleted({
-        id: 'set-2',
-        load: '40',
-        reps: '',
-        note: '',
-      }),
-    ).toBe(false);
-  });
-
-  it('only finalizes an exercise when all sets are complete', () => {
+  it('only allows finishing an exercise when all sets are complete', () => {
     expect(
       canFinalizeTrainingDraftExercise({
         workoutExerciseId: 'exercise-1',
@@ -62,22 +57,19 @@ describe('training session ui helpers', () => {
         baseLoad: '40',
         targetReps: '8-10',
         hint: '',
-        sets: [
-          {id: 'set-1', load: '40', reps: '8', note: ''},
-          {id: 'set-2', load: '42,5', reps: '6', note: ''},
-        ],
+        sets: [{id: 'set-1', load: '50', reps: '8', note: ''}],
       }),
     ).toBe(true);
     expect(
       canFinalizeTrainingDraftExercise({
-        workoutExerciseId: 'exercise-2',
-        orderIndex: 1,
-        exerciseName: 'Crucifixo',
+        workoutExerciseId: 'exercise-1',
+        orderIndex: 0,
+        exerciseName: 'Supino',
         muscleGroup: 'Peito',
-        baseLoad: '12',
-        targetReps: '10-12',
+        baseLoad: '40',
+        targetReps: '8-10',
         hint: '',
-        sets: [{id: 'set-3', load: '12', reps: '', note: ''}],
+        sets: [{id: 'set-1', load: '50', reps: '', note: ''}],
       }),
     ).toBe(false);
   });
@@ -93,7 +85,7 @@ describe('training session ui helpers', () => {
           baseLoad: '40',
           targetReps: '8-10',
           hint: '',
-          sets: [{id: 'set-1', load: '40', reps: '8', note: ''}],
+          sets: [{id: 'set-1', load: '50', reps: '8', note: ''}],
         },
         {
           workoutExerciseId: 'exercise-2',
@@ -141,12 +133,15 @@ describe('training session ui helpers', () => {
           baseLoad: '40',
           targetReps: '8-10',
           hint: '',
-          sets: [{id: 'set-1', load: '40', reps: '8', note: ''}],
+          sets: [{id: 'set-1', load: '50', reps: '8', note: ''}],
         },
       ],
     };
 
-    expect(mergeTrainingDraftExercisesForSave(draftState).map(exercise => exercise.workoutExerciseId))
-      .toEqual(['exercise-1', 'exercise-2']);
+    expect(
+      mergeTrainingDraftExercisesForSave(draftState).map(
+        exercise => exercise.workoutExerciseId,
+      ),
+    ).toEqual(['exercise-1', 'exercise-2']);
   });
 });
