@@ -27,8 +27,18 @@ const createDraftSetId = () =>
 const createSessionDocumentId = () =>
   `training-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-const createBlankSet = (): TrainingDraftSet => ({
+const getNextSeriesNumber = (sets: TrainingDraftSet[]) =>
+  sets.reduce(
+    (highestSeriesNumber, setItem) =>
+      Number.isFinite(setItem.seriesNumber)
+        ? Math.max(highestSeriesNumber, setItem.seriesNumber)
+        : highestSeriesNumber,
+    0,
+  ) + 1;
+
+const createBlankSet = (seriesNumber = 1): TrainingDraftSet => ({
   id: createDraftSetId(),
+  seriesNumber,
   load: '',
   reps: '',
   note: '',
@@ -90,13 +100,16 @@ export const createTrainingDraftFromWorkout = (
     baseLoad: exercise.baseLoad,
     targetReps: exercise.targetReps,
     hint: exercise.note,
-    sets: [createBlankSet()],
+    sets: [createBlankSet(1)],
   }));
 
 export const addDraftSet = (exercises: TrainingDraftExercise[], exerciseIndex: number) =>
   exercises.map((exercise, currentExerciseIndex) =>
     currentExerciseIndex === exerciseIndex
-      ? {...exercise, sets: [createBlankSet(), ...exercise.sets]}
+      ? {
+          ...exercise,
+          sets: [createBlankSet(getNextSeriesNumber(exercise.sets)), ...exercise.sets],
+        }
       : exercise,
   );
 
@@ -151,7 +164,7 @@ export const removeDraftSet = (
       ...exercise,
       sets:
         exercise.sets.length === 1
-          ? [createBlankSet()]
+          ? [createBlankSet(1)]
           : exercise.sets.filter((_, currentSetIndex) => currentSetIndex !== setIndex),
     };
   });
@@ -160,7 +173,7 @@ export const updateDraftSet = (
   exercises: TrainingDraftExercise[],
   exerciseIndex: number,
   setIndex: number,
-  field: keyof TrainingDraftSet,
+  field: 'load' | 'reps' | 'note',
   value: string,
 ) =>
   exercises.map((exercise, currentExerciseIndex) => {

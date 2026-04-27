@@ -20,6 +20,7 @@ type LegacyTrainingDraftAutosavePayload = Omit<
       orderIndex?: number;
       sets: Array<{
         id?: string;
+        seriesNumber?: number;
         load: string;
         reps: string;
         note: string;
@@ -80,8 +81,8 @@ describe('training draft autosave', () => {
           targetReps: '0',
           hint: 'Dica antiga',
           sets: [
-            {id: 'set-1', load: '50', reps: '8', note: 'Boa execucao'},
-            {load: '52,5', reps: '6', note: ''},
+            {id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: 'Boa execucao'},
+            {seriesNumber: 2, load: '52,5', reps: '6', note: ''},
           ],
         },
       ],
@@ -102,10 +103,12 @@ describe('training draft autosave', () => {
       targetReps: '8-10',
       hint: 'Ajustar banco',
       sets: [
-        {id: 'set-1', load: '50', reps: '8', note: 'Boa execucao'},
-        {load: '52,5', reps: '6', note: ''},
+        {id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: 'Boa execucao'},
+        {seriesNumber: 2, load: '52,5', reps: '6', note: ''},
       ],
     });
+    expect(restored[0]?.sets[0]?.seriesNumber).toBe(1);
+    expect(restored[0]?.sets[1]?.seriesNumber).toBe(2);
     expect(restored[0]?.sets[1]?.id).toEqual(expect.any(String));
     expect(restored[1]).toMatchObject({
       workoutExerciseId: 'exercise-2',
@@ -115,9 +118,10 @@ describe('training draft autosave', () => {
       baseLoad: '12',
       targetReps: '10-12',
       hint: '',
-      sets: [{load: '', reps: '', note: ''}],
+      sets: [{seriesNumber: 1, load: '', reps: '', note: ''}],
     });
     expect(restored[1]?.sets[0]?.id).toEqual(expect.any(String));
+    expect(restored[1]?.sets[0]?.seriesNumber).toBe(1);
   });
 
   it('restores completed exercises separately from pending ones', () => {
@@ -129,13 +133,13 @@ describe('training draft autosave', () => {
       pendingExercises: [
         {
           ...restoreTrainingDraftExercises(workout, null)[1],
-          sets: [{id: 'pending-set', load: '', reps: '', note: ''}],
+          sets: [{id: 'pending-set', seriesNumber: 1, load: '', reps: '', note: ''}],
         },
       ],
       completedExercises: [
         {
           ...restoreTrainingDraftExercises(workout, null)[0],
-          sets: [{id: 'done-set', load: '50', reps: '8', note: ''}],
+          sets: [{id: 'done-set', seriesNumber: 1, load: '50', reps: '8', note: ''}],
         },
       ],
       updatedAt: '2026-04-24T12:10:00.000Z',
@@ -147,13 +151,13 @@ describe('training draft autosave', () => {
     expect(restored.completedExercises[0]).toMatchObject({
       workoutExerciseId: 'exercise-1',
       orderIndex: 0,
-      sets: [{id: 'done-set', load: '50', reps: '8', note: ''}],
+      sets: [{id: 'done-set', seriesNumber: 1, load: '50', reps: '8', note: ''}],
     });
     expect(restored.pendingExercises).toHaveLength(1);
     expect(restored.pendingExercises[0]).toMatchObject({
       workoutExerciseId: 'exercise-2',
       orderIndex: 1,
-      sets: [{id: 'pending-set', load: '', reps: '', note: ''}],
+      sets: [{id: 'pending-set', seriesNumber: 1, load: '', reps: '', note: ''}],
     });
   });
 
@@ -189,7 +193,7 @@ describe('training draft autosave', () => {
       pendingExercises: [
         {
           ...blankDraft.pendingExercises[0],
-          sets: [{id: 'started-set', load: '50', reps: '', note: ''}],
+          sets: [{id: 'started-set', seriesNumber: 1, load: '50', reps: '', note: ''}],
         },
       ],
     };
@@ -199,7 +203,7 @@ describe('training draft autosave', () => {
       completedExercises: [
         {
           ...blankDraft.pendingExercises[0],
-          sets: [{id: 'done-set', load: '50', reps: '8', note: ''}],
+          sets: [{id: 'done-set', seriesNumber: 1, load: '50', reps: '8', note: ''}],
         },
       ],
     };
@@ -210,14 +214,14 @@ describe('training draft autosave', () => {
     expect(hasStartedTrainingDraft(completedDraft)).toBe(true);
   });
 
-  it('adds a new blank set to the top of the selected exercise', () => {
+  it('adds a new blank set to the top of the selected exercise without renaming older sets', () => {
     const drafts = restoreTrainingDraftExercises(workout, null);
     const seededDrafts = [
       {
         ...drafts[0],
         sets: [
-          {id: 'set-1', load: '50', reps: '8', note: 'Boa execucao'},
-          {id: 'set-2', load: '52,5', reps: '6', note: ''},
+          {id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: 'Boa execucao'},
+          {id: 'set-2', seriesNumber: 2, load: '52,5', reps: '6', note: ''},
         ],
       },
       drafts[1],
@@ -227,6 +231,7 @@ describe('training draft autosave', () => {
 
     expect(updated[0]?.sets).toHaveLength(3);
     expect(updated[0]?.sets[0]).toMatchObject({
+      seriesNumber: 3,
       load: '',
       reps: '',
       note: '',
@@ -234,12 +239,14 @@ describe('training draft autosave', () => {
     expect(updated[0]?.sets[0]?.id).toEqual(expect.any(String));
     expect(updated[0]?.sets[1]).toEqual({
       id: 'set-1',
+      seriesNumber: 1,
       load: '50',
       reps: '8',
       note: 'Boa execucao',
     });
     expect(updated[0]?.sets[2]).toEqual({
       id: 'set-2',
+      seriesNumber: 2,
       load: '52,5',
       reps: '6',
       note: '',

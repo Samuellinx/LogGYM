@@ -15,6 +15,7 @@ import {
   trainingSessionInputSchema,
   workoutInputSchema,
 } from '@/features/workouts/workout.schemas';
+import {getWorkoutValidationMessage} from '@/features/workouts/workoutForm';
 import {
   hasStartedTrainingDraft,
   parseTrainingDraftSnapshot,
@@ -1006,7 +1007,13 @@ export const saveWorkout = async (
   input: WorkoutInput,
   workoutId?: string,
 ) => {
-  const validatedInput = workoutInputSchema.parse(input);
+  const validationResult = workoutInputSchema.safeParse(input);
+
+  if (!validationResult.success) {
+    throw new Error(getWorkoutValidationMessage(validationResult.error));
+  }
+
+  const validatedInput = validationResult.data;
   const db = getDatabase();
   const now = new Date().toISOString();
   const resolvedWorkoutId = workoutId ?? createId();

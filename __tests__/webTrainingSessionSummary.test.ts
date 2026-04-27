@@ -13,8 +13,8 @@ describe('web training session completion summary', () => {
         targetReps: '8-10',
         hint: '',
         sets: [
-          {id: 'set-1', load: '50', reps: '8', note: ''},
-          {id: 'set-2', load: '52,5', reps: '6', note: 'pesado'},
+          {id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: ''},
+          {id: 'set-2', seriesNumber: 2, load: '52,5', reps: '6', note: 'pesado'},
         ],
       },
       {
@@ -26,8 +26,8 @@ describe('web training session completion summary', () => {
         targetReps: '10-12',
         hint: '',
         sets: [
-          {id: 'set-3', load: '45', reps: '10', note: ''},
-          {id: 'set-4', load: '', reps: '', note: ''},
+          {id: 'set-3', seriesNumber: 1, load: '45', reps: '10', note: ''},
+          {id: 'set-4', seriesNumber: 2, load: '', reps: '', note: ''},
         ],
       },
     ];

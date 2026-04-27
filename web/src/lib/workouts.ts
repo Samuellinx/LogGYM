@@ -23,6 +23,7 @@ import {
   workoutSessionDocumentSchema,
 } from './documentSchemas';
 import {firebaseDb} from './firebase';
+import {validateWorkoutDocumentForSave} from './workoutEditor';
 
 const getWorkoutCollection = (userId: string) =>
   collection(firebaseDb, 'users', userId, 'workouts');
@@ -78,7 +79,7 @@ export const saveWorkoutFromPanel = async (
   user: User,
   workout: WorkoutDocument,
 ) => {
-  const validatedWorkout = parseWorkoutDocument({
+  const validatedWorkout = validateWorkoutDocumentForSave({
     ...workout,
     userId: user.uid,
   });

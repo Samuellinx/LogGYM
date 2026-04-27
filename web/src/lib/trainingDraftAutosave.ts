@@ -33,8 +33,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const createDraftSetId = () =>
   `draft-set-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-const createBlankSet = (): TrainingDraftSet => ({
+const createBlankSet = (seriesNumber = 1): TrainingDraftSet => ({
   id: createDraftSetId(),
+  seriesNumber,
   load: '',
   reps: '',
   note: '',
@@ -51,19 +52,24 @@ const createDraftExercisesFromWorkout = (
     baseLoad: exercise.baseLoad,
     targetReps: exercise.targetReps,
     hint: exercise.note,
-    sets: [createBlankSet()],
+    sets: [createBlankSet(1)],
   }));
 
 const normalizeDraftSet = (setItem: {
   id?: string;
+  seriesNumber?: number;
   load: string;
   reps: string;
   note: string;
-}): TrainingDraftSet => ({
+}, fallbackSeriesNumber: number): TrainingDraftSet => ({
   id:
     typeof setItem.id === 'string' && setItem.id.trim()
       ? setItem.id
       : createDraftSetId(),
+  seriesNumber:
+    typeof setItem.seriesNumber === 'number' && Number.isFinite(setItem.seriesNumber)
+      ? setItem.seriesNumber
+      : fallbackSeriesNumber,
   load: setItem.load,
   reps: setItem.reps,
   note: setItem.note,
@@ -203,7 +209,9 @@ const normalizeDraftExercise = (
   baseLoad: exercise.baseLoad,
   targetReps: exercise.targetReps,
   hint: exercise.hint,
-  sets: exercise.sets.map(normalizeDraftSet),
+  sets: exercise.sets.map((setItem, setIndex) =>
+    normalizeDraftSet(setItem, setIndex + 1),
+  ),
 });
 
 const parseDraftExercises = (
@@ -229,7 +237,7 @@ const parseDraftExercises = (
       }
 
       const sets = exercise.sets
-        .map((setItem): TrainingDraftSet | null => {
+        .map((setItem, setIndex): TrainingDraftSet | null => {
           if (
             !isRecord(setItem) ||
             typeof setItem.load !== 'string' ||
@@ -241,10 +249,12 @@ const parseDraftExercises = (
 
           return normalizeDraftSet({
             id: typeof setItem.id === 'string' ? setItem.id : undefined,
+            seriesNumber:
+              typeof setItem.seriesNumber === 'number' ? setItem.seriesNumber : undefined,
             load: setItem.load,
             reps: setItem.reps,
             note: setItem.note,
-          });
+          }, setIndex + 1);
         })
         .filter((setItem): setItem is TrainingDraftSet => setItem !== null);
 
@@ -327,8 +337,10 @@ export const restoreTrainingDraftState = (
       targetReps: exercise.targetReps,
       hint: exercise.note,
       sets: savedExercise?.sets.length
-        ? savedExercise.sets.map(normalizeDraftSet)
-        : [createBlankSet()],
+        ? savedExercise.sets.map((setItem, setIndex) =>
+            normalizeDraftSet(setItem, setIndex + 1),
+          )
+        : [createBlankSet(1)],
     });
   });
 

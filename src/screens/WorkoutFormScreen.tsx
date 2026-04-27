@@ -20,6 +20,10 @@ import {TagChip} from '@/components/TagChip';
 import {TextField} from '@/components/TextField';
 import {getWorkoutDetail, saveWorkout} from '@/features/workouts/workoutRepository';
 import {
+  createWorkoutFormExerciseDraft,
+  getWorkoutValidationMessage,
+} from '@/features/workouts/workoutForm';
+import {
   type WorkoutFormValues,
   workoutFormSchema,
 } from '@/features/workouts/workout.schemas';
@@ -27,7 +31,7 @@ import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import {composeBaseLoad, formatBaseLoadLabel, parseBaseLoad} from '@/utils/baseLoad';
-import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
+import {accentSpectrum, weekdayOptions} from '@/utils/constants';
 import {toUserMessage} from '@/utils/errors';
 import {maskDecimalInput, maskRepRangeInput} from '@/utils/inputMasks';
 
@@ -36,23 +40,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutForm'>;
 const MAX_EXERCISES = 12;
 const MAX_BATCH_SIZE = 6;
 
-const createExerciseDraft = (): WorkoutFormValues['exercises'][number] => ({
-  name: '',
-  muscleGroup: setTypeOptions[2],
-  baseLoadKg: '',
-  baseLoadPlates: '',
-  baseLoadLegacy: '',
-  targetReps: '8-10',
-  note: '',
-});
-
 const defaultValues: WorkoutFormValues = {
   name: '',
   focus: 'Treino',
   notes: '',
   accentColor: accentSpectrum[3],
   scheduledDay: 'Segunda',
-  exercises: [createExerciseDraft()],
+  exercises: [createWorkoutFormExerciseDraft()],
 };
 
 export const WorkoutFormScreen = ({navigation, route}: Props) => {
@@ -200,7 +194,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
       setExerciseBatchCount(1);
       navigation.navigate('MainTabs', {screen: 'Workouts'});
     } catch (error) {
-      showError(toUserMessage(error));
+      showError(getWorkoutValidationMessage(error, toUserMessage(error)));
     } finally {
       setIsSaving(false);
     }
@@ -229,7 +223,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
 
     const exercisesToAdd = Math.min(exerciseBatchCount, remainingSlots);
 
-    append(Array.from({length: exercisesToAdd}, createExerciseDraft));
+    append(Array.from({length: exercisesToAdd}, createWorkoutFormExerciseDraft));
 
     if (exercisesToAdd < exerciseBatchCount) {
       Alert.alert(

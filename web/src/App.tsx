@@ -79,6 +79,10 @@ import {
   watchUserProfile,
 } from './lib/profile';
 import {firebaseAuth} from './lib/firebase';
+import {
+  createWorkoutExerciseDraft,
+  normalizeWorkoutForSave,
+} from './lib/workoutEditor';
 import {importTrainingFileForCurrentUser} from './lib/trainingImport';
 import {
   createTrainingDraftSnapshot,
@@ -190,16 +194,6 @@ const modeDescriptions: Record<
   },
 };
 
-const createExerciseDraft = (): WorkoutExerciseInput => ({
-  id: crypto.randomUUID(),
-  name: '',
-  muscleGroup: '',
-  baseLoad: '',
-  targetReps: '8-10',
-  note: '',
-  orderIndex: 0,
-});
-
 const createWorkoutDraft = (userId = ''): WorkoutDocument => {
   const now = new Date().toISOString();
 
@@ -211,38 +205,9 @@ const createWorkoutDraft = (userId = ''): WorkoutDocument => {
     notes: '',
     accentColor: accentPalette[3],
     scheduledDay: 'Livre',
-    exercises: [createExerciseDraft()],
+    exercises: [createWorkoutExerciseDraft()],
     createdAt: now,
     updatedAt: now,
-  };
-};
-
-const normalizeWorkoutForSave = (
-  workout: WorkoutDocument,
-  userId: string,
-): WorkoutDocument => {
-  const now = new Date().toISOString();
-
-  return {
-    ...workout,
-    userId,
-    name: workout.name.trim(),
-    focus: workout.focus.trim() || workout.name.trim(),
-    notes: workout.notes.trim(),
-    scheduledDay: workout.scheduledDay === 'Livre' ? null : workout.scheduledDay,
-    updatedAt: now,
-    createdAt: workout.createdAt || now,
-    exercises: workout.exercises
-      .map((exercise, index) => ({
-        ...exercise,
-        name: exercise.name.trim(),
-        muscleGroup: exercise.muscleGroup.trim(),
-        baseLoad: exercise.baseLoad.trim(),
-        targetReps: exercise.targetReps.trim(),
-        note: exercise.note.trim(),
-        orderIndex: index,
-      }))
-      .filter(exercise => exercise.name.length > 0),
   };
 };
 
@@ -1183,7 +1148,7 @@ function App() {
   const addExercise = () => {
     setEditorWorkout(current => ({
       ...current,
-      exercises: [...current.exercises, createExerciseDraft()],
+      exercises: [...current.exercises, createWorkoutExerciseDraft()],
     }));
   };
 
@@ -1267,7 +1232,7 @@ function App() {
     setEditorWorkout({
       ...workout,
       scheduledDay: workout.scheduledDay ?? 'Livre',
-      exercises: workout.exercises.length ? workout.exercises : [createExerciseDraft()],
+      exercises: workout.exercises.length ? workout.exercises : [createWorkoutExerciseDraft()],
     });
   };
 
@@ -1529,11 +1494,12 @@ function App() {
     exerciseName: string,
     exerciseIndex: number,
     setIndex: number,
+    seriesNumber: number,
   ) => {
     requestDeleteConfirmation(
       getDeleteConfirmation({
         type: 'training-set',
-        name: `${setIndex + 1} de ${exerciseName || 'exercício'}`,
+        name: `${seriesNumber} de ${exerciseName || 'exercício'}`,
       }),
       () =>
         setTrainingPendingDrafts(current =>
@@ -2330,7 +2296,7 @@ function App() {
                     {exercise.sets.map((setItem, setIndex) => (
                       <div className="training-set-card" key={setItem.id}>
                         <div className="exercise-card-head">
-                          <strong>Série - {setIndex + 1}</strong>
+                          <strong>Série - {setItem.seriesNumber}</strong>
                           <button
                             type="button"
                             className="danger-button subtle"
@@ -2339,6 +2305,7 @@ function App() {
                                 exercise.exerciseName,
                                 exerciseIndex,
                                 setIndex,
+                                setItem.seriesNumber,
                               )
                             }>
                             <Trash2 size={14} />

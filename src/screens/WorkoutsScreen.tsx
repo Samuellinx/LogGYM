@@ -193,7 +193,7 @@ export const WorkoutsScreen = () => {
             styles.calendarButton,
             pressed ? styles.filterPressed : null,
           ]}>
-          <CalendarDays color={theme.colors.accent} size={18} />
+          <CalendarDays color={theme.colors.text} size={18} />
           <Text style={styles.calendarButtonLabel}>
             {selectedDateLabel ? selectedDateLabel : 'Filtrar por data'}
           </Text>

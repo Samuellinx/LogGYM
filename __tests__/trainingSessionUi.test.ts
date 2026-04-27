@@ -37,6 +37,7 @@ describe('training session ui helpers', () => {
     expect(
       isTrainingDraftSetCompleted({
         id: 'set-1',
+        seriesNumber: 1,
         load: '40',
         reps: '8',
         note: '',
@@ -45,6 +46,7 @@ describe('training session ui helpers', () => {
     expect(
       isTrainingDraftSetCompleted({
         id: 'set-2',
+        seriesNumber: 2,
         load: '40',
         reps: '',
         note: '',
@@ -63,8 +65,8 @@ describe('training session ui helpers', () => {
         targetReps: '8-10',
         hint: '',
         sets: [
-          {id: 'set-1', load: '40', reps: '8', note: ''},
-          {id: 'set-2', load: '42,5', reps: '6', note: ''},
+          {id: 'set-1', seriesNumber: 1, load: '40', reps: '8', note: ''},
+          {id: 'set-2', seriesNumber: 2, load: '42,5', reps: '6', note: ''},
         ],
       }),
     ).toBe(true);
@@ -77,7 +79,7 @@ describe('training session ui helpers', () => {
         baseLoad: '12',
         targetReps: '10-12',
         hint: '',
-        sets: [{id: 'set-3', load: '12', reps: '', note: ''}],
+        sets: [{id: 'set-3', seriesNumber: 1, load: '12', reps: '', note: ''}],
       }),
     ).toBe(false);
   });
@@ -93,7 +95,7 @@ describe('training session ui helpers', () => {
           baseLoad: '40',
           targetReps: '8-10',
           hint: '',
-          sets: [{id: 'set-1', load: '40', reps: '8', note: ''}],
+          sets: [{id: 'set-1', seriesNumber: 1, load: '40', reps: '8', note: ''}],
         },
         {
           workoutExerciseId: 'exercise-2',
@@ -103,7 +105,7 @@ describe('training session ui helpers', () => {
           baseLoad: '12',
           targetReps: '10-12',
           hint: '',
-          sets: [{id: 'set-2', load: '', reps: '', note: ''}],
+          sets: [{id: 'set-2', seriesNumber: 1, load: '', reps: '', note: ''}],
         },
       ],
       completedExercises: [],
@@ -129,7 +131,7 @@ describe('training session ui helpers', () => {
           baseLoad: '12',
           targetReps: '10-12',
           hint: '',
-          sets: [{id: 'set-2', load: '', reps: '', note: ''}],
+          sets: [{id: 'set-2', seriesNumber: 1, load: '', reps: '', note: ''}],
         },
       ],
       completedExercises: [
@@ -141,7 +143,7 @@ describe('training session ui helpers', () => {
           baseLoad: '40',
           targetReps: '8-10',
           hint: '',
-          sets: [{id: 'set-1', load: '40', reps: '8', note: ''}],
+          sets: [{id: 'set-1', seriesNumber: 1, load: '40', reps: '8', note: ''}],
         },
       ],
     };

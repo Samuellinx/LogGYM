@@ -723,6 +723,13 @@ h3 {
 
 .training-date-field input {
   min-width: 220px;
+  color-scheme: dark;
+}
+
+.training-date-field input::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+  cursor: pointer;
 }
 
 .training-date-field > span {

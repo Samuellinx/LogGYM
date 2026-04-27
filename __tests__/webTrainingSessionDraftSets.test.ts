@@ -7,7 +7,7 @@ import {
 import type {TrainingDraftExercise, TrainingDraftExerciseState} from '../web/src/types';
 
 describe('web training session draft sets', () => {
-  it('adds a new blank set to the top of the selected exercise', () => {
+  it('adds a new blank set to the top of the selected exercise without renaming older sets', () => {
     const drafts: TrainingDraftExercise[] = [
       {
         workoutExerciseId: 'exercise-1',
@@ -18,8 +18,8 @@ describe('web training session draft sets', () => {
         targetReps: '8-10',
         hint: '',
         sets: [
-          {id: 'set-1', load: '50', reps: '8', note: 'forte'},
-          {id: 'set-2', load: '52,5', reps: '6', note: ''},
+          {id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: 'forte'},
+          {id: 'set-2', seriesNumber: 2, load: '52,5', reps: '6', note: ''},
         ],
       },
     ];
@@ -28,6 +28,7 @@ describe('web training session draft sets', () => {
 
     expect(updated[0]?.sets).toHaveLength(3);
     expect(updated[0]?.sets[0]).toMatchObject({
+      seriesNumber: 3,
       load: '',
       reps: '',
       note: '',
@@ -35,12 +36,14 @@ describe('web training session draft sets', () => {
     expect(updated[0]?.sets[0]?.id).toEqual(expect.any(String));
     expect(updated[0]?.sets[1]).toEqual({
       id: 'set-1',
+      seriesNumber: 1,
       load: '50',
       reps: '8',
       note: 'forte',
     });
     expect(updated[0]?.sets[2]).toEqual({
       id: 'set-2',
+      seriesNumber: 2,
       load: '52,5',
       reps: '6',
       note: '',
@@ -57,7 +60,7 @@ describe('web training session draft sets', () => {
         baseLoad: '40',
         targetReps: '8-10',
         hint: '',
-        sets: [{id: 'set-1', load: '50', reps: '8', note: ''}],
+        sets: [{id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: ''}],
       }),
     ).toBe(true);
     expect(
@@ -69,7 +72,7 @@ describe('web training session draft sets', () => {
         baseLoad: '40',
         targetReps: '8-10',
         hint: '',
-        sets: [{id: 'set-1', load: '50', reps: '', note: ''}],
+        sets: [{id: 'set-1', seriesNumber: 1, load: '50', reps: '', note: ''}],
       }),
     ).toBe(false);
   });
@@ -85,7 +88,7 @@ describe('web training session draft sets', () => {
           baseLoad: '40',
           targetReps: '8-10',
           hint: '',
-          sets: [{id: 'set-1', load: '50', reps: '8', note: ''}],
+          sets: [{id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: ''}],
         },
         {
           workoutExerciseId: 'exercise-2',
@@ -95,7 +98,7 @@ describe('web training session draft sets', () => {
           baseLoad: '12',
           targetReps: '10-12',
           hint: '',
-          sets: [{id: 'set-2', load: '', reps: '', note: ''}],
+          sets: [{id: 'set-2', seriesNumber: 1, load: '', reps: '', note: ''}],
         },
       ],
       completedExercises: [],
@@ -121,7 +124,7 @@ describe('web training session draft sets', () => {
           baseLoad: '12',
           targetReps: '10-12',
           hint: '',
-          sets: [{id: 'set-2', load: '', reps: '', note: ''}],
+          sets: [{id: 'set-2', seriesNumber: 1, load: '', reps: '', note: ''}],
         },
       ],
       completedExercises: [
@@ -133,7 +136,7 @@ describe('web training session draft sets', () => {
           baseLoad: '40',
           targetReps: '8-10',
           hint: '',
-          sets: [{id: 'set-1', load: '50', reps: '8', note: ''}],
+          sets: [{id: 'set-1', seriesNumber: 1, load: '50', reps: '8', note: ''}],
         },
       ],
     };

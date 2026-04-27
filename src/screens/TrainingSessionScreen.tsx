@@ -38,7 +38,6 @@ import {
   restoreTrainingDraftState,
   type TrainingDraftExercise,
   type TrainingDraftExerciseState,
-  type TrainingDraftSet,
 } from '@/features/workouts/trainingDraftAutosave';
 import {
   canFinalizeTrainingDraftExercise,
@@ -62,6 +61,7 @@ type PendingSetDeletion = {
 } | null;
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
+type UpdatableTrainingDraftSetField = 'load' | 'reps' | 'note';
 
 const normalizeToken = (value: string) =>
   value
@@ -263,7 +263,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    field: keyof TrainingDraftSet,
+    field: UpdatableTrainingDraftSetField,
     value: string,
   ) => {
     setDraftState(current => ({
@@ -522,7 +522,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                 {exercise.sets.map((set, setIndex) => (
                   <View key={set.id} style={styles.setCard}>
                     <View style={styles.setHeader}>
-                      <Text style={styles.setTitle}>Série - {setIndex + 1}</Text>
+                      <Text style={styles.setTitle}>Série - {set.seriesNumber}</Text>
                       <Pressable
                         hitSlop={10}
                         style={styles.deleteIconButton}

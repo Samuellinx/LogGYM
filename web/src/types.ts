@@ -110,6 +110,7 @@ export type ExerciseProgressData = {
 
 export type TrainingDraftSet = {
   id: string;
+  seriesNumber: number;
   load: string;
   reps: string;
   note: string;
