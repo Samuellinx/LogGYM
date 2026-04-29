@@ -1,6 +1,7 @@
 ﻿import {useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react';
 import {Component} from 'react';
 import type {ErrorInfo, ReactNode} from 'react';
+import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {User} from 'firebase/auth';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -15,6 +16,7 @@ import {
   Dumbbell,
   Eye,
   FileUp,
+  GripVertical,
   LoaderCircle,
   LogOut,
   Mail,
@@ -84,6 +86,7 @@ import {firebaseAuth} from './lib/firebase';
 import {
   createWorkoutExerciseDraft,
   normalizeWorkoutForSave,
+  reorderWorkoutExercises,
 } from './lib/workoutEditor';
 import {importTrainingFileForCurrentUser} from './lib/trainingImport';
 import {
@@ -291,6 +294,13 @@ type WorkspaceDetailView =
   | null;
 type PendingDeleteConfirmation = DeleteConfirmationCopy & {
   onConfirm: () => void;
+};
+type WorkoutExerciseDragState = {
+  exerciseId: string;
+  fromIndex: number;
+  targetIndex: number;
+  pointerId: number;
+  startY: number;
 };
 
 const normalizeToken = (value: string) =>
@@ -653,6 +663,8 @@ function App() {
     createWorkoutDraft(),
   );
   const [isWorkoutEditorOpen, setIsWorkoutEditorOpen] = useState(false);
+  const [workoutExerciseDrag, setWorkoutExerciseDrag] =
+    useState<WorkoutExerciseDragState | null>(null);
   const [trainingPendingDrafts, setTrainingPendingDrafts] = useState<
     TrainingDraftExerciseState['pendingExercises']
   >([]);
@@ -668,6 +680,15 @@ function App() {
   const [trainingOverallNotes, setTrainingOverallNotes] = useState('');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const trainingImportInputRef = useRef<HTMLInputElement | null>(null);
+  const workoutExerciseRefs = useRef<Array<HTMLElement | null>>([]);
+  const workoutExerciseHoldTimerRef = useRef<number | null>(null);
+  const workoutExercisePointerRef = useRef<{
+    exerciseId: string;
+    fromIndex: number;
+    pointerId: number;
+    startY: number;
+  } | null>(null);
+  const workoutExerciseDragRef = useRef<WorkoutExerciseDragState | null>(null);
   const trainingExerciseRefs = useRef<Array<HTMLElement | null>>([]);
   const trainingExerciseLoadInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -711,6 +732,7 @@ function App() {
           setSessions([]);
           setEditorWorkout(createWorkoutDraft());
           setIsWorkoutEditorOpen(false);
+          setWorkoutExerciseDrag(null);
           setWorkspaceView('dashboard');
           setDetailView(null);
           setConsultWorkout(null);
@@ -756,6 +778,25 @@ function App() {
       window.removeEventListener('offline', syncOnlineStatus);
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (workoutExerciseHoldTimerRef.current) {
+        window.clearTimeout(workoutExerciseHoldTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle(
+      'is-workout-exercise-dragging',
+      Boolean(workoutExerciseDrag),
+    );
+
+    return () => {
+      document.body.classList.remove('is-workout-exercise-dragging');
+    };
+  }, [workoutExerciseDrag]);
 
   useEffect(() => {
     if (!user) {
@@ -1264,6 +1305,132 @@ function App() {
     }));
   };
 
+  const setWorkoutExerciseDragState = (state: WorkoutExerciseDragState | null) => {
+    workoutExerciseDragRef.current = state;
+    setWorkoutExerciseDrag(state);
+  };
+
+  const clearWorkoutExerciseHoldTimer = () => {
+    if (!workoutExerciseHoldTimerRef.current) {
+      return;
+    }
+
+    window.clearTimeout(workoutExerciseHoldTimerRef.current);
+    workoutExerciseHoldTimerRef.current = null;
+  };
+
+  const getWorkoutExerciseDropIndex = (clientY: number, fallbackIndex: number) => {
+    const maxIndex = editorWorkout.exercises.length - 1;
+
+    for (const [index, element] of workoutExerciseRefs.current.entries()) {
+      if (!element) {
+        continue;
+      }
+
+      const bounds = element.getBoundingClientRect();
+
+      if (clientY < bounds.top + bounds.height / 2) {
+        return Math.max(0, Math.min(maxIndex, index));
+      }
+    }
+
+    return Math.max(0, Math.min(maxIndex, fallbackIndex));
+  };
+
+  const reorderEditorExercise = (exerciseId: string, targetIndex: number) => {
+    setEditorWorkout(current => {
+      const fromIndex = current.exercises.findIndex(exercise => exercise.id === exerciseId);
+
+      if (fromIndex < 0) {
+        return current;
+      }
+
+      return {
+        ...current,
+        exercises: reorderWorkoutExercises(current.exercises, fromIndex, targetIndex),
+      };
+    });
+  };
+
+  const startWorkoutExerciseHold = (event: ReactPointerEvent<HTMLElement>) => {
+    const exerciseId = event.currentTarget.dataset.exerciseId;
+    const fromIndex = Number(event.currentTarget.dataset.exerciseIndex);
+
+    if (
+      !exerciseId ||
+      !Number.isInteger(fromIndex) ||
+      editorWorkout.exercises.length <= 1 ||
+      (event.pointerType === 'mouse' && event.button !== 0)
+    ) {
+      return;
+    }
+
+    clearWorkoutExerciseHoldTimer();
+    workoutExercisePointerRef.current = {
+      exerciseId,
+      fromIndex,
+      pointerId: event.pointerId,
+      startY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    workoutExerciseHoldTimerRef.current = window.setTimeout(() => {
+      setWorkoutExerciseDragState({
+        exerciseId,
+        fromIndex,
+        targetIndex: fromIndex,
+        pointerId: event.pointerId,
+        startY: event.clientY,
+      });
+      workoutExerciseHoldTimerRef.current = null;
+    }, 1000);
+  };
+
+  const moveWorkoutExerciseDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const pointer = workoutExercisePointerRef.current;
+
+    if (!pointer || pointer.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const currentDrag = workoutExerciseDragRef.current;
+
+    if (!currentDrag) {
+      if (Math.abs(event.clientY - pointer.startY) > 8) {
+        clearWorkoutExerciseHoldTimer();
+      }
+
+      return;
+    }
+
+    event.preventDefault();
+    setWorkoutExerciseDragState({
+      ...currentDrag,
+      targetIndex: getWorkoutExerciseDropIndex(event.clientY, currentDrag.targetIndex),
+    });
+  };
+
+  const finishWorkoutExerciseDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const pointer = workoutExercisePointerRef.current;
+
+    if (
+      pointer?.pointerId === event.pointerId &&
+      event.currentTarget.hasPointerCapture(event.pointerId)
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    clearWorkoutExerciseHoldTimer();
+
+    const currentDrag = workoutExerciseDragRef.current;
+
+    if (currentDrag && currentDrag.fromIndex !== currentDrag.targetIndex) {
+      reorderEditorExercise(currentDrag.exerciseId, currentDrag.targetIndex);
+    }
+
+    workoutExercisePointerRef.current = null;
+    setWorkoutExerciseDragState(null);
+  };
+
   const updateExercise = (
     exerciseId: string,
     field: keyof WorkoutExerciseInput,
@@ -1307,6 +1474,7 @@ function App() {
   const openWorkoutCreationEditor = () => {
     clearFeedback();
     setEditorWorkout(createWorkoutDraft(user?.uid ?? ''));
+    setWorkoutExerciseDragState(null);
     setIsWorkoutEditorOpen(true);
     setWorkspaceView('workouts');
   };
@@ -1314,6 +1482,7 @@ function App() {
   const closeWorkoutEditor = () => {
     setEditorWorkout(createWorkoutDraft(user?.uid ?? ''));
     setIsWorkoutEditorOpen(false);
+    setWorkoutExerciseDragState(null);
   };
 
   const handleSaveWorkout = async () => {
@@ -1360,6 +1529,7 @@ function App() {
   const handleEditWorkout = (workout: WorkoutDocument) => {
     clearFeedback();
     setConsultWorkout(null);
+    setWorkoutExerciseDragState(null);
     setWorkspaceView('workouts');
     setIsWorkoutEditorOpen(true);
     setEditorWorkout({
@@ -1410,6 +1580,7 @@ function App() {
   const handleSelectTab = (view: WorkspaceView) => {
     setDetailView(null);
     setConsultWorkout(null);
+    setWorkoutExerciseDragState(null);
     setWorkspaceView(view);
     setIsWorkoutEditorOpen(false);
   };
@@ -2083,20 +2254,57 @@ function App() {
           </div>
 
           <div className="exercise-stack">
-            {editorWorkout.exercises.map((exercise, index) => (
-              <article className="exercise-card" key={exercise.id}>
-                <div className="exercise-card-head">
-                  <strong>Exercício {index + 1}</strong>
-                  {editorWorkout.exercises.length > 1 ? (
-                    <button
-                      type="button"
-                      className="danger-button subtle"
-                      onClick={() => requestRemoveExercise(exercise, index)}>
-                      <Trash2 size={14} />
-                      Remover
-                    </button>
-                  ) : null}
-                </div>
+            {editorWorkout.exercises.map((exercise, index) => {
+              const isDragging = workoutExerciseDrag?.exerciseId === exercise.id;
+              const isDropTarget =
+                workoutExerciseDrag?.targetIndex === index &&
+                workoutExerciseDrag.exerciseId !== exercise.id;
+
+              return (
+                <article
+                  className={[
+                    'exercise-card',
+                    'workout-editor-exercise-card',
+                    isDragging ? 'exercise-card--dragging' : '',
+                    isDropTarget ? 'exercise-card--drop-target' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  key={exercise.id}
+                  ref={element => {
+                    workoutExerciseRefs.current[index] = element;
+                  }}>
+                  <div className="exercise-card-head">
+                    <div className="exercise-card-title-row">
+                      <button
+                        type="button"
+                        className={
+                          isDragging
+                            ? 'exercise-drag-handle active'
+                            : 'exercise-drag-handle'
+                        }
+                        aria-label={`Segurar e arrastar exercício ${index + 1}`}
+                        data-exercise-id={exercise.id}
+                        data-exercise-index={index}
+                        onPointerDown={startWorkoutExerciseHold}
+                        onPointerMove={moveWorkoutExerciseDrag}
+                        onPointerUp={finishWorkoutExerciseDrag}
+                        onPointerCancel={finishWorkoutExerciseDrag}>
+                        <GripVertical size={16} />
+                        <span>Segure 1s</span>
+                      </button>
+                      <strong>Exercício {index + 1}</strong>
+                    </div>
+                    {editorWorkout.exercises.length > 1 ? (
+                      <button
+                        type="button"
+                        className="danger-button subtle"
+                        onClick={() => requestRemoveExercise(exercise, index)}>
+                        <Trash2 size={14} />
+                        Remover
+                      </button>
+                    ) : null}
+                  </div>
 
                 <div className="editor-grid">
                   <label>
@@ -2158,8 +2366,9 @@ function App() {
                     placeholder="Dicas curtas para a execução."
                   />
                 </label>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
 
             <button

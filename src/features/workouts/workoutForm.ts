@@ -13,6 +13,28 @@ export const createWorkoutFormExerciseDraft = (): WorkoutFormValues['exercises']
   note: '',
 });
 
+export const reorderWorkoutExercises = <Exercise>(
+  exercises: Exercise[],
+  fromIndex: number,
+  toIndex: number,
+) => {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= exercises.length ||
+    toIndex >= exercises.length
+  ) {
+    return exercises;
+  }
+
+  const nextExercises = [...exercises];
+  const [movedExercise] = nextExercises.splice(fromIndex, 1);
+  nextExercises.splice(toIndex, 0, movedExercise);
+
+  return nextExercises;
+};
+
 const formatWorkoutIssue = (issue: ZodIssue) => {
   const [rootKey, pathIndex, fieldKey] = issue.path;
 

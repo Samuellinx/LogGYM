@@ -1,5 +1,6 @@
 import {
   createWorkoutExerciseDraft,
+  reorderWorkoutExercises,
   validateWorkoutDocumentForSave,
 } from '../web/src/lib/workoutEditor';
 
@@ -30,5 +31,26 @@ describe('web workout editor', () => {
 
   it('creates a new editor exercise draft with an empty reps range', () => {
     expect(createWorkoutExerciseDraft().targetReps).toBe('');
+  });
+
+  it('reorders editor exercises before save without mutating the previous list', () => {
+    const exercises = [
+      {...createWorkoutExerciseDraft(), name: 'Exercício A'},
+      {...createWorkoutExerciseDraft(), name: 'Exercício B'},
+      {...createWorkoutExerciseDraft(), name: 'Exercício C'},
+    ];
+
+    const reordered = reorderWorkoutExercises(exercises, 2, 0);
+
+    expect(reordered.map(exercise => exercise.name)).toEqual([
+      'Exercício C',
+      'Exercício A',
+      'Exercício B',
+    ]);
+    expect(exercises.map(exercise => exercise.name)).toEqual([
+      'Exercício A',
+      'Exercício B',
+      'Exercício C',
+    ]);
   });
 });

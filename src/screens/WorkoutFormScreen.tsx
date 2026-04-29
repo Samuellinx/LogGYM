@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {
   Alert,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,7 @@ import {Controller, useFieldArray, useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {type NavigationAction} from '@react-navigation/native';
-import {Check, Minus, Plus, Trash2} from 'lucide-react-native';
+import {Check, GripVertical, Minus, Plus, Trash2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {ConfirmModal} from '@/components/ConfirmModal';
@@ -22,6 +23,7 @@ import {getWorkoutDetail, saveWorkout} from '@/features/workouts/workoutReposito
 import {
   createWorkoutFormExerciseDraft,
   getWorkoutValidationMessage,
+  reorderWorkoutExercises,
 } from '@/features/workouts/workoutForm';
 import {
   type WorkoutFormValues,
@@ -39,6 +41,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutForm'>;
 
 const MAX_EXERCISES = 12;
 const MAX_BATCH_SIZE = 6;
+const DRAG_LONG_PRESS_MS = 1000;
+const DRAG_GAP = theme.spacing.lg;
 
 const defaultValues: WorkoutFormValues = {
   name: '',
@@ -57,8 +61,14 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
   const [isSaving, setIsSaving] = useState(false);
   const [exerciseBatchCount, setExerciseBatchCount] = useState(1);
   const [exerciseToDelete, setExerciseToDelete] = useState<number | null>(null);
+  const [exerciseDrag, setExerciseDrag] = useState<{
+    fromIndex: number;
+    targetIndex: number;
+    offsetY: number;
+  } | null>(null);
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const pendingNavigationAction = useRef<NavigationAction | null>(null);
+  const exerciseCardHeights = useRef<Record<number, number>>({});
 
   const {
     control,
@@ -72,7 +82,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     defaultValues,
   });
 
-  const {fields, append, remove} = useFieldArray({
+  const {fields, append, remove, move} = useFieldArray({
     control,
     name: 'exercises',
   });
@@ -233,6 +243,77 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     }
   };
 
+  const beginExerciseDrag = (index: number) => {
+    if (fields.length <= 1) {
+      return;
+    }
+
+    setExerciseDrag({
+      fromIndex: index,
+      targetIndex: index,
+      offsetY: 0,
+    });
+  };
+
+  const updateExerciseDragOffset = (offsetY: number) => {
+    setExerciseDrag(current => {
+      if (!current) {
+        return current;
+      }
+
+      const measuredHeight =
+        exerciseCardHeights.current[current.fromIndex] ??
+        Object.values(exerciseCardHeights.current)[0] ??
+        240;
+      const slotHeight = Math.max(1, measuredHeight + DRAG_GAP);
+      const movedSlots = Math.round(offsetY / slotHeight);
+      const targetIndex = Math.min(
+        fields.length - 1,
+        Math.max(0, current.fromIndex + movedSlots),
+      );
+
+      return {
+        ...current,
+        offsetY,
+        targetIndex,
+      };
+    });
+  };
+
+  const finishExerciseDrag = () => {
+    if (!exerciseDrag) {
+      return;
+    }
+
+    const {fromIndex, targetIndex} = exerciseDrag;
+    const reorderedFields = reorderWorkoutExercises(fields, fromIndex, targetIndex);
+
+    if (reorderedFields !== fields) {
+      move(fromIndex, targetIndex);
+    }
+
+    setExerciseDrag(null);
+  };
+
+  const clearIdleExerciseDrag = (index: number) => {
+    setTimeout(() => {
+      setExerciseDrag(current =>
+        current?.fromIndex === index && current.offsetY === 0 ? null : current,
+      );
+    }, 0);
+  };
+
+  const createExerciseDragResponder = (index: number) =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => exerciseDrag?.fromIndex === index,
+      onPanResponderMove: (_, gestureState) => {
+        updateExerciseDragOffset(gestureState.dy);
+      },
+      onPanResponderRelease: finishExerciseDrag,
+      onPanResponderTerminate: () => setExerciseDrag(null),
+      onPanResponderTerminationRequest: () => false,
+    }).panHandlers;
+
   const closeDiscardModal = () => {
     setShowDiscardModal(false);
     pendingNavigationAction.current = null;
@@ -255,6 +336,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
     }
 
     remove(exerciseToDelete);
+    setExerciseDrag(null);
     setExerciseToDelete(null);
   };
 
@@ -414,22 +496,75 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
             </View>
           </View>
 
-          {fields.map((item, index) => (
-            <View key={item.id} style={styles.exerciseCard}>
-              <View style={styles.exerciseCardHeader}>
-                <Text style={styles.exerciseCardTitle}>Exercício {index + 1}</Text>
-                {fields.length > 1 ? (
-                  <Pressable
-                    hitSlop={10}
-                    onPress={() => setExerciseToDelete(index)}
-                    style={({pressed}) => [
-                      styles.deleteIconButton,
-                      pressed ? styles.pressed : null,
-                    ]}>
-                    <Trash2 color={theme.colors.danger} size={18} />
-                  </Pressable>
-                ) : null}
-              </View>
+          {fields.map((item, index) => {
+            const dragResponder = createExerciseDragResponder(index);
+            const isDragging = exerciseDrag?.fromIndex === index;
+            const isDropTarget =
+              exerciseDrag?.targetIndex === index && exerciseDrag.fromIndex !== index;
+
+            return (
+              <View
+                key={item.id}
+                onLayout={event => {
+                  exerciseCardHeights.current[index] = event.nativeEvent.layout.height;
+                }}
+                style={[
+                  styles.exerciseCard,
+                  isDropTarget ? styles.exerciseDropTarget : null,
+                  isDragging ? styles.exerciseCardDragging : null,
+                  isDragging
+                    ? {
+                        transform: [{translateY: exerciseDrag.offsetY}],
+                      }
+                    : null,
+                ]}>
+                <View style={styles.exerciseCardHeader}>
+                  <View style={styles.exerciseTitleGroup}>
+                    <Text style={styles.exerciseCardTitle}>Exercício {index + 1}</Text>
+                    {fields.length > 1 ? (
+                      <Pressable
+                        accessibilityHint="Segure por um segundo e arraste para alterar a ordem."
+                        accessibilityLabel={`Reordenar exercício ${index + 1}`}
+                        accessibilityRole="button"
+                        delayLongPress={DRAG_LONG_PRESS_MS}
+                        hitSlop={8}
+                        onLongPress={() => beginExerciseDrag(index)}
+                        onPressOut={() => clearIdleExerciseDrag(index)}
+                        style={({pressed}) => [
+                          styles.dragHandle,
+                          isDragging ? styles.dragHandleActive : null,
+                          pressed ? styles.pressed : null,
+                        ]}
+                        {...dragResponder}>
+                        <GripVertical
+                          color={
+                            isDragging ? theme.colors.accent : theme.colors.textMuted
+                          }
+                          size={16}
+                        />
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.dragHandleText,
+                            isDragging ? styles.dragHandleTextActive : null,
+                          ]}>
+                          Segure 1s
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  {fields.length > 1 ? (
+                    <Pressable
+                      hitSlop={10}
+                      onPress={() => setExerciseToDelete(index)}
+                      style={({pressed}) => [
+                        styles.deleteIconButton,
+                        pressed ? styles.pressed : null,
+                      ]}>
+                      <Trash2 color={theme.colors.danger} size={18} />
+                    </Pressable>
+                  ) : null}
+                </View>
 
               <Controller
                 control={control}
@@ -522,8 +657,9 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                   />
                 )}
               />
-            </View>
-          ))}
+              </View>
+            );
+          })}
 
           <Button
             label={isSaving ? 'Salvando treino...' : 'Salvar treino'}
@@ -705,14 +841,59 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     gap: theme.spacing.md,
   },
+  exerciseCardDragging: {
+    zIndex: 4,
+    borderColor: 'rgba(124,255,79,0.44)',
+    backgroundColor: theme.colors.surfaceElevated,
+    opacity: 0.96,
+  },
+  exerciseDropTarget: {
+    borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(124,255,79,0.06)',
+  },
   exerciseCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  exerciseTitleGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    minWidth: 0,
   },
   exerciseCardTitle: {
     ...theme.typography.subtitle,
     color: theme.colors.text,
+  },
+  dragHandle: {
+    minHeight: 34,
+    maxWidth: 124,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  dragHandleActive: {
+    borderColor: 'rgba(124,255,79,0.42)',
+    backgroundColor: 'rgba(124,255,79,0.08)',
+  },
+  dragHandleText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    lineHeight: 14,
+    flexShrink: 1,
+  },
+  dragHandleTextActive: {
+    color: theme.colors.accent,
   },
   loadPreviewCard: {
     padding: theme.spacing.md,

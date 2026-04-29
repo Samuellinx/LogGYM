@@ -2,6 +2,7 @@ import {workoutInputSchema} from '../src/features/workouts/workout.schemas';
 import {
   createWorkoutFormExerciseDraft,
   getWorkoutValidationMessage,
+  reorderWorkoutExercises,
 } from '../src/features/workouts/workoutForm';
 
 describe('mobile workout validation', () => {
@@ -31,5 +32,26 @@ describe('mobile workout validation', () => {
 
   it('creates a new exercise draft with an empty reps range', () => {
     expect(createWorkoutFormExerciseDraft().targetReps).toBe('');
+  });
+
+  it('reorders exercises while preserving each exercise data', () => {
+    const exercises = [
+      {...createWorkoutFormExerciseDraft(), name: 'Exercício A'},
+      {...createWorkoutFormExerciseDraft(), name: 'Exercício B'},
+      {...createWorkoutFormExerciseDraft(), name: 'Exercício C'},
+    ];
+
+    const reordered = reorderWorkoutExercises(exercises, 2, 0);
+
+    expect(reordered.map(exercise => exercise.name)).toEqual([
+      'Exercício C',
+      'Exercício A',
+      'Exercício B',
+    ]);
+    expect(exercises.map(exercise => exercise.name)).toEqual([
+      'Exercício A',
+      'Exercício B',
+      'Exercício C',
+    ]);
   });
 });

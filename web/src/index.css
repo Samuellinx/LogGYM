@@ -1160,6 +1160,64 @@ select:focus {
   gap: 12px;
 }
 
+.exercise-card-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exercise-drag-handle {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: grab;
+  touch-action: none;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.exercise-drag-handle:hover,
+.exercise-drag-handle.active {
+  border-color: rgba(124, 255, 79, 0.32);
+  background: rgba(124, 255, 79, 0.08);
+  color: var(--accent);
+}
+
+.exercise-drag-handle:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.exercise-card--dragging {
+  z-index: 4;
+  border-color: rgba(124, 255, 79, 0.38);
+  background: rgba(17, 28, 23, 0.96);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.34);
+}
+
+.exercise-card--drop-target {
+  border-color: var(--accent);
+  background: rgba(124, 255, 79, 0.06);
+}
+
+.is-workout-exercise-dragging {
+  user-select: none;
+}
+
 .primary-button,
 .secondary-button,
 .ghost-button,

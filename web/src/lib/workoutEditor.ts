@@ -27,6 +27,28 @@ export const createWorkoutExerciseDraft = (): WorkoutExerciseInput => ({
   orderIndex: 0,
 });
 
+export const reorderWorkoutExercises = <Exercise>(
+  exercises: Exercise[],
+  fromIndex: number,
+  toIndex: number,
+) => {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= exercises.length ||
+    toIndex >= exercises.length
+  ) {
+    return exercises;
+  }
+
+  const nextExercises = [...exercises];
+  const [movedExercise] = nextExercises.splice(fromIndex, 1);
+  nextExercises.splice(toIndex, 0, movedExercise);
+
+  return nextExercises;
+};
+
 export const normalizeWorkoutForSave = (
   workout: WorkoutDocument,
   userId: string,
