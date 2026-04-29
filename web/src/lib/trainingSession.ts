@@ -3,6 +3,7 @@ import type {
   TrainingDraftExerciseState,
   TrainingDraftSet,
   WorkoutDocument,
+  WorkoutExerciseInput,
   WorkoutSessionDocument,
 } from '../types';
 import {normalizeSessionDateInput} from './sessionDate';
@@ -21,6 +22,15 @@ export type TrainingCompletionSummary = {
   maxReps: number;
   minReps: number;
 };
+
+export type ExercisePerformanceRecord = {
+  load: number;
+  reps: number;
+};
+
+type ExercisePerformanceLookup =
+  | Pick<WorkoutExerciseInput, 'id' | 'name'>
+  | Pick<TrainingDraftExercise, 'workoutExerciseId' | 'exerciseName'>;
 
 const createDraftSetId = () =>
   `draft-set-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -45,6 +55,67 @@ const createBlankSet = (seriesNumber = 1): TrainingDraftSet => ({
 });
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
+
+const normalizeToken = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const getPerformanceLookupId = (exercise: ExercisePerformanceLookup) =>
+  'id' in exercise ? exercise.id : exercise.workoutExerciseId;
+
+const getPerformanceLookupName = (exercise: ExercisePerformanceLookup) =>
+  'name' in exercise ? exercise.name : exercise.exerciseName;
+
+export const getExercisePerformanceRecordFromSessions = (
+  workoutId: string,
+  exercise: ExercisePerformanceLookup,
+  sessions: WorkoutSessionDocument[],
+) => {
+  const exerciseId = getPerformanceLookupId(exercise);
+  const exerciseToken = normalizeToken(getPerformanceLookupName(exercise));
+
+  return sessions
+    .filter(session => session.workoutId === workoutId)
+    .flatMap(session =>
+      session.exercises
+        .filter(sessionExercise => {
+          if (sessionExercise.workoutExerciseId === exerciseId) {
+            return true;
+          }
+
+          return normalizeToken(sessionExercise.exerciseName) === exerciseToken;
+        })
+        .flatMap(sessionExercise =>
+          sessionExercise.sets.map(setItem => ({
+            load: setItem.load,
+            reps: setItem.reps,
+          })),
+        ),
+    )
+    .reduce<ExercisePerformanceRecord | null>((record, current) => {
+      if (
+        !Number.isFinite(current.load) ||
+        !Number.isFinite(current.reps) ||
+        current.load <= 0 ||
+        current.reps <= 0
+      ) {
+        return record;
+      }
+
+      if (!record || current.load > record.load) {
+        return current;
+      }
+
+      if (current.load === record.load && current.reps > record.reps) {
+        return current;
+      }
+
+      return record;
+    }, null);
+};
 
 export const buildTrainingCompletionSummary = (
   workoutName: string,

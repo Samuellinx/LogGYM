@@ -13,6 +13,7 @@ import {
   Clock3,
   Download,
   Dumbbell,
+  Eye,
   FileUp,
   LoaderCircle,
   LogOut,
@@ -28,6 +29,7 @@ import {
   UserRound,
   Wifi,
   WifiOff,
+  X,
 } from 'lucide-react';
 import {z} from 'zod';
 
@@ -99,9 +101,11 @@ import {
   buildTrainingSessionDocument,
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
+  getExercisePerformanceRecordFromSessions,
   mergeTrainingDraftExercisesForSave,
   removeDraftSet,
   updateDraftSet,
+  type ExercisePerformanceRecord,
   type TrainingCompletionSummary,
 } from './lib/trainingSession';
 import {
@@ -355,6 +359,49 @@ const formatTrainingMetric = (value: number, suffix = '') => {
   return `${formatted}${suffix}`;
 };
 
+const workoutLastSessionTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const getSessionTimestamp = (session: WorkoutSessionDocument) => {
+  const timestamp = new Date(session.performedAt).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const getLatestWorkoutSession = (
+  workoutId: string,
+  sessions: WorkoutSessionDocument[],
+) =>
+  sessions
+    .filter(session => session.workoutId === workoutId)
+    .sort((left, right) => getSessionTimestamp(right) - getSessionTimestamp(left))[0] ??
+  null;
+
+const formatSuggestedLoad = (value: string) => {
+  const load = value.trim();
+
+  return load.length > 0 ? load : 'Não informada';
+};
+
+const formatExercisePerformanceRecord = (record: ExercisePerformanceRecord) =>
+  `${formatLoad(record.load)} - ${formatTrainingMetric(record.reps)} reps`;
+
+const formatWorkoutLastSessionTime = (value?: string | null) => {
+  if (!value) {
+    return 'Não realizado';
+  }
+
+  const date = new Date(value);
+
+  if (!Number.isFinite(date.getTime())) {
+    return 'Não realizado';
+  }
+
+  return workoutLastSessionTimeFormatter.format(date);
+};
+
 const TrainingCompletionModal = ({
   summary,
   onClose,
@@ -420,6 +467,89 @@ const TrainingCompletionModal = ({
     </section>
   </div>
 );
+
+const WorkoutConsultModal = ({
+  workout,
+  sessions,
+  onClose,
+}: {
+  workout: WorkoutDocument;
+  sessions: WorkoutSessionDocument[];
+  onClose: () => void;
+}) => {
+  const latestSession = getLatestWorkoutSession(workout.id, sessions);
+
+  return (
+    <div className="error-modal-backdrop" role="presentation">
+      <section
+        aria-labelledby="workout-consult-title"
+        aria-modal="true"
+        className="error-modal workout-consult-modal"
+        role="dialog">
+        <div className="workout-consult-head">
+          <div>
+            <p className="eyebrow">Consulta de treino</p>
+            <h2 id="workout-consult-title">{workout.name}</h2>
+            <p>
+              {workout.focus} - {workout.exercises.length} exercícios
+            </p>
+          </div>
+          <button className="workout-consult-close" type="button" onClick={onClose}>
+            <X size={16} />
+            Fechar
+          </button>
+        </div>
+
+        <div className="workout-consult-meta">
+          <span>
+            <CalendarDays size={16} />
+            Dia: <strong>{workout.scheduledDay || 'Livre'}</strong>
+            <Clock3 size={16} />
+            Horario ultimo treino:{' '}
+            <strong>{formatWorkoutLastSessionTime(latestSession?.performedAt)}</strong>
+          </span>
+        </div>
+
+        <div className="workout-consult-notes">
+          <span>Observações</span>
+          <p>{workout.notes || 'Sem observações extras para este treino.'}</p>
+        </div>
+
+        <div className="workout-consult-exercises">
+          <span className="workout-consult-section-title">Exercícios</span>
+          {workout.exercises.map((exercise, index) => {
+            const registeredPerformanceRecord = getExercisePerformanceRecordFromSessions(workout.id, exercise, sessions);
+
+            return (
+              <article className="workout-consult-exercise" key={exercise.id}>
+                <div className="workout-consult-exercise-head">
+                  <span>{index + 1}</span>
+                  <div>
+                    <strong>{exercise.name}</strong>
+                    <p>
+                      {exercise.muscleGroup} - alvo{' '}
+                      {exercise.targetReps || 'não informado'}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="workout-consult-load">
+                  {registeredPerformanceRecord !== null
+                    ? `Maior carga registrada: ${formatExercisePerformanceRecord(registeredPerformanceRecord)}`
+                    : `Carga sugerida: ${formatSuggestedLoad(exercise.baseLoad)}`}
+                </p>
+
+                {exercise.note ? (
+                  <p className="workout-consult-exercise-note">{exercise.note}</p>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+};
 
 const DeleteConfirmationModal = ({
   title,
@@ -516,6 +646,7 @@ function App() {
   const [workoutSearch, setWorkoutSearch] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [detailView, setDetailView] = useState<WorkspaceDetailView>(null);
+  const [consultWorkout, setConsultWorkout] = useState<WorkoutDocument | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutDocument[]>([]);
   const [sessions, setSessions] = useState<WorkoutSessionDocument[]>([]);
   const [editorWorkout, setEditorWorkout] = useState<WorkoutDocument>(() =>
@@ -582,6 +713,7 @@ function App() {
           setIsWorkoutEditorOpen(false);
           setWorkspaceView('dashboard');
           setDetailView(null);
+          setConsultWorkout(null);
           setTrainingPendingDrafts([]);
           setTrainingCompletedDrafts([]);
           setTrainingPendingFocusIndex(null);
@@ -1227,6 +1359,7 @@ function App() {
 
   const handleEditWorkout = (workout: WorkoutDocument) => {
     clearFeedback();
+    setConsultWorkout(null);
     setWorkspaceView('workouts');
     setIsWorkoutEditorOpen(true);
     setEditorWorkout({
@@ -1269,8 +1402,14 @@ function App() {
     );
   };
 
+  const handleConsultWorkout = (workout: WorkoutDocument) => {
+    clearFeedback();
+    setConsultWorkout(workout);
+  };
+
   const handleSelectTab = (view: WorkspaceView) => {
     setDetailView(null);
+    setConsultWorkout(null);
     setWorkspaceView(view);
     setIsWorkoutEditorOpen(false);
   };
@@ -1286,6 +1425,7 @@ function App() {
 
   const openTrainingSession = (workout: WorkoutDocument, returnTo: WorkspaceView) => {
     clearFeedback();
+    setConsultWorkout(null);
     const savedDraft = user ? getTrainingDraftAutosave(user.uid, workout.id) : null;
     const restoredDraftState = restoreTrainingDraftState(workout, savedDraft);
 
@@ -1785,6 +1925,13 @@ function App() {
                     </button>
                     <button
                       type="button"
+                      className="primary-button primary-button--consult"
+                      onClick={() => handleConsultWorkout(workout)}>
+                      <Eye size={16} />
+                      Consultar treino
+                    </button>
+                    <button
+                      type="button"
                       className="danger-button"
                       disabled={!startedWorkoutIds.has(workout.id)}
                       onClick={() => requestClearTrainingDraft(workout)}>
@@ -2068,7 +2215,12 @@ function App() {
                   </div>
 
                   <div className="history-card-actions">
-                    <strong>{formatLoad(sessionItem.topLoad)}</strong>
+                    <div className="history-card-metrics">
+                      <strong>Maior carga - {formatLoad(sessionItem.topLoad)}</strong>
+                      <strong>
+                        Total levantado - {formatVolume(sessionItem.totalVolume)}
+                      </strong>
+                    </div>
                     <button
                       type="button"
                       className="danger-button subtle"
@@ -2084,9 +2236,7 @@ function App() {
                   </div>
                 </div>
 
-                <p>
-                  {sessionItem.totalSets} séries - {formatVolume(sessionItem.totalVolume)}
-                </p>
+                <p>{sessionItem.totalSets} séries</p>
 
                 {sessionItem.overallNotes ? (
                   <p className="session-card-note">{sessionItem.overallNotes}</p>
@@ -2247,50 +2397,58 @@ function App() {
 
           <div className="exercise-stack">
             {trainingPendingDrafts.length ? (
-              trainingPendingDrafts.map((exercise, exerciseIndex) => (
-                <article
-                  className="exercise-card training-exercise-card"
-                  key={exercise.workoutExerciseId}
-                  ref={element => {
-                    trainingExerciseRefs.current[exerciseIndex] = element;
-                  }}>
-                  <div className="exercise-card-head">
-                    <div>
-                      <strong>{exercise.exerciseName}</strong>
-                      <p className="exercise-meta-text">
-                        {exercise.muscleGroup} - alvo {exercise.targetReps}
-                      </p>
-                    </div>
-                    <div className="training-exercise-actions">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => handleFinishTrainingExercise(exerciseIndex)}>
-                        <ChevronRight size={16} />
-                        Finalizar exercício
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() =>
-                          setTrainingPendingDrafts(current =>
-                            addDraftSet(current, exerciseIndex),
-                          )
-                        }>
-                        <Plus size={16} />
-                        Nova série
-                      </button>
-                    </div>
-                  </div>
+              trainingPendingDrafts.map((exercise, exerciseIndex) => {
+                const performedRecord = getExercisePerformanceRecordFromSessions(activeTrainingWorkout.id, exercise, sessions);
 
-                  {exercise.hint ? (
-                    <p className="training-support-text">{exercise.hint}</p>
-                  ) : null}
-                  {exercise.baseLoad ? (
-                    <p className="training-support-text training-support-text--accent">
-                      Carga sugerida: {exercise.baseLoad}
-                    </p>
-                  ) : null}
+                return (
+                  <article
+                    className="exercise-card training-exercise-card"
+                    key={exercise.workoutExerciseId}
+                    ref={element => {
+                      trainingExerciseRefs.current[exerciseIndex] = element;
+                    }}>
+                    <div className="exercise-card-head">
+                      <div>
+                        <strong>{exercise.exerciseName}</strong>
+                        <p className="exercise-meta-text">
+                          {exercise.muscleGroup} - alvo {exercise.targetReps}
+                        </p>
+                      </div>
+                      <div className="training-exercise-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => handleFinishTrainingExercise(exerciseIndex)}>
+                          <ChevronRight size={16} />
+                          Finalizar exercício
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() =>
+                            setTrainingPendingDrafts(current =>
+                              addDraftSet(current, exerciseIndex),
+                            )
+                          }>
+                          <Plus size={16} />
+                          Nova série
+                        </button>
+                      </div>
+                    </div>
+
+                    {exercise.hint ? (
+                      <p className="training-support-text">{exercise.hint}</p>
+                    ) : null}
+                    {performedRecord ? (
+                      <p className="training-support-text training-support-text--record">
+                        Maior carga realizada: {formatExercisePerformanceRecord(performedRecord)}
+                      </p>
+                    ) : null}
+                    {exercise.baseLoad ? (
+                      <p className="training-support-text training-support-text--accent">
+                        Carga sugerida: {exercise.baseLoad}
+                      </p>
+                    ) : null}
 
                   <div className="training-set-stack">
                     {exercise.sets.map((setItem, setIndex) => (
@@ -2381,8 +2539,9 @@ function App() {
                       </div>
                     ))}
                   </div>
-                </article>
-              ))
+                  </article>
+                );
+              })
             ) : (
               <div className="empty-card">
                 Todos os exercícios foram finalizados. Salve o treino para concluir a sessão.
@@ -2681,6 +2840,13 @@ function App() {
           confirmLabel={deleteConfirmation.confirmLabel}
           onConfirm={confirmDeleteAction}
           onCancel={() => setDeleteConfirmation(null)}
+        />
+      ) : null}
+      {consultWorkout ? (
+        <WorkoutConsultModal
+          workout={consultWorkout}
+          sessions={sessions}
+          onClose={() => setConsultWorkout(null)}
         />
       ) : null}
       {authView === 'loading' ? (

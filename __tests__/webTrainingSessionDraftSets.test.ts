@@ -2,9 +2,14 @@ import {
   addDraftSet,
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
+  getExercisePerformanceRecordFromSessions,
   mergeTrainingDraftExercisesForSave,
 } from '../web/src/lib/trainingSession';
-import type {TrainingDraftExercise, TrainingDraftExerciseState} from '../web/src/types';
+import type {
+  TrainingDraftExercise,
+  TrainingDraftExerciseState,
+  WorkoutSessionDocument,
+} from '../web/src/types';
 
 describe('web training session draft sets', () => {
   it('adds a new blank set to the top of the selected exercise without renaming older sets', () => {
@@ -75,6 +80,70 @@ describe('web training session draft sets', () => {
         sets: [{id: 'set-1', seriesNumber: 1, load: '50', reps: '', note: ''}],
       }),
     ).toBe(false);
+  });
+
+  it('returns the max performed load and reps for an exercise from saved sessions', () => {
+    const sessions: WorkoutSessionDocument[] = [
+      {
+        id: 'session-1',
+        userId: 'user-1',
+        workoutId: 'workout-1',
+        workoutName: 'Upper',
+        focus: 'Upper',
+        overallNotes: '',
+        performedAt: '2026-04-20T10:00:00.000Z',
+        createdAt: '2026-04-20T10:00:00.000Z',
+        totalSets: 2,
+        totalVolume: 800,
+        topLoad: 50,
+        exercises: [
+          {
+            workoutExerciseId: 'exercise-1',
+            exerciseName: 'Supino',
+            muscleGroup: 'Peito',
+            sets: [
+              {load: 40, reps: 10, note: ''},
+              {load: 50, reps: 8, note: ''},
+            ],
+          },
+        ],
+      },
+      {
+        id: 'session-2',
+        userId: 'user-1',
+        workoutId: 'workout-1',
+        workoutName: 'Upper',
+        focus: 'Upper',
+        overallNotes: '',
+        performedAt: '2026-04-21T10:00:00.000Z',
+        createdAt: '2026-04-21T10:00:00.000Z',
+        totalSets: 1,
+        totalVolume: 450,
+        topLoad: 50,
+        exercises: [
+          {
+            workoutExerciseId: 'exercise-1',
+            exerciseName: 'Supino',
+            muscleGroup: 'Peito',
+            sets: [{load: 50, reps: 9, note: ''}],
+          },
+        ],
+      },
+    ];
+
+    expect(
+      getExercisePerformanceRecordFromSessions(
+        'workout-1',
+        {
+          workoutExerciseId: 'exercise-1',
+          exerciseName: 'Supino',
+        },
+        sessions,
+      ),
+    ).toEqual({
+      load: 50,
+      reps: 9,
+    });
   });
 
   it('moves a completed exercise out of the pending list', () => {

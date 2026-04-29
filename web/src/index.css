@@ -615,9 +615,33 @@ h3 {
 }
 
 .history-card-actions {
-  display: grid;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   justify-items: end;
   gap: 12px;
+}
+
+.history-card-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-card-metrics strong {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.86rem;
+  white-space: nowrap;
 }
 
 .session-list--history {
@@ -704,12 +728,13 @@ h3 {
 }
 
 .training-session-actions {
+  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 12px;
-  margin-left: auto;
+  margin-left: 32px;
 }
 
 .training-date-field {
@@ -743,6 +768,14 @@ h3 {
 
 .training-support-text--accent {
   color: var(--accent);
+}
+
+.training-support-text--previous {
+  color: var(--accent-secondary);
+}
+
+.training-support-text--record {
+  color: var(--accent-secondary);
 }
 
 .training-exercise-actions {
@@ -1182,6 +1215,12 @@ select:focus {
   color: #04131b;
 }
 
+.primary-button--consult {
+  background: linear-gradient(135deg, #d9ffc8, #a8ffb9);
+  border-color: rgba(217, 255, 200, 0.36);
+  color: #06120a;
+}
+
 .secondary-button {
   background: rgba(255, 255, 255, 0.05);
 }
@@ -1297,6 +1336,139 @@ select:focus {
 
 .success-modal p:not(.eyebrow) {
   color: #d6ffeb;
+}
+
+.workout-consult-modal {
+  width: min(100%, 640px);
+  max-height: min(86vh, 780px);
+  overflow: auto;
+  border-color: rgba(217, 255, 200, 0.28);
+  background:
+    linear-gradient(180deg, rgba(16, 23, 20, 0.98), rgba(11, 16, 22, 0.98)),
+    rgba(15, 19, 26, 0.96);
+}
+
+.workout-consult-modal p:not(.eyebrow) {
+  color: var(--text-muted);
+}
+
+.workout-consult-head,
+.workout-consult-exercise-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.workout-consult-head {
+  justify-content: space-between;
+}
+
+.workout-consult-head h2 {
+  margin-top: 4px;
+}
+
+.workout-consult-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.workout-consult-close:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 247, 250, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.workout-consult-close:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.workout-consult-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.workout-consult-meta span,
+.workout-consult-notes,
+.workout-consult-exercise {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(8, 12, 17, 0.72);
+}
+
+.workout-consult-meta span {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--text);
+}
+
+.workout-consult-notes,
+.workout-consult-exercise {
+  padding: 14px;
+}
+
+.workout-consult-notes > span,
+.workout-consult-section-title {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.workout-consult-exercises {
+  display: grid;
+  gap: 10px;
+}
+
+.workout-consult-exercise {
+  display: grid;
+  gap: 10px;
+  background: rgba(5, 7, 11, 0.58);
+}
+
+.workout-consult-exercise-head > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.workout-consult-exercise-head strong {
+  color: var(--text);
+}
+
+.workout-consult-load {
+  color: var(--accent) !important;
+  font-weight: 700;
+}
+
+.workout-consult-exercise-note {
+  color: var(--text-soft) !important;
 }
 
 .training-completion-modal {

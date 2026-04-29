@@ -1,5 +1,5 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {ChevronRight, Play, Repeat2, Trash2} from 'lucide-react-native';
+import {ChevronRight, Eye, Play, Repeat2, Trash2} from 'lucide-react-native';
 
 import type {WorkoutSummary} from '@/types/domain';
 import {cardShadow, theme} from '@/theme';
@@ -9,6 +9,7 @@ interface WorkoutCardProps {
   workout: WorkoutSummary;
   onPress: () => void;
   onStart?: () => void;
+  onConsult?: () => void;
   onDuplicate?: () => void;
   onClearTraining?: () => void;
   clearTrainingDisabled?: boolean;
@@ -20,6 +21,7 @@ export const WorkoutCard = ({
   workout,
   onPress,
   onStart,
+  onConsult,
   onDuplicate,
   onClearTraining,
   clearTrainingDisabled = false,
@@ -53,7 +55,7 @@ export const WorkoutCard = ({
         Última execução: {formatSessionDate(workout.lastPerformedAt)}
       </Text>
 
-      {onDuplicate || onClearTraining || onStart ? (
+      {onDuplicate || onClearTraining || onStart || onConsult ? (
         <View style={styles.actions}>
           {onDuplicate ? (
             <Pressable onPress={onDuplicate} style={styles.actionPill}>
@@ -87,6 +89,16 @@ export const WorkoutCard = ({
                 numberOfLines={1}
                 style={[styles.startLabel, isResume ? styles.startLabelResume : null]}>
                 {startLabel}
+              </Text>
+            </Pressable>
+          ) : null}
+          {onConsult ? (
+            <Pressable
+              onPress={onConsult}
+              style={[styles.startButton, styles.consultButton]}>
+              <Eye color="#06120A" size={14} />
+              <Text numberOfLines={1} style={styles.startLabel}>
+                Consultar treino
               </Text>
             </Pressable>
           ) : null}
@@ -166,6 +178,9 @@ const styles = StyleSheet.create({
   },
   startButtonResume: {
     backgroundColor: theme.colors.accentSecondary,
+  },
+  consultButton: {
+    backgroundColor: '#D9FFC8',
   },
   startLabel: {
     fontSize: 12,

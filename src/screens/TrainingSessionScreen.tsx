@@ -12,7 +12,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ChevronRight, Play, Plus, Trash2} from 'lucide-react-native';
+import {ChevronRight, Play, Plus, Trash2, Undo2} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {ConfirmModal} from '@/components/ConfirmModal';
@@ -25,6 +25,7 @@ import {
 } from '@/components/WorkoutCompletionModal';
 import {
   deleteTrainingDraftAutosave,
+  getExerciseProgress,
   getTrainingDraftAutosave,
   getWorkoutDetail,
   saveTrainingSession,
@@ -42,7 +43,9 @@ import {
 import {
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
+  getExercisePerformanceRecord,
   mergeTrainingDraftExercisesForSave,
+  type ExercisePerformanceRecord,
 } from '@/features/workouts/trainingSessionUi';
 import {RootStackParamList} from '@/navigation/types';
 import {useAppStore} from '@/store/useAppStore';
@@ -50,7 +53,10 @@ import {theme} from '@/theme';
 import type {WorkoutDetail} from '@/types/domain';
 import {formatBaseLoadLabel} from '@/utils/baseLoad';
 import {toUserMessage} from '@/utils/errors';
-import {formatDateLong} from '@/utils/formatters';
+import {
+  formatDateLong,
+  formatExercisePerformanceRecord,
+} from '@/utils/formatters';
 import {maskDecimalInput, maskIntegerInput} from '@/utils/inputMasks';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainingSession'>;
@@ -59,9 +65,50 @@ type PendingSetDeletion = {
   exerciseIndex: number;
   setIndex: number;
 } | null;
+type TrainingUndoSnapshot = {
+  draftState: TrainingDraftExerciseState;
+  performedAt: string;
+  overallNotes: string;
+};
+type ExercisePerformanceRecords = Record<string, ExercisePerformanceRecord>;
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 type UpdatableTrainingDraftSetField = 'load' | 'reps' | 'note';
+const MAX_UNDO_STEPS = 50;
+
+const cloneDraftExercises = (exercises: TrainingDraftExercise[]) =>
+  exercises.map(exercise => ({
+    ...exercise,
+    sets: exercise.sets.map(setItem => ({...setItem})),
+  }));
+
+const cloneDraftState = (
+  state: TrainingDraftExerciseState,
+): TrainingDraftExerciseState => ({
+  pendingExercises: cloneDraftExercises(state.pendingExercises),
+  completedExercises: cloneDraftExercises(state.completedExercises),
+});
+
+const loadExercisePerformanceRecords = async (
+  userId: string,
+  workout: WorkoutDetail,
+): Promise<ExercisePerformanceRecords> => {
+  const entries = await Promise.all(
+    workout.exercises.map(async exercise => {
+      const progress = await getExerciseProgress(userId, exercise.name);
+      const performanceRecord = getExercisePerformanceRecord(progress.points);
+
+      return performanceRecord ? ([exercise.id, performanceRecord] as const) : null;
+    }),
+  );
+
+  return Object.fromEntries(
+    entries.filter(
+      (entry): entry is readonly [string, ExercisePerformanceRecord] =>
+        entry !== null,
+    ),
+  );
+};
 
 const normalizeToken = (value: string) =>
   value
@@ -188,6 +235,9 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [completionSummary, setCompletionSummary] =
     useState<WorkoutCompletionSummary | null>(null);
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
+  const [undoStack, setUndoStack] = useState<TrainingUndoSnapshot[]>([]);
+  const [exercisePerformanceRecords, setExercisePerformanceRecords] =
+    useState<ExercisePerformanceRecords>({});
   const scrollViewRef = useRef<ScrollView | null>(null);
   const exercisePositions = useRef<number[]>([]);
   const exerciseLoadInputRefs = useRef<Array<TextInput | null>>([]);
@@ -211,14 +261,22 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           return;
         }
 
+        const restoredDraftState = restoreTrainingDraftState(detail, savedDraft);
+        const performanceRecords = await loadExercisePerformanceRecords(
+          session.user.id,
+          detail,
+        ).catch(() => ({}));
+
         setWorkout(detail);
-        setDraftState(restoreTrainingDraftState(detail, savedDraft));
+        setDraftState(restoredDraftState);
+        setExercisePerformanceRecords(performanceRecords);
 
         if (savedDraft) {
           setOverallNotes(savedDraft.overallNotes);
           setPerformedAt(new Date(savedDraft.performedAt));
         }
 
+        setUndoStack([]);
         setHasLoadedDraft(true);
       } catch (error) {
         if (active) {
@@ -260,15 +318,47 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     return () => clearTimeout(timeoutId);
   }, [draftState, hasLoadedDraft, overallNotes, performedAt, session, workout]);
 
+  const pushUndoSnapshot = () => {
+    setUndoStack(current => [
+      {
+        draftState: cloneDraftState(draftState),
+        performedAt: performedAt.toISOString(),
+        overallNotes,
+      },
+      ...current,
+    ].slice(0, MAX_UNDO_STEPS));
+  };
+
+  const handleUndoLastChange = () => {
+    const [lastSnapshot, ...remainingSnapshots] = undoStack;
+
+    if (!lastSnapshot) {
+      return;
+    }
+
+    setDraftState(cloneDraftState(lastSnapshot.draftState));
+    setPerformedAt(new Date(lastSnapshot.performedAt));
+    setOverallNotes(lastSnapshot.overallNotes);
+    setUndoStack(remainingSnapshots);
+  };
+
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
     field: UpdatableTrainingDraftSetField,
     value: string,
   ) => {
-    setDraftState(current => ({
-      ...current,
-      pendingExercises: current.pendingExercises.map((exercise, currentExerciseIndex) => {
+    const currentValue =
+      draftState.pendingExercises[exerciseIndex]?.sets[setIndex]?.[field];
+
+    if (currentValue === value) {
+      return;
+    }
+
+    pushUndoSnapshot();
+    setDraftState({
+      ...draftState,
+      pendingExercises: draftState.pendingExercises.map((exercise, currentExerciseIndex) => {
         if (currentExerciseIndex !== exerciseIndex) {
           return exercise;
         }
@@ -280,23 +370,33 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           ),
         };
       }),
-    }));
+    });
   };
 
   const addSet = (exerciseIndex: number) => {
-    setDraftState(current => ({
-      ...current,
+    if (!draftState.pendingExercises[exerciseIndex]) {
+      return;
+    }
+
+    pushUndoSnapshot();
+    setDraftState({
+      ...draftState,
       pendingExercises: addDraftSetToExercise(
-        current.pendingExercises,
+        draftState.pendingExercises,
         exerciseIndex,
       ),
-    }));
+    });
   };
 
   const removeSet = (exerciseIndex: number, setIndex: number) => {
-    setDraftState(current => ({
-      ...current,
-      pendingExercises: current.pendingExercises.map((exercise, currentExerciseIndex) => {
+    if (!draftState.pendingExercises[exerciseIndex]?.sets[setIndex]) {
+      return;
+    }
+
+    pushUndoSnapshot();
+    setDraftState({
+      ...draftState,
+      pendingExercises: draftState.pendingExercises.map((exercise, currentExerciseIndex) => {
         if (currentExerciseIndex !== exerciseIndex) {
           return exercise;
         }
@@ -313,15 +413,25 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           sets: nextSets,
         };
       }),
-    }));
+    });
   };
 
   const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(false);
 
-    if (selectedDate) {
+    if (selectedDate && selectedDate.getTime() !== performedAt.getTime()) {
+      pushUndoSnapshot();
       setPerformedAt(selectedDate);
     }
+  };
+
+  const handleOverallNotesChange = (value: string) => {
+    if (value === overallNotes) {
+      return;
+    }
+
+    pushUndoSnapshot();
+    setOverallNotes(value);
   };
 
   const handleExerciseLayout =
@@ -345,6 +455,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
       return;
     }
 
+    pushUndoSnapshot();
     setDraftState(nextDraftState);
 
     if (nextDraftState.pendingExercises.length === 0) {
@@ -452,6 +563,14 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
               />
               <Button
                 fullWidth={false}
+                variant="secondary"
+                label="Desfazer alterações"
+                icon={<Undo2 color={theme.colors.text} size={15} />}
+                onPress={handleUndoLastChange}
+                disabled={undoStack.length === 0}
+              />
+              <Button
+                fullWidth={false}
                 label={isSaving ? 'Salvando treino...' : 'Salvar treino'}
                 icon={isSaving ? undefined : <Play color="#04110A" size={15} />}
                 onPress={handleSave}
@@ -473,7 +592,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
             label="Notas gerais da execução"
             placeholder="Como o treino se comportou hoje?"
             value={overallNotes}
-            onChangeText={setOverallNotes}
+            onChangeText={handleOverallNotesChange}
             multiline
           />
 
@@ -511,6 +630,15 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
                 {exercise.hint ? (
                   <Text style={styles.exerciseHint}>{exercise.hint}</Text>
+                ) : null}
+
+                {exercisePerformanceRecords[exercise.workoutExerciseId] ? (
+                  <Text style={styles.exercisePerformanceRecord}>
+                    Maior carga realizada:{' '}
+                    {formatExercisePerformanceRecord(
+                      exercisePerformanceRecords[exercise.workoutExerciseId],
+                    )}
+                  </Text>
                 ) : null}
 
                 {exercise.baseLoad ? (
@@ -699,6 +827,10 @@ const styles = StyleSheet.create({
   exerciseLoadHint: {
     ...theme.typography.caption,
     color: theme.colors.accent,
+  },
+  exercisePerformanceRecord: {
+    ...theme.typography.caption,
+    color: theme.colors.accentSecondary,
   },
   setCard: {
     padding: theme.spacing.md,

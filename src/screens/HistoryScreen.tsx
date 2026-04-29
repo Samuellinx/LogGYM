@@ -105,7 +105,6 @@ export const HistoryScreen = () => {
                   </Text>
                 </View>
                 <View style={styles.cardActions}>
-                  <Text style={styles.cardLoad}>{formatLoad(item.topLoad)}</Text>
                   <Pressable
                     accessibilityRole="button"
                     hitSlop={10}
@@ -119,8 +118,17 @@ export const HistoryScreen = () => {
                 </View>
               </View>
 
+              <View style={styles.metricsRow}>
+                <Text style={styles.metricText}>
+                  Maior carga - {formatLoad(item.topLoad)}
+                </Text>
+                <Text style={styles.metricText}>
+                  Total levantado - {formatVolume(item.totalVolume)}
+                </Text>
+              </View>
+
               <Text style={styles.cardStats}>
-                {item.totalSets} séries - {formatVolume(item.totalVolume)}
+                {item.totalSets} séries
               </Text>
 
               {item.overallNotes ? (
@@ -216,9 +224,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: theme.spacing.sm,
   },
-  cardLoad: {
-    ...theme.typography.subtitle,
-    color: theme.colors.accent,
+  metricsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  metricText: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   deleteButton: {
     width: 34,

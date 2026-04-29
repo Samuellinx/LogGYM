@@ -14,14 +14,22 @@ import {Screen} from '@/components/Screen';
 import {SectionHeader} from '@/components/SectionHeader';
 import {TextField} from '@/components/TextField';
 import {WorkoutCard} from '@/components/WorkoutCard';
+import {WorkoutConsultModal} from '@/components/WorkoutConsultModal';
 import {
   deleteTrainingDraftAutosave,
   duplicateWorkout,
+  getExerciseProgress,
+  getWorkoutDetail,
   listStartedTrainingDraftWorkoutIds,
 } from '@/features/workouts/workoutRepository';
-import {getTrainingStartActionConfig} from '@/features/workouts/trainingSessionUi';
+import {
+  getExercisePerformanceRecord,
+  getTrainingStartActionConfig,
+  type ExercisePerformanceRecord,
+} from '@/features/workouts/trainingSessionUi';
 import {MainTabParamList, RootStackParamList} from '@/navigation/types';
 import {theme} from '@/theme';
+import type {WorkoutDetail} from '@/types/domain';
 import {toUserMessage} from '@/utils/errors';
 import {useAppStore} from '@/store/useAppStore';
 
@@ -30,6 +38,28 @@ type DraftToClear = {
   workoutId: string;
   workoutName: string;
 } | null;
+type ExercisePerformanceRecords = Record<string, ExercisePerformanceRecord>;
+
+const loadExercisePerformanceRecords = async (
+  userId: string,
+  workout: WorkoutDetail,
+): Promise<ExercisePerformanceRecords> => {
+  const entries = await Promise.all(
+    workout.exercises.map(async exercise => {
+      const progress = await getExerciseProgress(userId, exercise.name);
+      const performanceRecord = getExercisePerformanceRecord(progress.points);
+
+      return performanceRecord ? ([exercise.id, performanceRecord] as const) : null;
+    }),
+  );
+
+  return Object.fromEntries(
+    entries.filter(
+      (entry): entry is readonly [string, ExercisePerformanceRecord] =>
+        entry !== null,
+    ),
+  );
+};
 
 export const WorkoutsScreen = () => {
   const navigation = useNavigation<AppNavigation>();
@@ -44,6 +74,10 @@ export const WorkoutsScreen = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [draftToClear, setDraftToClear] = useState<DraftToClear>(null);
+  const [consultWorkout, setConsultWorkout] =
+    useState<WorkoutDetail | null>(null);
+  const [consultWorkoutRecords, setConsultWorkoutRecords] =
+    useState<ExercisePerformanceRecords>({});
   const deferredSearch = useDeferredValue(search);
 
   const normalized = deferredSearch.trim().toLowerCase();
@@ -120,6 +154,33 @@ export const WorkoutsScreen = () => {
       setDraftToClear(null);
     } catch (error) {
       showError(toUserMessage(error));
+    }
+  };
+
+  const handleConsultWorkout = async (workoutId: string) => {
+    if (!session) {
+      return;
+    }
+
+    try {
+      const detail = await getWorkoutDetail(session.user.id, workoutId);
+
+      if (!detail) {
+        showError('Treino não encontrado para consulta.');
+        return;
+      }
+
+      const performanceRecords = await loadExercisePerformanceRecords(
+        session.user.id,
+        detail,
+      ).catch(() => ({}));
+
+      setConsultWorkoutRecords(performanceRecords);
+      setConsultWorkout(detail);
+    } catch (error) {
+      showError(
+        toUserMessage(error, 'Não foi possível consultar este treino agora.'),
+      );
     }
   };
 
@@ -244,6 +305,7 @@ export const WorkoutsScreen = () => {
                 onStart={() =>
                   navigation.navigate('TrainingSession', {workoutId: workout.id})
                 }
+                onConsult={() => handleConsultWorkout(workout.id)}
                 onDuplicate={() => handleDuplicate(workout.id)}
                 onClearTraining={() =>
                   setDraftToClear({
@@ -287,6 +349,15 @@ export const WorkoutsScreen = () => {
         confirmVariant="danger"
         onConfirm={handleClearTrainingDraft}
         onCancel={() => setDraftToClear(null)}
+      />
+      <WorkoutConsultModal
+        visible={consultWorkout !== null}
+        workout={consultWorkout}
+        performanceRecords={consultWorkoutRecords}
+        onClose={() => {
+          setConsultWorkout(null);
+          setConsultWorkoutRecords({});
+        }}
       />
     </Screen>
   );

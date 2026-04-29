@@ -1,6 +1,7 @@
 import {
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
+  getExercisePerformanceRecord,
   getNextTrainingExerciseIndex,
   getTrainingStartActionConfig,
   isTrainingDraftSetCompleted,
@@ -21,6 +22,37 @@ describe('training session ui helpers', () => {
       label: 'Iniciar treino',
       variant: 'primary',
     });
+  });
+
+  it('returns the max performed load with its reps for an exercise', () => {
+    expect(
+      getExercisePerformanceRecord([
+        {
+          load: 40,
+          reps: 10,
+        },
+        {
+          load: 50,
+          reps: 8,
+        },
+        {
+          load: 50,
+          reps: 9,
+        },
+      ]),
+    ).toEqual({
+      load: 50,
+      reps: 9,
+    });
+
+    expect(
+      getExercisePerformanceRecord([
+        {
+          load: 0,
+          reps: 10,
+        },
+      ]),
+    ).toBeNull();
   });
 
   it('returns the next exercise index when there is another exercise', () => {

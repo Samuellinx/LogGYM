@@ -34,6 +34,20 @@ export const formatLoad = (value: number) =>
     maximumFractionDigits: 1,
   })} kg`;
 
+export const formatReps = (value: number) =>
+  value.toLocaleString('pt-BR', {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
+  });
+
+export const formatExercisePerformanceRecord = ({
+  load,
+  reps,
+}: {
+  load: number;
+  reps: number;
+}) => `${formatLoad(load)} - ${formatReps(reps)} reps`;
+
 export const formatVolume = (value: number) =>
   `${Math.round(value).toLocaleString('pt-BR')} kg`;
 
