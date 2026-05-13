@@ -26,7 +26,7 @@ describe('mobile workout validation', () => {
 
     expect(parsed.success).toBe(false);
     expect(getWorkoutValidationMessage(parsed.error)).toBe(
-      'Exercício 1: informe a faixa de repetições.',
+      'Exercício 1: informe as repetições.',
     );
   });
 

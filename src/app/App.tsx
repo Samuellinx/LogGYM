@@ -25,6 +25,7 @@ const App = () => {
   const refreshData = useAppStore(state => state.refreshData);
   const clearError = useAppStore(state => state.clearError);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [hasSplashSettled, setHasSplashSettled] = useState(false);
 
   useEffect(() => {
     bootstrap().catch(() => {
@@ -39,6 +40,12 @@ const App = () => {
 
     return unsubscribe;
   }, [bootstrap, setOnline]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setHasSplashSettled(true), 1800);
+
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     const errorUtils = (
@@ -84,7 +91,7 @@ const App = () => {
 
   const modalError = runtimeError ?? (session ? error : null);
 
-  if (isBootstrapping || (!session && error)) {
+  if (!hasSplashSettled || isBootstrapping || (!session && error)) {
     return (
       <SplashScreen
         error={error}

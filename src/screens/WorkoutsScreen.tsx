@@ -1,4 +1,4 @@
-import {useDeferredValue, useEffect, useState} from 'react';
+import {useDeferredValue, useEffect, useMemo, useState} from 'react';
 import {Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -27,6 +27,7 @@ import {
   getTrainingStartActionConfig,
   type ExercisePerformanceRecord,
 } from '@/features/workouts/trainingSessionUi';
+import {prioritizeStartedWorkouts} from '@/features/workouts/workoutList';
 import {MainTabParamList, RootStackParamList} from '@/navigation/types';
 import {theme} from '@/theme';
 import type {WorkoutDetail} from '@/types/domain';
@@ -81,6 +82,10 @@ export const WorkoutsScreen = () => {
   const deferredSearch = useDeferredValue(search);
 
   const normalized = deferredSearch.trim().toLowerCase();
+  const startedWorkoutIdSet = useMemo(
+    () => new Set(startedWorkoutIds),
+    [startedWorkoutIds],
+  );
   const workoutsForDate = selectedDate
     ? new Set(
         history
@@ -101,16 +106,21 @@ export const WorkoutsScreen = () => {
           .filter((workoutId): workoutId is string => Boolean(workoutId)),
       )
     : null;
-  const filteredWorkouts = workouts.filter(workout => {
-    const matchesSearch = normalized
-      ? `${workout.name} ${workout.focus} ${workout.notes}`
-          .toLowerCase()
-          .includes(normalized)
-      : true;
-    const matchesDate = workoutsForDate ? workoutsForDate.has(workout.id) : true;
+  const filteredWorkouts = prioritizeStartedWorkouts(
+    workouts.filter(workout => {
+      const matchesSearch = normalized
+        ? `${workout.name} ${workout.focus} ${workout.notes}`
+            .toLowerCase()
+            .includes(normalized)
+        : true;
+      const matchesDate = workoutsForDate
+        ? workoutsForDate.has(workout.id)
+        : true;
 
-    return matchesSearch && matchesDate;
-  });
+      return matchesSearch && matchesDate;
+    }),
+    startedWorkoutIdSet,
+  );
   const selectedDateLabel = selectedDate
     ? selectedDate.toLocaleDateString('pt-BR', {
         day: '2-digit',
@@ -292,7 +302,7 @@ export const WorkoutsScreen = () => {
         {filteredWorkouts.length ? (
           filteredWorkouts.map(workout => {
             const startAction = getTrainingStartActionConfig(
-              startedWorkoutIds.includes(workout.id),
+              startedWorkoutIdSet.has(workout.id),
             );
 
             return (
@@ -313,7 +323,7 @@ export const WorkoutsScreen = () => {
                     workoutName: workout.name,
                   })
                 }
-                clearTrainingDisabled={!startedWorkoutIds.includes(workout.id)}
+                clearTrainingDisabled={!startedWorkoutIdSet.has(workout.id)}
                 startLabel={startAction.label}
                 isResume={startAction.variant === 'resume'}
               />

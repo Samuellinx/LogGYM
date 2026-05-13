@@ -47,7 +47,7 @@ const formatWorkoutIssue = (issue: ZodIssue) => {
       case 'muscleGroup':
         return `${exerciseLabel}: escolha o grupo ou tipo.`;
       case 'targetReps':
-        return `${exerciseLabel}: informe a faixa de repetições.`;
+        return `${exerciseLabel}: informe as repetições.`;
       case 'baseLoadKg':
         return `${exerciseLabel}: use apenas números na carga em kg.`;
       case 'baseLoadPlates':

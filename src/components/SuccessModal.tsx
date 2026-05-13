@@ -6,16 +6,22 @@ import {theme} from '@/theme';
 interface SuccessModalProps {
   visible: boolean;
   message: string;
+  actionLabel?: string;
   onClose: () => void;
 }
 
-export const SuccessModal = ({visible, message, onClose}: SuccessModalProps) => (
+export const SuccessModal = ({
+  visible,
+  message,
+  actionLabel = 'Continuar',
+  onClose,
+}: SuccessModalProps) => (
   <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
     <View style={styles.overlay}>
       <View accessibilityRole="alert" style={styles.modalCard}>
         <Text style={styles.eyebrow}>Sucesso</Text>
         <Text style={styles.title}>{message}</Text>
-        <Button variant="primary" label="Continuar" onPress={onClose} />
+        <Button variant="primary" label={actionLabel} onPress={onClose} />
       </View>
     </View>
   </Modal>

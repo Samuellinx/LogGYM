@@ -459,7 +459,7 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
             <View style={styles.exerciseHeaderCopy}>
               <Text style={styles.exerciseTitle}>Exercícios</Text>
               <Text style={styles.exerciseSubtitle}>
-                Defina ordem, carga, repeticoes e observações para cada bloco.
+                Defina ordem, carga, repetições e observações para cada bloco.
               </Text>
             </View>
 
@@ -633,11 +633,11 @@ export const WorkoutFormScreen = ({navigation, route}: Props) => {
                 name={`exercises.${index}.targetReps`}
                 render={({field}) => (
                   <TextField
-                    label="Faixa de repeticoes"
+                    label="Repetições"
                     placeholder="Ex: 8-10"
                     value={field.value}
                     onChangeText={value => field.onChange(maskRepRangeInput(value))}
-                    keyboardType="numbers-and-punctuation"
+                    keyboardType="default"
                     error={errors.exercises?.[index]?.targetReps?.message}
                   />
                 )}

@@ -124,6 +124,7 @@ export type TrainingDraftExercise = {
   baseLoad: string;
   targetReps: string;
   hint: string;
+  status?: 'not-performed';
   sets: TrainingDraftSet[];
 };
 

@@ -12,12 +12,21 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ChevronRight, Play, Plus, Trash2, Undo2} from 'lucide-react-native';
+import {
+  ChevronRight,
+  Clock3,
+  Play,
+  Plus,
+  Trash2,
+  Undo2,
+  XCircle,
+} from 'lucide-react-native';
 
 import {Button} from '@/components/Button';
 import {ConfirmModal} from '@/components/ConfirmModal';
 import {EmptyState} from '@/components/EmptyState';
 import {Screen} from '@/components/Screen';
+import {SuccessModal} from '@/components/SuccessModal';
 import {TextField} from '@/components/TextField';
 import {
   WorkoutCompletionModal,
@@ -41,9 +50,12 @@ import {
   type TrainingDraftExerciseState,
 } from '@/features/workouts/trainingDraftAutosave';
 import {
+  addTrainingDraftExercise,
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
   getExercisePerformanceRecord,
+  getNextTrainingExerciseIndex,
+  markTrainingDraftExerciseNotPerformed,
   mergeTrainingDraftExercisesForSave,
   type ExercisePerformanceRecord,
 } from '@/features/workouts/trainingSessionUi';
@@ -57,7 +69,21 @@ import {
   formatDateLong,
   formatExercisePerformanceRecord,
 } from '@/utils/formatters';
-import {maskDecimalInput, maskIntegerInput} from '@/utils/inputMasks';
+import {
+  maskDecimalInput,
+  maskIntegerInput,
+  maskRepRangeInput,
+} from '@/utils/inputMasks';
+import {
+  normalizeSessionDateInput,
+  resolveTrainingDraftPerformedAt,
+  toSessionDate,
+} from '@/utils/sessionDate';
+import {
+  defaultRestTimerSeconds,
+  formatRestTimerTime,
+  restTimerPresets,
+} from '@/utils/restTimer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainingSession'>;
 
@@ -71,10 +97,30 @@ type TrainingUndoSnapshot = {
   overallNotes: string;
 };
 type ExercisePerformanceRecords = Record<string, ExercisePerformanceRecord>;
+type SetRestTimerState = {
+  durationSeconds: number;
+  remainingSeconds: number;
+  isRunning: boolean;
+  endsAt: number | null;
+};
+type NewExerciseDraft = {
+  exerciseName: string;
+  muscleGroup: string;
+  baseLoad: string;
+  targetReps: string;
+  hint: string;
+};
 
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
 type UpdatableTrainingDraftSetField = 'load' | 'reps' | 'note';
 const MAX_UNDO_STEPS = 50;
+const createEmptyNewExerciseDraft = (): NewExerciseDraft => ({
+  exerciseName: '',
+  muscleGroup: '',
+  baseLoad: '',
+  targetReps: '',
+  hint: '',
+});
 
 const cloneDraftExercises = (exercises: TrainingDraftExercise[]) =>
   exercises.map(exercise => ({
@@ -88,6 +134,31 @@ const cloneDraftState = (
   pendingExercises: cloneDraftExercises(state.pendingExercises),
   completedExercises: cloneDraftExercises(state.completedExercises),
 });
+
+const createRestTimerState = (
+  durationSeconds = defaultRestTimerSeconds,
+): SetRestTimerState => ({
+  durationSeconds,
+  remainingSeconds: durationSeconds,
+  isRunning: false,
+  endsAt: null,
+});
+
+const getSetRestTimerKey = (exerciseId: string, setId: string) =>
+  `${exerciseId}:${setId}`;
+
+const removeRestTimerKeys = (
+  timers: Record<string, SetRestTimerState>,
+  timerKeys: string[],
+) => {
+  const nextTimers = {...timers};
+
+  timerKeys.forEach(timerKey => {
+    delete nextTimers[timerKey];
+  });
+
+  return nextTimers;
+};
 
 const loadExercisePerformanceRecords = async (
   userId: string,
@@ -226,8 +297,12 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [draftState, setDraftState] = useState<TrainingDraftExerciseState>(
     createEmptyTrainingDraftState(),
   );
-  const [performedAt, setPerformedAt] = useState(new Date());
+  const [performedAt, setPerformedAt] = useState(() => toSessionDate(new Date()));
   const [overallNotes, setOverallNotes] = useState('');
+  const [isAddingExercise, setIsAddingExercise] = useState(false);
+  const [newExerciseDraft, setNewExerciseDraft] = useState<NewExerciseDraft>(
+    createEmptyNewExerciseDraft(),
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -238,9 +313,23 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   const [undoStack, setUndoStack] = useState<TrainingUndoSnapshot[]>([]);
   const [exercisePerformanceRecords, setExercisePerformanceRecords] =
     useState<ExercisePerformanceRecords>({});
+  const [setRestTimers, setSetRestTimers] = useState<Record<string, SetRestTimerState>>(
+    {},
+  );
+  const [activeRestTimerMenuKey, setActiveRestTimerMenuKey] = useState<
+    string | null
+  >(null);
+  const [restTimerCompletionKey, setRestTimerCompletionKey] = useState<
+    string | null
+  >(null);
+  const hasRunningRestTimer = Object.values(setRestTimers).some(
+    timer => timer.isRunning,
+  );
+  const notifiedRestTimerKeysRef = useRef<Set<string>>(new Set());
   const scrollViewRef = useRef<ScrollView | null>(null);
   const exercisePositions = useRef<number[]>([]);
   const exerciseLoadInputRefs = useRef<Array<TextInput | null>>([]);
+  const draftAutosavePausedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -250,6 +339,8 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         setIsLoading(false);
         return;
       }
+
+      draftAutosavePausedRef.current = false;
 
       try {
         const [detail, savedDraft] = await Promise.all([
@@ -270,11 +361,11 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         setWorkout(detail);
         setDraftState(restoredDraftState);
         setExercisePerformanceRecords(performanceRecords);
+        setIsAddingExercise(false);
+        setNewExerciseDraft(createEmptyNewExerciseDraft());
 
-        if (savedDraft) {
-          setOverallNotes(savedDraft.overallNotes);
-          setPerformedAt(new Date(savedDraft.performedAt));
-        }
+        setOverallNotes(savedDraft?.overallNotes ?? '');
+        setPerformedAt(resolveTrainingDraftPerformedAt(savedDraft?.performedAt));
 
         setUndoStack([]);
         setHasLoadedDraft(true);
@@ -297,16 +388,20 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   }, [route.params.workoutId, session, showError]);
 
   useEffect(() => {
-    if (!session || !workout || !hasLoadedDraft) {
+    if (!session || !workout || !hasLoadedDraft || isSaving) {
       return;
     }
 
     const timeoutId = setTimeout(() => {
+      if (draftAutosavePausedRef.current) {
+        return;
+      }
+
       saveTrainingDraftAutosave(
         createTrainingDraftSnapshot({
           userId: session.user.id,
           workoutId: workout.id,
-          performedAt: performedAt.toISOString(),
+          performedAt: normalizeSessionDateInput(performedAt),
           overallNotes,
           pendingExercises: draftState.pendingExercises,
           completedExercises: draftState.completedExercises,
@@ -316,13 +411,84 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     }, 350);
 
     return () => clearTimeout(timeoutId);
-  }, [draftState, hasLoadedDraft, overallNotes, performedAt, session, workout]);
+  }, [draftState, hasLoadedDraft, isSaving, overallNotes, performedAt, session, workout]);
+
+  useEffect(() => {
+    if (!hasRunningRestTimer) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setSetRestTimers(currentTimers => {
+        let hasChanges = false;
+        const nextTimers = Object.fromEntries(
+          Object.entries(currentTimers).map(([timerKey, timer]) => {
+            if (!timer.isRunning || timer.endsAt === null) {
+              return [timerKey, timer];
+            }
+
+            const remainingSeconds = Math.max(
+              0,
+              Math.ceil((timer.endsAt - Date.now()) / 1000),
+            );
+
+            if (
+              remainingSeconds === timer.remainingSeconds &&
+              (remainingSeconds > 0 || !timer.isRunning)
+            ) {
+              return [timerKey, timer];
+            }
+
+            hasChanges = true;
+
+            return [
+              timerKey,
+              {
+                ...timer,
+                remainingSeconds,
+                isRunning: remainingSeconds > 0,
+                endsAt: remainingSeconds > 0 ? timer.endsAt : null,
+              },
+            ];
+          }),
+        );
+
+        return hasChanges ? nextTimers : currentTimers;
+      });
+    }, 250);
+
+    return () => clearInterval(intervalId);
+  }, [hasRunningRestTimer]);
+
+  useEffect(() => {
+    Object.entries(setRestTimers).forEach(([timerKey, timer]) => {
+      if (timer.remainingSeconds > 0 || timer.isRunning) {
+        notifiedRestTimerKeysRef.current.delete(timerKey);
+      }
+    });
+
+    const finishedTimerKey = Object.entries(setRestTimers).find(
+      ([timerKey, timer]) =>
+        timer.remainingSeconds === 0 &&
+        !timer.isRunning &&
+        timer.endsAt === null &&
+        !notifiedRestTimerKeysRef.current.has(timerKey),
+    )?.[0];
+
+    if (!finishedTimerKey) {
+      return;
+    }
+
+    notifiedRestTimerKeysRef.current.add(finishedTimerKey);
+    setActiveRestTimerMenuKey(null);
+    setRestTimerCompletionKey(finishedTimerKey);
+  }, [setRestTimers]);
 
   const pushUndoSnapshot = () => {
     setUndoStack(current => [
       {
         draftState: cloneDraftState(draftState),
-        performedAt: performedAt.toISOString(),
+        performedAt: normalizeSessionDateInput(performedAt),
         overallNotes,
       },
       ...current,
@@ -337,9 +503,76 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     }
 
     setDraftState(cloneDraftState(lastSnapshot.draftState));
-    setPerformedAt(new Date(lastSnapshot.performedAt));
+    setPerformedAt(toSessionDate(lastSnapshot.performedAt));
     setOverallNotes(lastSnapshot.overallNotes);
     setUndoStack(remainingSnapshots);
+  };
+
+  const getRestTimerState = (timerKey: string) =>
+    setRestTimers[timerKey] ?? createRestTimerState();
+
+  const configureRestTimer = (timerKey: string, durationSeconds: number) => {
+    notifiedRestTimerKeysRef.current.delete(timerKey);
+    setSetRestTimers(current => ({
+      ...current,
+      [timerKey]: createRestTimerState(durationSeconds),
+    }));
+  };
+
+  const toggleRestTimer = (timerKey: string) => {
+    setSetRestTimers(current => {
+      const timer = current[timerKey] ?? createRestTimerState();
+
+      if (timer.isRunning) {
+        const remainingSeconds =
+          timer.endsAt === null
+            ? timer.remainingSeconds
+            : Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000));
+
+        return {
+          ...current,
+          [timerKey]: {
+            ...timer,
+            remainingSeconds,
+            isRunning: false,
+            endsAt: null,
+          },
+        };
+      }
+
+      const remainingSeconds =
+        timer.remainingSeconds > 0 ? timer.remainingSeconds : timer.durationSeconds;
+
+      notifiedRestTimerKeysRef.current.delete(timerKey);
+
+      return {
+        ...current,
+        [timerKey]: {
+          ...timer,
+          remainingSeconds,
+          isRunning: true,
+          endsAt: Date.now() + remainingSeconds * 1000,
+        },
+      };
+    });
+  };
+
+  const resetRestTimer = (timerKey: string) => {
+    notifiedRestTimerKeysRef.current.delete(timerKey);
+    setSetRestTimers(current => {
+      const timer = current[timerKey] ?? createRestTimerState();
+
+      return {
+        ...current,
+        [timerKey]: createRestTimerState(timer.durationSeconds),
+      };
+    });
+  };
+
+  const toggleRestTimerMenu = (timerKey: string) => {
+    setActiveRestTimerMenuKey(current =>
+      current === timerKey ? null : timerKey,
+    );
   };
 
   const updateSet = (
@@ -389,27 +622,40 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
   };
 
   const removeSet = (exerciseIndex: number, setIndex: number) => {
-    if (!draftState.pendingExercises[exerciseIndex]?.sets[setIndex]) {
+    const exercise = draftState.pendingExercises[exerciseIndex];
+    const set = exercise?.sets[setIndex];
+
+    if (!exercise || !set) {
       return;
     }
 
     pushUndoSnapshot();
+    const timerKey = getSetRestTimerKey(exercise.workoutExerciseId, set.id);
+
+    setSetRestTimers(current =>
+      removeRestTimerKeys(current, [
+        timerKey,
+      ]),
+    );
+    notifiedRestTimerKeysRef.current.delete(timerKey);
+    setActiveRestTimerMenuKey(current => (current === timerKey ? null : current));
+    setRestTimerCompletionKey(current => (current === timerKey ? null : current));
     setDraftState({
       ...draftState,
-      pendingExercises: draftState.pendingExercises.map((exercise, currentExerciseIndex) => {
+      pendingExercises: draftState.pendingExercises.map((draftExercise, currentExerciseIndex) => {
         if (currentExerciseIndex !== exerciseIndex) {
-          return exercise;
+          return draftExercise;
         }
 
         const nextSets =
-          exercise.sets.length === 1
+          draftExercise.sets.length === 1
             ? [createBlankSet()]
-            : exercise.sets.filter(
+            : draftExercise.sets.filter(
                 (_, currentSetIndex) => currentSetIndex !== setIndex,
               );
 
         return {
-          ...exercise,
+          ...draftExercise,
           sets: nextSets,
         };
       }),
@@ -421,7 +667,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
     if (selectedDate && selectedDate.getTime() !== performedAt.getTime()) {
       pushUndoSnapshot();
-      setPerformedAt(selectedDate);
+      setPerformedAt(toSessionDate(selectedDate));
     }
   };
 
@@ -438,6 +684,22 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     (exerciseIndex: number) => (event: LayoutChangeEvent) => {
       exercisePositions.current[exerciseIndex] = event.nativeEvent.layout.y;
     };
+
+  const scrollToPendingExercise = (exerciseIndex: number) => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(
+          (exercisePositions.current[exerciseIndex] ?? 0) - theme.spacing.md,
+          0,
+        ),
+        animated: true,
+      });
+
+      setTimeout(() => {
+        exerciseLoadInputRefs.current[exerciseIndex]?.focus();
+      }, 220);
+    }, 40);
+  };
 
   const handleFinishExercise = (exerciseIndex: number) => {
     const exercise = draftState.pendingExercises[exerciseIndex];
@@ -457,6 +719,24 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
     pushUndoSnapshot();
     setDraftState(nextDraftState);
+    const removedTimerKeys = exercise.sets.map(set =>
+      getSetRestTimerKey(exercise.workoutExerciseId, set.id),
+    );
+    setSetRestTimers(current =>
+      removeRestTimerKeys(
+        current,
+        removedTimerKeys,
+      ),
+    );
+    removedTimerKeys.forEach(timerKey =>
+      notifiedRestTimerKeysRef.current.delete(timerKey),
+    );
+    setActiveRestTimerMenuKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
+    setRestTimerCompletionKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
 
     if (nextDraftState.pendingExercises.length === 0) {
       return;
@@ -467,19 +747,73 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
       nextDraftState.pendingExercises.length - 1,
     );
 
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({
-        y: Math.max(
-          (exercisePositions.current[targetExerciseIndex] ?? 0) - theme.spacing.md,
-          0,
-        ),
-        animated: true,
-      });
+    scrollToPendingExercise(targetExerciseIndex);
+  };
 
-      setTimeout(() => {
-        exerciseLoadInputRefs.current[targetExerciseIndex]?.focus();
-      }, 220);
-    }, 40);
+  const handleMarkExerciseNotPerformed = (exerciseIndex: number) => {
+    const exercise = draftState.pendingExercises[exerciseIndex];
+
+    if (!exercise || exercise.status === 'not-performed') {
+      return;
+    }
+
+    const nextDraftState = markTrainingDraftExerciseNotPerformed(
+      draftState,
+      exerciseIndex,
+    );
+
+    if (!nextDraftState) {
+      return;
+    }
+
+    pushUndoSnapshot();
+    setDraftState(nextDraftState);
+
+    const removedTimerKeys = exercise.sets.map(set =>
+      getSetRestTimerKey(exercise.workoutExerciseId, set.id),
+    );
+    setSetRestTimers(current => removeRestTimerKeys(current, removedTimerKeys));
+    removedTimerKeys.forEach(timerKey =>
+      notifiedRestTimerKeysRef.current.delete(timerKey),
+    );
+    setActiveRestTimerMenuKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
+    setRestTimerCompletionKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
+
+    const nextExerciseIndex = getNextTrainingExerciseIndex(
+      exerciseIndex,
+      nextDraftState.pendingExercises.length,
+    );
+
+    if (nextExerciseIndex !== null) {
+      scrollToPendingExercise(nextExerciseIndex);
+    }
+  };
+
+  const handleNewExerciseDraftChange = (
+    field: keyof NewExerciseDraft,
+    value: string,
+  ) => {
+    setNewExerciseDraft(current => ({...current, [field]: value}));
+  };
+
+  const handleAddTrainingExercise = () => {
+    if (!newExerciseDraft.exerciseName.trim()) {
+      showError('Informe o nome do exercício para adicionar ao treino.');
+      return;
+    }
+
+    pushUndoSnapshot();
+    const nextDraftState = addTrainingDraftExercise(draftState, newExerciseDraft);
+    const targetExerciseIndex = nextDraftState.pendingExercises.length - 1;
+
+    setDraftState(nextDraftState);
+    setNewExerciseDraft(createEmptyNewExerciseDraft());
+    setIsAddingExercise(false);
+    scrollToPendingExercise(targetExerciseIndex);
   };
 
   const handleSave = async () => {
@@ -488,6 +822,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
     }
 
     try {
+      draftAutosavePausedRef.current = true;
       setIsSaving(true);
       const exercisesForSave = mergeTrainingDraftExercisesForSave(draftState);
       const summary = buildCompletionSummary(
@@ -501,7 +836,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         workoutName: workout.name,
         focus: workout.focus,
         overallNotes,
-        performedAt: performedAt.toISOString(),
+        performedAt: normalizeSessionDateInput(performedAt),
         exercises: exercisesForSave.map(exercise => ({
           workoutExerciseId: exercise.workoutExerciseId,
           exerciseName: exercise.exerciseName,
@@ -516,8 +851,13 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
       await deleteTrainingDraftAutosave(session.user.id, workout.id);
       await refreshData();
+      setSetRestTimers({});
+      notifiedRestTimerKeysRef.current.clear();
+      setActiveRestTimerMenuKey(null);
+      setRestTimerCompletionKey(null);
       setCompletionSummary(summary);
     } catch (error) {
+      draftAutosavePausedRef.current = false;
       showError(toUserMessage(error));
     } finally {
       setIsSaving(false);
@@ -588,6 +928,93 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
             />
           ) : null}
 
+          <View style={styles.addExerciseBox}>
+            <Button
+              fullWidth={false}
+              variant="secondary"
+              label="Adicionar novo exercício"
+              icon={<Plus color={theme.colors.text} size={15} />}
+              onPress={() => setIsAddingExercise(current => !current)}
+            />
+
+            {isAddingExercise ? (
+              <View style={styles.newExerciseForm}>
+                <TextField
+                  label="Nome do exercício"
+                  placeholder="Ex: Elevação lateral"
+                  value={newExerciseDraft.exerciseName}
+                  onChangeText={value =>
+                    handleNewExerciseDraftChange('exerciseName', value)
+                  }
+                />
+                <TextField
+                  label="Grupo muscular"
+                  placeholder="Ex: Ombro"
+                  value={newExerciseDraft.muscleGroup}
+                  onChangeText={value =>
+                    handleNewExerciseDraftChange('muscleGroup', value)
+                  }
+                />
+                <View style={styles.newExerciseMetricsRow}>
+                  <View style={styles.newExerciseMetricField}>
+                    <TextField
+                      label="Carga sugerida"
+                      placeholder="0"
+                      value={newExerciseDraft.baseLoad}
+                      keyboardType="decimal-pad"
+                      onChangeText={value =>
+                        handleNewExerciseDraftChange(
+                          'baseLoad',
+                          maskDecimalInput(value),
+                        )
+                      }
+                    />
+                  </View>
+                  <View style={styles.newExerciseMetricField}>
+                    <TextField
+                      label="Repetições"
+                      placeholder="8-12"
+                      value={newExerciseDraft.targetReps}
+                      keyboardType="default"
+                      onChangeText={value =>
+                        handleNewExerciseDraftChange(
+                          'targetReps',
+                          maskRepRangeInput(value),
+                        )
+                      }
+                    />
+                  </View>
+                </View>
+                <TextField
+                  label="Observação"
+                  placeholder="Ex: controlar a descida"
+                  value={newExerciseDraft.hint}
+                  onChangeText={value =>
+                    handleNewExerciseDraftChange('hint', value)
+                  }
+                  multiline
+                />
+                <View style={styles.newExerciseActions}>
+                  <Button
+                    fullWidth={false}
+                    variant="secondary"
+                    label="Cancelar"
+                    onPress={() => {
+                      setIsAddingExercise(false);
+                      setNewExerciseDraft(createEmptyNewExerciseDraft());
+                    }}
+                  />
+                  <Button
+                    fullWidth={false}
+                    label="Adicionar"
+                    icon={<Plus color="#04110A" size={15} />}
+                    onPress={handleAddTrainingExercise}
+                  />
+                </View>
+              </View>
+            ) : null}
+          </View>
+
           <TextField
             label="Notas gerais da execução"
             placeholder="Como o treino se comportou hoje?"
@@ -598,10 +1025,16 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
 
             <View style={styles.exerciseList}>
             {draftState.pendingExercises.length ? (
-              draftState.pendingExercises.map((exercise, exerciseIndex) => (
+              draftState.pendingExercises.map((exercise, exerciseIndex) => {
+                const isNotPerformed = exercise.status === 'not-performed';
+
+                return (
               <View
                 key={exercise.workoutExerciseId}
-                style={styles.exerciseCard}
+                style={[
+                  styles.exerciseCard,
+                  isNotPerformed ? styles.exerciseCardNotPerformed : null,
+                ]}
                 onLayout={handleExerciseLayout(exerciseIndex)}>
                 <View style={styles.exerciseHeader}>
                   <View style={styles.exerciseHeaderCopy}>
@@ -609,8 +1042,28 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                     <Text style={styles.exerciseMeta}>
                       {exercise.muscleGroup} - alvo {exercise.targetReps}
                     </Text>
+                    {isNotPerformed ? (
+                      <Text style={styles.notPerformedBadge}>Não realizado</Text>
+                    ) : null}
                   </View>
                   <View style={styles.exerciseHeaderActions}>
+                    {!isNotPerformed ? (
+                      <>
+                        <Button
+                          fullWidth={false}
+                          variant="secondary"
+                          label="Desfazer alteração"
+                          icon={<Undo2 color={theme.colors.text} size={15} />}
+                          onPress={handleUndoLastChange}
+                          disabled={undoStack.length === 0}
+                        />
+                        <Button
+                          fullWidth={false}
+                          variant="secondary"
+                          label="Não realizado"
+                          icon={<XCircle color={theme.colors.text} size={15} />}
+                          onPress={() => handleMarkExerciseNotPerformed(exerciseIndex)}
+                        />
                     <Button
                       fullWidth={false}
                       variant="secondary"
@@ -625,6 +1078,16 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                       icon={<Plus color={theme.colors.text} size={15} />}
                       onPress={() => addSet(exerciseIndex)}
                     />
+                      </>
+                    ) : (
+                      <Button
+                        fullWidth={false}
+                        variant="danger"
+                        label="Não realizado"
+                        icon={<XCircle color="#FFE8EC" size={15} />}
+                        disabled
+                      />
+                    )}
                   </View>
                 </View>
 
@@ -647,22 +1110,158 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                   </Text>
                 ) : null}
 
-                {exercise.sets.map((set, setIndex) => (
-                  <View key={set.id} style={styles.setCard}>
-                    <View style={styles.setHeader}>
-                      <Text style={styles.setTitle}>Série - {set.seriesNumber}</Text>
-                      <Pressable
-                        hitSlop={10}
-                        style={styles.deleteIconButton}
-                        onPress={() =>
-                          setSetToDelete({
-                            exerciseIndex,
-                            setIndex,
-                          })
-                        }>
-                        <Trash2 color={theme.colors.textMuted} size={16} />
-                      </Pressable>
-                    </View>
+                {isNotPerformed ? (
+                  <View style={styles.notPerformedPanel}>
+                    <Text style={styles.notPerformedText}>
+                      Este exercício foi marcado como não realizado e não entrará
+                      no histórico salvo.
+                    </Text>
+                  </View>
+                ) : exercise.sets.map((set, setIndex) => {
+                  const timerKey = getSetRestTimerKey(
+                    exercise.workoutExerciseId,
+                    set.id,
+                  );
+                  const restTimer = getRestTimerState(timerKey);
+                  const timerActionLabel = restTimer.isRunning
+                    ? 'Pausar'
+                    : restTimer.remainingSeconds === 0
+                      ? 'Reiniciar'
+                      : 'Iniciar';
+                  const isRestTimerMenuOpen =
+                    activeRestTimerMenuKey === timerKey;
+
+                  return (
+                    <View key={set.id} style={styles.setCard}>
+                      <View style={styles.setHeader}>
+                        <Text style={styles.setTitle}>
+                          Série - {set.seriesNumber}
+                        </Text>
+                        <Pressable
+                          hitSlop={10}
+                          style={styles.deleteIconButton}
+                          onPress={() =>
+                            setSetToDelete({
+                              exerciseIndex,
+                              setIndex,
+                            })
+                          }>
+                          <Trash2 color={theme.colors.textMuted} size={16} />
+                        </Pressable>
+                      </View>
+
+                      <View style={styles.restTimerFloatArea}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Abrir opções de descanso. Tempo atual ${formatRestTimerTime(
+                            restTimer.remainingSeconds,
+                          )}`}
+                          onPress={() => toggleRestTimerMenu(timerKey)}
+                          style={({pressed}) => [
+                            styles.restTimerFloatingButton,
+                            restTimer.isRunning
+                              ? styles.restTimerFloatingButtonActive
+                              : null,
+                            pressed ? styles.pressed : null,
+                          ]}>
+                          <Clock3
+                            color={
+                              restTimer.isRunning
+                                ? '#04131B'
+                                : theme.colors.accentSecondary
+                            }
+                            size={21}
+                          />
+                        </Pressable>
+
+                        {isRestTimerMenuOpen ? (
+                          <View style={styles.restTimerMenu}>
+                            <View style={styles.restTimerMenuHeader}>
+                              <View>
+                                <Text style={styles.restTimerMenuTitle}>
+                                  Editar tempo
+                                </Text>
+                                <Text style={styles.restTimerMenuStatus}>
+                                  {restTimer.isRunning
+                                    ? 'Rodando'
+                                    : `${formatRestTimerTime(
+                                        restTimer.durationSeconds,
+                                      )} configurado`}
+                                </Text>
+                              </View>
+                              <Text style={styles.restTimerMenuClock}>
+                                {formatRestTimerTime(restTimer.remainingSeconds)}
+                              </Text>
+                            </View>
+                            <View style={styles.restTimerPresetRow}>
+                              {restTimerPresets.map(preset => {
+                                const isActive =
+                                  restTimer.durationSeconds === preset.seconds;
+
+                                return (
+                                  <Pressable
+                                    key={preset.seconds}
+                                    accessibilityRole="button"
+                                    onPress={() =>
+                                      configureRestTimer(timerKey, preset.seconds)
+                                    }
+                                    style={({pressed}) => [
+                                      styles.restTimerPreset,
+                                      isActive
+                                        ? styles.restTimerPresetActive
+                                        : null,
+                                      pressed ? styles.pressed : null,
+                                    ]}>
+                                    <Text
+                                      style={[
+                                        styles.restTimerPresetText,
+                                        isActive
+                                          ? styles.restTimerPresetTextActive
+                                          : null,
+                                      ]}>
+                                      {preset.label}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+
+                            <View style={styles.restTimerActions}>
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => toggleRestTimer(timerKey)}
+                                style={({pressed}) => [
+                                  styles.restTimerActionButton,
+                                  restTimer.isRunning
+                                    ? styles.restTimerActionButtonActive
+                                    : null,
+                                  pressed ? styles.pressed : null,
+                                ]}>
+                                <Text
+                                  style={[
+                                    styles.restTimerActionText,
+                                    restTimer.isRunning
+                                      ? styles.restTimerActionTextActive
+                                      : null,
+                                  ]}>
+                                  {timerActionLabel}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => resetRestTimer(timerKey)}
+                                style={({pressed}) => [
+                                  styles.restTimerResetButton,
+                                  pressed ? styles.pressed : null,
+                                ]}>
+                                <Text style={styles.restTimerResetText}>
+                                  Resetar
+                                </Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ) : null}
+                      </View>
 
                     <View style={styles.metricsRow}>
                       <View style={styles.metricField}>
@@ -717,11 +1316,13 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                         updateSet(exerciseIndex, setIndex, 'note', value)
                       }
                     />
-                  </View>
-                ))}
+                    </View>
+                  );
+                })}
 
               </View>
-              ))
+                );
+              })
             ) : (
               <EmptyState
                 title="Exercícios finalizados"
@@ -754,6 +1355,13 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
         visible={completionSummary !== null}
         summary={completionSummary}
         onClose={handleCloseCompletionModal}
+      />
+
+      <SuccessModal
+        visible={restTimerCompletionKey !== null}
+        message="Descanso finalizado. Inicie a nova série"
+        actionLabel="Próxima série"
+        onClose={() => setRestTimerCompletionKey(null)}
       />
     </Screen>
   );
@@ -788,6 +1396,32 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.spacing.sm,
   },
+  addExerciseBox: {
+    gap: theme.spacing.md,
+  },
+  newExerciseForm: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.md,
+  },
+  newExerciseMetricsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.md,
+  },
+  newExerciseMetricField: {
+    flex: 1,
+    minWidth: 132,
+  },
+  newExerciseActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
   exerciseList: {
     gap: theme.spacing.md,
   },
@@ -798,6 +1432,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: theme.spacing.md,
+  },
+  exerciseCardNotPerformed: {
+    borderColor: 'rgba(255,111,125,0.3)',
+    backgroundColor: 'rgba(255,111,125,0.06)',
   },
   exerciseHeader: {
     gap: theme.spacing.sm,
@@ -820,6 +1458,27 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
   },
+  notPerformedBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(255,111,125,0.14)',
+    color: '#FFB8C0',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  notPerformedPanel: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,111,125,0.18)',
+    backgroundColor: 'rgba(255,111,125,0.08)',
+  },
+  notPerformedText: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
+  },
   exerciseHint: {
     ...theme.typography.body,
     color: theme.colors.textSoft,
@@ -837,6 +1496,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surfaceElevated,
     gap: theme.spacing.md,
+    position: 'relative',
   },
   setHeader: {
     flexDirection: 'row',
@@ -851,10 +1511,144 @@ const styles = StyleSheet.create({
     ...theme.typography.subtitle,
     color: theme.colors.text,
   },
+  restTimerFloatArea: {
+    position: 'absolute',
+    top: 54,
+    right: theme.spacing.md,
+    width: 220,
+    gap: theme.spacing.sm,
+    zIndex: 10,
+    elevation: 10,
+    alignItems: 'flex-end',
+  },
+  restTimerFloatingButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(81,199,255,0.34)',
+    backgroundColor: 'rgba(15,19,26,0.96)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOpacity: 0.22,
+    shadowOffset: {width: 0, height: 8},
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  restTimerFloatingButtonActive: {
+    borderColor: 'rgba(81,199,255,0.55)',
+    backgroundColor: theme.colors.accentSecondary,
+  },
+  restTimerMenu: {
+    width: 220,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    gap: theme.spacing.sm,
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowOffset: {width: 0, height: 8},
+    shadowRadius: 14,
+    elevation: 5,
+  },
+  restTimerMenuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  restTimerMenuTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  restTimerMenuStatus: {
+    ...theme.typography.caption,
+    color: theme.colors.textSoft,
+    fontSize: 12,
+  },
+  restTimerMenuClock: {
+    minWidth: 56,
+    textAlign: 'right',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+    color: theme.colors.accentSecondary,
+    fontVariant: ['tabular-nums'],
+  },
+  restTimerPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  restTimerPreset: {
+    minHeight: 34,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  restTimerPresetActive: {
+    borderColor: 'rgba(81,199,255,0.42)',
+    backgroundColor: 'rgba(81,199,255,0.1)',
+  },
+  restTimerPresetText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  restTimerPresetTextActive: {
+    color: theme.colors.accentSecondary,
+  },
+  restTimerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  restTimerActionButton: {
+    minHeight: 38,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accentSecondary,
+  },
+  restTimerActionButtonActive: {
+    backgroundColor: theme.colors.warning,
+  },
+  restTimerActionText: {
+    ...theme.typography.caption,
+    color: '#04131B',
+    fontWeight: '700',
+  },
+  restTimerActionTextActive: {
+    color: '#1A1200',
+  },
+  restTimerResetButton: {
+    minHeight: 38,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  restTimerResetText: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    fontWeight: '700',
+  },
   metricsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.spacing.md,
+    marginTop: 54,
   },
   metricField: {
     flex: 1,
@@ -874,5 +1668,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 12,
     ...theme.typography.body,
+  },
+  pressed: {
+    opacity: 0.9,
+    transform: [{scale: 0.98}],
   },
 });

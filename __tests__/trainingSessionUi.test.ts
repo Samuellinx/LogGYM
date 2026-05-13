@@ -1,10 +1,12 @@
 import {
   canFinalizeTrainingDraftExercise,
+  addTrainingDraftExercise,
   finalizeTrainingDraftExercise,
   getExercisePerformanceRecord,
   getNextTrainingExerciseIndex,
   getTrainingStartActionConfig,
   isTrainingDraftSetCompleted,
+  markTrainingDraftExerciseNotPerformed,
   mergeTrainingDraftExercisesForSave,
 } from '@/features/workouts/trainingSessionUi';
 import type {TrainingDraftExerciseState} from '@/features/workouts/trainingDraftAutosave';
@@ -150,6 +152,86 @@ describe('training session ui helpers', () => {
       completedExercises: [draftState.pendingExercises[0]],
     });
     expect(finalizeTrainingDraftExercise(draftState, 1)).toBeNull();
+  });
+
+  it('keeps a not performed exercise visible and excludes it from save', () => {
+    const draftState: TrainingDraftExerciseState = {
+      pendingExercises: [
+        {
+          workoutExerciseId: 'exercise-1',
+          orderIndex: 0,
+          exerciseName: 'Supino',
+          muscleGroup: 'Peito',
+          baseLoad: '40',
+          targetReps: '8-10',
+          hint: '',
+          sets: [{id: 'set-1', seriesNumber: 1, load: '', reps: '', note: ''}],
+        },
+        {
+          workoutExerciseId: 'exercise-2',
+          orderIndex: 1,
+          exerciseName: 'Crucifixo',
+          muscleGroup: 'Peito',
+          baseLoad: '12',
+          targetReps: '10-12',
+          hint: '',
+          sets: [{id: 'set-2', seriesNumber: 1, load: '12', reps: '10', note: ''}],
+        },
+      ],
+      completedExercises: [],
+    };
+
+    const updated = markTrainingDraftExerciseNotPerformed(draftState, 0);
+
+    expect(updated?.pendingExercises).toHaveLength(2);
+    expect(updated?.pendingExercises[0]).toMatchObject({
+      workoutExerciseId: 'exercise-1',
+      status: 'not-performed',
+    });
+    expect(
+      mergeTrainingDraftExercisesForSave(updated as TrainingDraftExerciseState).map(
+        exercise => exercise.workoutExerciseId,
+      ),
+    ).toEqual(['exercise-2']);
+  });
+
+  it('adds a new exercise during a running workout as a pending draft', () => {
+    const draftState: TrainingDraftExerciseState = {
+      pendingExercises: [],
+      completedExercises: [
+        {
+          workoutExerciseId: 'exercise-1',
+          orderIndex: 0,
+          exerciseName: 'Supino',
+          muscleGroup: 'Peito',
+          baseLoad: '40',
+          targetReps: '8-10',
+          hint: '',
+          sets: [{id: 'set-1', seriesNumber: 1, load: '40', reps: '8', note: ''}],
+        },
+      ],
+    };
+
+    const updated = addTrainingDraftExercise(draftState, {
+      exerciseName: 'Elevação lateral',
+      muscleGroup: 'Ombro',
+      baseLoad: '8',
+      targetReps: '12',
+      hint: 'Controle a descida',
+    });
+
+    expect(updated.pendingExercises).toHaveLength(1);
+    expect(updated.pendingExercises[0]).toMatchObject({
+      orderIndex: 1,
+      exerciseName: 'Elevação lateral',
+      muscleGroup: 'Ombro',
+      baseLoad: '8',
+      targetReps: '12',
+      hint: 'Controle a descida',
+      sets: [{seriesNumber: 1, load: '', reps: '', note: ''}],
+    });
+    expect(updated.pendingExercises[0]?.workoutExerciseId).toEqual(expect.any(String));
+    expect(updated.pendingExercises[0]?.sets[0]?.id).toEqual(expect.any(String));
   });
 
   it('merges completed and pending exercises in template order for save', () => {

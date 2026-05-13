@@ -1,9 +1,12 @@
 import {
   addDraftSet,
+  addTrainingDraftExercise,
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
   getExercisePerformanceRecordFromSessions,
+  markTrainingDraftExerciseNotPerformed,
   mergeTrainingDraftExercisesForSave,
+  upsertTrainingSessionInHistory,
 } from '../web/src/lib/trainingSession';
 import type {
   TrainingDraftExercise,
@@ -182,6 +185,85 @@ describe('web training session draft sets', () => {
     expect(finalizeTrainingDraftExercise(draftState, 1)).toBeNull();
   });
 
+  it('keeps a not performed exercise visible and excludes it from save', () => {
+    const draftState: TrainingDraftExerciseState = {
+      pendingExercises: [
+        {
+          workoutExerciseId: 'exercise-1',
+          orderIndex: 0,
+          exerciseName: 'Supino',
+          muscleGroup: 'Peito',
+          baseLoad: '40',
+          targetReps: '8-10',
+          hint: '',
+          sets: [{id: 'set-1', seriesNumber: 1, load: '', reps: '', note: ''}],
+        },
+        {
+          workoutExerciseId: 'exercise-2',
+          orderIndex: 1,
+          exerciseName: 'Crucifixo',
+          muscleGroup: 'Peito',
+          baseLoad: '12',
+          targetReps: '10-12',
+          hint: '',
+          sets: [{id: 'set-2', seriesNumber: 1, load: '12', reps: '10', note: ''}],
+        },
+      ],
+      completedExercises: [],
+    };
+
+    const updated = markTrainingDraftExerciseNotPerformed(draftState, 0);
+
+    expect(updated?.pendingExercises).toHaveLength(2);
+    expect(updated?.pendingExercises[0]).toMatchObject({
+      workoutExerciseId: 'exercise-1',
+      status: 'not-performed',
+    });
+    expect(
+      mergeTrainingDraftExercisesForSave(updated as TrainingDraftExerciseState).map(
+        exercise => exercise.workoutExerciseId,
+      ),
+    ).toEqual(['exercise-2']);
+  });
+
+  it('adds a new exercise during a running workout as a pending draft', () => {
+    const draftState: TrainingDraftExerciseState = {
+      pendingExercises: [],
+      completedExercises: [
+        {
+          workoutExerciseId: 'exercise-1',
+          orderIndex: 0,
+          exerciseName: 'Supino',
+          muscleGroup: 'Peito',
+          baseLoad: '40',
+          targetReps: '8-10',
+          hint: '',
+          sets: [{id: 'set-1', seriesNumber: 1, load: '40', reps: '8', note: ''}],
+        },
+      ],
+    };
+
+    const updated = addTrainingDraftExercise(draftState, {
+      exerciseName: 'Elevação lateral',
+      muscleGroup: 'Ombro',
+      baseLoad: '8',
+      targetReps: '12',
+      hint: 'Controle a descida',
+    });
+
+    expect(updated.pendingExercises[0]).toMatchObject({
+      orderIndex: 1,
+      exerciseName: 'Elevação lateral',
+      muscleGroup: 'Ombro',
+      baseLoad: '8',
+      targetReps: '12',
+      hint: 'Controle a descida',
+      sets: [{seriesNumber: 1, load: '', reps: '', note: ''}],
+    });
+    expect(updated.pendingExercises[0]?.workoutExerciseId).toEqual(expect.any(String));
+    expect(updated.pendingExercises[0]?.sets[0]?.id).toEqual(expect.any(String));
+  });
+
   it('merges completed and pending exercises in template order for save', () => {
     const draftState: TrainingDraftExerciseState = {
       pendingExercises: [
@@ -215,5 +297,58 @@ describe('web training session draft sets', () => {
         exercise => exercise.workoutExerciseId,
       ),
     ).toEqual(['exercise-1', 'exercise-2']);
+  });
+
+  it('keeps a newly saved web session visible before the realtime listener refreshes', () => {
+    const olderSession: WorkoutSessionDocument = {
+      id: 'session-old',
+      userId: 'user-1',
+      workoutId: 'workout-1',
+      workoutName: 'Peito 1',
+      focus: 'Peito',
+      overallNotes: '',
+      performedAt: '2026-05-11T15:00:00.000Z',
+      createdAt: '2026-05-11T15:00:00.000Z',
+      totalSets: 1,
+      totalVolume: 400,
+      topLoad: 40,
+      exercises: [
+        {
+          workoutExerciseId: 'exercise-1',
+          exerciseName: 'Supino',
+          muscleGroup: 'Peito',
+          sets: [{load: 40, reps: 10, note: ''}],
+        },
+      ],
+    };
+    const savedSession: WorkoutSessionDocument = {
+      id: 'session-new',
+      userId: 'user-1',
+      workoutId: 'workout-2',
+      workoutName: 'Pernas 1',
+      focus: 'Pernas',
+      overallNotes: '',
+      performedAt: '2026-05-13T15:00:00.000Z',
+      createdAt: '2026-05-13T15:00:00.000Z',
+      totalSets: 2,
+      totalVolume: 1200,
+      topLoad: 60,
+      exercises: [
+        {
+          workoutExerciseId: 'exercise-2',
+          exerciseName: 'Leg press',
+          muscleGroup: 'Pernas',
+          sets: [{load: 60, reps: 10, note: ''}, {load: 60, reps: 10, note: ''}],
+        },
+      ],
+    };
+
+    expect(upsertTrainingSessionInHistory([olderSession], savedSession)).toEqual([
+      savedSession,
+      olderSession,
+    ]);
+    expect(
+      upsertTrainingSessionInHistory([savedSession], savedSession),
+    ).toHaveLength(1);
   });
 });

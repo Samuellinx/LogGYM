@@ -26,7 +26,7 @@ describe('web workout editor', () => {
         createdAt: '2026-04-27T12:00:00.000Z',
         updatedAt: '2026-04-27T12:00:00.000Z',
       }),
-    ).toThrow('Exercício 1: informe a faixa de repetições.');
+    ).toThrow('Exercício 1: informe as repetições.');
   });
 
   it('creates a new editor exercise draft with an empty reps range', () => {

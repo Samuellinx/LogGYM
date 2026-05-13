@@ -13,7 +13,7 @@ export const workoutInputExerciseSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome do exercício.').max(60),
   muscleGroup: z.string().trim().min(2, 'Escolha o tipo de série.').max(40),
   baseLoad: z.string().trim().max(60),
-  targetReps: z.string().trim().min(1, 'Informe a faixa de repeticoes.').max(20),
+  targetReps: z.string().trim().min(1, 'Informe as repetições.').max(20),
   note: z.string().trim().max(220),
 });
 
@@ -24,7 +24,7 @@ export const workoutExerciseSchema = z.object({
   baseLoadKg: optionalLoadFieldSchema,
   baseLoadPlates: optionalLoadFieldSchema,
   baseLoadLegacy: z.string().trim().max(60),
-  targetReps: z.string().trim().min(1, 'Informe a faixa de repeticoes.').max(20),
+  targetReps: z.string().trim().min(1, 'Informe as repetições.').max(20),
   note: z.string().trim().max(220),
 });
 

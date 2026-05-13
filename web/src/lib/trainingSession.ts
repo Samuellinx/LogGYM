@@ -32,8 +32,18 @@ type ExercisePerformanceLookup =
   | Pick<WorkoutExerciseInput, 'id' | 'name'>
   | Pick<TrainingDraftExercise, 'workoutExerciseId' | 'exerciseName'>;
 
+export type TrainingDraftExerciseInput = {
+  exerciseName: string;
+  muscleGroup: string;
+  baseLoad: string;
+  targetReps: string;
+  hint: string;
+};
+
 const createDraftSetId = () =>
   `draft-set-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const createDraftExerciseId = () =>
+  `ad-hoc-exercise-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 const createSessionDocumentId = () =>
   `training-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -54,7 +64,31 @@ const createBlankSet = (seriesNumber = 1): TrainingDraftSet => ({
   note: '',
 });
 
+const getNextExerciseOrderIndex = (draftState: TrainingDraftExerciseState) =>
+  [
+    ...draftState.completedExercises,
+    ...draftState.pendingExercises,
+  ].reduce(
+    (highestOrderIndex, exercise) =>
+      Number.isFinite(exercise.orderIndex)
+        ? Math.max(highestOrderIndex, exercise.orderIndex)
+        : highestOrderIndex,
+    -1,
+  ) + 1;
+
 const parseNumber = (value: string) => Number(value.replace(',', '.').trim());
+
+const getSessionHistoryTimestamp = (session: WorkoutSessionDocument) => {
+  const performedAtTimestamp = new Date(session.performedAt).getTime();
+
+  if (Number.isFinite(performedAtTimestamp)) {
+    return performedAtTimestamp;
+  }
+
+  const createdAtTimestamp = new Date(session.createdAt).getTime();
+
+  return Number.isFinite(createdAtTimestamp) ? createdAtTimestamp : 0;
+};
 
 const normalizeToken = (value: string) =>
   value
@@ -192,7 +226,10 @@ export const isTrainingDraftSetCompleted = (setItem: TrainingDraftSet) =>
 
 export const canFinalizeTrainingDraftExercise = (
   exercise: TrainingDraftExercise,
-) => exercise.sets.length > 0 && exercise.sets.every(isTrainingDraftSetCompleted);
+) =>
+  exercise.status !== 'not-performed' &&
+  exercise.sets.length > 0 &&
+  exercise.sets.every(isTrainingDraftSetCompleted);
 
 export const finalizeTrainingDraftExercise = (
   draftState: TrainingDraftExerciseState,
@@ -214,11 +251,64 @@ export const finalizeTrainingDraftExercise = (
   };
 };
 
+export const markTrainingDraftExerciseNotPerformed = (
+  draftState: TrainingDraftExerciseState,
+  exerciseIndex: number,
+): TrainingDraftExerciseState | null => {
+  const exercise = draftState.pendingExercises[exerciseIndex];
+
+  if (!exercise) {
+    return null;
+  }
+
+  return {
+    ...draftState,
+    pendingExercises: draftState.pendingExercises.map(
+      (currentExercise, currentExerciseIndex) =>
+        currentExerciseIndex === exerciseIndex
+          ? {...currentExercise, status: 'not-performed'}
+          : currentExercise,
+    ),
+  };
+};
+
+export const addTrainingDraftExercise = (
+  draftState: TrainingDraftExerciseState,
+  input: TrainingDraftExerciseInput,
+): TrainingDraftExerciseState => ({
+  ...draftState,
+  pendingExercises: [
+    ...draftState.pendingExercises,
+    {
+      workoutExerciseId: createDraftExerciseId(),
+      orderIndex: getNextExerciseOrderIndex(draftState),
+      exerciseName: input.exerciseName.trim(),
+      muscleGroup: input.muscleGroup.trim() || 'Outros',
+      baseLoad: input.baseLoad.trim(),
+      targetReps: input.targetReps.trim(),
+      hint: input.hint.trim(),
+      sets: [createBlankSet(1)],
+    },
+  ],
+});
+
 export const mergeTrainingDraftExercisesForSave = (
   draftState: TrainingDraftExerciseState,
 ) =>
-  [...draftState.completedExercises, ...draftState.pendingExercises].sort(
-    (left, right) => left.orderIndex - right.orderIndex,
+  [...draftState.completedExercises, ...draftState.pendingExercises]
+    .filter(exercise => exercise.status !== 'not-performed')
+    .sort((left, right) => left.orderIndex - right.orderIndex);
+
+export const upsertTrainingSessionInHistory = (
+  sessions: WorkoutSessionDocument[],
+  savedSession: WorkoutSessionDocument,
+) =>
+  [
+    savedSession,
+    ...sessions.filter(session => session.id !== savedSession.id),
+  ].sort(
+    (left, right) =>
+      getSessionHistoryTimestamp(right) - getSessionHistoryTimestamp(left),
   );
 
 export const removeDraftSet = (

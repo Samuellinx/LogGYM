@@ -170,6 +170,82 @@ strong {
   place-items: center;
 }
 
+.splash-stage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background:
+    linear-gradient(135deg, rgba(4, 6, 10, 0.98), rgba(16, 23, 32, 0.98), rgba(7, 17, 11, 0.98)),
+    var(--background);
+}
+
+.splash-panel {
+  width: min(420px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+  padding: 34px 28px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(15, 19, 26, 0.9), rgba(8, 12, 17, 0.86)),
+    rgba(15, 19, 26, 0.86);
+  box-shadow: var(--card-shadow);
+}
+
+.splash-mark-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.splash-mark-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border: 1px solid rgba(124, 255, 79, 0.2);
+  border-radius: 36px;
+  background: rgba(81, 199, 255, 0.04);
+  animation: splashPulse 1.92s ease-in-out infinite;
+}
+
+.splash-copy {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+}
+
+.splash-copy h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(1.75rem, 4vw, 2.4rem);
+  line-height: 1.08;
+}
+
+.splash-copy p:last-child {
+  max-width: 32ch;
+  color: var(--text-muted);
+}
+
+.splash-progress {
+  width: min(240px, 100%);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.splash-progress span {
+  display: block;
+  width: 44%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+  animation: splashProgress 1.2s ease-in-out infinite;
+}
+
 .workspace-panel {
   display: grid;
   gap: 24px;
@@ -685,6 +761,141 @@ h3 {
 .training-set-card {
   display: grid;
   gap: 14px;
+  position: relative;
+}
+
+.rest-timer-float-area {
+  position: absolute;
+  top: 80px;
+  right: 18px;
+  z-index: 8;
+  width: 220px;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.rest-timer-floating-button {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(81, 199, 255, 0.34);
+  border-radius: 16px;
+  background: rgba(15, 19, 26, 0.96);
+  color: var(--text);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+}
+
+.rest-timer-floating-button svg {
+  color: var(--accent-secondary);
+}
+
+.rest-timer-floating-button.active {
+  border-color: rgba(81, 199, 255, 0.55);
+  background: var(--accent-secondary);
+  color: #04131b;
+}
+
+.rest-timer-floating-button.active svg {
+  color: #04131b;
+}
+
+.rest-timer-menu {
+  width: 220px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(15, 19, 26, 0.98);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
+.rest-timer-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rest-timer-menu-head > span {
+  display: grid;
+  gap: 2px;
+}
+
+.rest-timer-menu-head strong {
+  min-width: 56px;
+  color: var(--accent-secondary);
+  font-size: 1.36rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: right;
+}
+
+.training-set-card > .editor-grid {
+  margin-top: 72px;
+}
+
+.rest-timer-menu-title {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rest-timer-menu-status {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.rest-timer-presets,
+.rest-timer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rest-timer-preset,
+.rest-timer-action,
+.rest-timer-reset {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rest-timer-preset {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.rest-timer-preset.active {
+  border-color: rgba(81, 199, 255, 0.38);
+  background: rgba(81, 199, 255, 0.11);
+  color: var(--accent-secondary);
+}
+
+.rest-timer-action {
+  background: var(--accent-secondary);
+  color: #04131b;
+}
+
+.rest-timer-action.active {
+  background: #f3c96a;
+  color: #1a1200;
+}
+
+.rest-timer-reset {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
 }
 
 .progress-chart-head,
@@ -760,6 +971,52 @@ h3 {
 .training-date-field > span {
   margin: 0;
   white-space: nowrap;
+}
+
+.training-add-exercise {
+  display: grid;
+  gap: 14px;
+}
+
+.training-add-exercise-form {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(8, 12, 17, 0.82);
+}
+
+.training-add-exercise-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.training-exercise-card--not-performed {
+  border-color: rgba(255, 111, 125, 0.28);
+  background: rgba(255, 111, 125, 0.05);
+}
+
+.not-performed-badge {
+  width: fit-content;
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 111, 125, 0.14);
+  color: #ffb8c0;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.not-performed-panel {
+  padding: 16px;
+  border: 1px solid rgba(255, 111, 125, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 111, 125, 0.08);
+  color: var(--text-muted);
 }
 
 .training-support-text {
@@ -1531,8 +1788,61 @@ select:focus {
 
 .training-completion-modal {
   width: min(100%, 520px);
-  gap: 16px;
+  max-height: min(92dvh, 760px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  position: relative;
   border-color: rgba(57, 217, 138, 0.38);
+}
+
+.training-completion-scroll {
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+  padding: 28px 24px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.training-completion-modal > .primary-button {
+  margin: 0 24px 24px;
+}
+
+.training-completion-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 255, 235, 0.2);
+  background: rgba(8, 12, 17, 0.88);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.training-completion-close:hover {
+  transform: translateY(-1px);
+  border-color: rgba(214, 255, 235, 0.34);
+  background: rgba(15, 19, 26, 0.96);
+}
+
+.training-completion-close:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .training-completion-badge {
@@ -1665,6 +1975,63 @@ select:focus {
   border-radius: 24px;
 }
 
+.brand-mark--animated {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  padding: 18px;
+  animation: splashShellIn 0.36s ease-out both;
+}
+
+.brand-mark--animated .brand-piece {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splashPieceIn 0.62s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.brand-mark--animated .brand-piece--halo {
+  --piece-x: -22px;
+  --piece-y: -16px;
+  --piece-r: -18deg;
+  animation-delay: 0.18s;
+}
+
+.brand-mark--animated .brand-piece--bar {
+  --piece-x: 20px;
+  --piece-y: -18px;
+  --piece-r: 22deg;
+  animation-delay: 0.28s;
+}
+
+.brand-mark--animated .brand-piece--lower-node {
+  --piece-x: -26px;
+  --piece-y: 22px;
+  --piece-r: -28deg;
+  animation-delay: 0.38s;
+}
+
+.brand-mark--animated .brand-piece--upper-node {
+  --piece-x: 28px;
+  --piece-y: -24px;
+  --piece-r: 28deg;
+  animation-delay: 0.48s;
+}
+
+.brand-mark--animated .brand-piece--chart {
+  --piece-x: -20px;
+  --piece-y: 16px;
+  --piece-r: -16deg;
+  animation-delay: 0.58s;
+}
+
+.brand-mark--animated .brand-piece--arrow {
+  --piece-x: 16px;
+  --piece-y: 16px;
+  --piece-r: 16deg;
+  animation-delay: 0.68s;
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -1676,6 +2043,67 @@ select:focus {
 
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes splashShellIn {
+  from {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes splashPieceIn {
+  from {
+    opacity: 0;
+    transform: translate(var(--piece-x), var(--piece-y)) rotate(var(--piece-r)) scale(0.74);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes splashPulse {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.44;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes splashProgress {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  50% {
+    transform: translateX(80%);
+  }
+
+  100% {
+    transform: translateX(240%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-mark-wrap::before,
+  .splash-progress span,
+  .brand-mark--animated,
+  .brand-mark--animated .brand-piece {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
   }
 }
 
@@ -1786,6 +2214,18 @@ select:focus {
 
   .training-completion-grid {
     grid-template-columns: 1fr;
+  }
+
+  .training-completion-modal {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .training-completion-scroll {
+    padding: 24px 18px 14px;
+  }
+
+  .training-completion-modal > .primary-button {
+    margin: 0 18px 18px;
   }
 
   .card-actions {

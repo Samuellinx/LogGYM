@@ -28,6 +28,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  Undo2,
   UserRound,
   Wifi,
   WifiOff,
@@ -60,6 +61,8 @@ import {
   formatSessionDate,
   formatVolume,
 } from './lib/dashboard';
+import {resolveDraftSessionDateInput} from './lib/sessionDate';
+import {prioritizeStartedWorkouts} from './lib/workoutList';
 import {
   getDeleteConfirmation,
   type DeleteConfirmationCopy,
@@ -77,6 +80,11 @@ import {
   defaultProfileAvatarId,
   profileAvatarCatalog,
 } from './lib/profileAvatarCatalog';
+import {
+  defaultRestTimerSeconds,
+  formatRestTimerTime,
+  restTimerPresets,
+} from './lib/restTimer';
 import {
   ensureUserProfileDocument,
   updateUserProfileAvatar,
@@ -100,14 +108,17 @@ import {
 } from './lib/trainingDraftAutosave';
 import {
   addDraftSet,
+  addTrainingDraftExercise,
   buildTrainingCompletionSummary,
   buildTrainingSessionDocument,
   canFinalizeTrainingDraftExercise,
   finalizeTrainingDraftExercise,
   getExercisePerformanceRecordFromSessions,
+  markTrainingDraftExerciseNotPerformed,
   mergeTrainingDraftExercisesForSave,
   removeDraftSet,
   updateDraftSet,
+  upsertTrainingSessionInHistory,
   type ExercisePerformanceRecord,
   type TrainingCompletionSummary,
 } from './lib/trainingSession';
@@ -218,8 +229,20 @@ const createWorkoutDraft = (userId = ''): WorkoutDocument => {
   };
 };
 
-const BrandMark = ({compact = false}: {compact: boolean}) => (
-  <div className={compact ? 'brand-mark brand-mark--compact' : 'brand-mark'}>
+const BrandMark = ({
+  compact = false,
+  animated = false,
+}: {
+  compact?: boolean;
+  animated?: boolean;
+}) => (
+  <div
+    className={[
+      compact ? 'brand-mark brand-mark--compact' : 'brand-mark',
+      animated ? 'brand-mark--animated' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')}>
     <svg viewBox="0 0 64 64" aria-hidden="true">
       <defs>
         <linearGradient id="brandStrokeWeb" x1="12" y1="12" x2="52" y2="52">
@@ -229,6 +252,7 @@ const BrandMark = ({compact = false}: {compact: boolean}) => (
       </defs>
 
       <circle
+        className="brand-piece brand-piece--halo"
         cx="32"
         cy="32"
         r="22"
@@ -237,30 +261,36 @@ const BrandMark = ({compact = false}: {compact: boolean}) => (
         strokeWidth="2.5"
       />
       <path
+        className="brand-piece brand-piece--bar"
         d="M22 41 L41 23"
         stroke="url(#brandStrokeWeb)"
         strokeWidth="5"
         strokeLinecap="round"
       />
-      <circle
-        cx="19.5"
-        cy="43.5"
-        r="7"
-        fill="none"
-        stroke="url(#brandStrokeWeb)"
-        strokeWidth="3.4"
-      />
-      <circle cx="19.5" cy="43.5" r="2.8" fill="#09110C" />
-      <circle
-        cx="44.5"
-        cy="20.5"
-        r="7"
-        fill="none"
-        stroke="url(#brandStrokeWeb)"
-        strokeWidth="3.4"
-      />
-      <circle cx="44.5" cy="20.5" r="2.8" fill="#09110C" />
+      <g className="brand-piece brand-piece--lower-node">
+        <circle
+          cx="19.5"
+          cy="43.5"
+          r="7"
+          fill="none"
+          stroke="url(#brandStrokeWeb)"
+          strokeWidth="3.4"
+        />
+        <circle cx="19.5" cy="43.5" r="2.8" fill="#09110C" />
+      </g>
+      <g className="brand-piece brand-piece--upper-node">
+        <circle
+          cx="44.5"
+          cy="20.5"
+          r="7"
+          fill="none"
+          stroke="url(#brandStrokeWeb)"
+          strokeWidth="3.4"
+        />
+        <circle cx="44.5" cy="20.5" r="2.8" fill="#09110C" />
+      </g>
       <path
+        className="brand-piece brand-piece--chart"
         d="M17 22 L27 31 L34 25 L46 36"
         fill="none"
         stroke="#4FCBFF"
@@ -269,6 +299,7 @@ const BrandMark = ({compact = false}: {compact: boolean}) => (
         strokeLinejoin="round"
       />
       <path
+        className="brand-piece brand-piece--arrow"
         d="M41.5 35.5 H46 V31"
         fill="none"
         stroke="#4FCBFF"
@@ -302,6 +333,25 @@ type WorkoutExerciseDragState = {
   pointerId: number;
   startY: number;
 };
+type SetRestTimerState = {
+  durationSeconds: number;
+  remainingSeconds: number;
+  isRunning: boolean;
+  endsAt: number | null;
+};
+type NewTrainingExerciseDraft = {
+  exerciseName: string;
+  muscleGroup: string;
+  baseLoad: string;
+  targetReps: string;
+  hint: string;
+};
+type WebTrainingUndoSnapshot = {
+  pendingExercises: TrainingDraftExerciseState['pendingExercises'];
+  completedExercises: TrainingDraftExerciseState['completedExercises'];
+  performedAt: string;
+  overallNotes: string;
+};
 
 const normalizeToken = (value: string) =>
   value
@@ -311,6 +361,7 @@ const normalizeToken = (value: string) =>
     .toLowerCase();
 
 const formatDateInputValue = (value: string) => value.slice(0, 10);
+const MAX_TRAINING_UNDO_STEPS = 50;
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
@@ -340,9 +391,11 @@ const ErrorModal = ({
 
 const SuccessModal = ({
   message,
+  actionLabel = 'Continuar',
   onClose,
 }: {
   message: string;
+  actionLabel?: string;
   onClose: () => void;
 }) => (
   <div className="error-modal-backdrop" role="presentation">
@@ -355,7 +408,7 @@ const SuccessModal = ({
       <h2 id="success-modal-title">Tudo certo</h2>
       <p>{message}</p>
       <button className="primary-button wide" type="button" onClick={onClose}>
-        Continuar
+        {actionLabel}
       </button>
     </section>
   </div>
@@ -412,6 +465,51 @@ const formatWorkoutLastSessionTime = (value?: string | null) => {
   return workoutLastSessionTimeFormatter.format(date);
 };
 
+const createRestTimerState = (
+  durationSeconds = defaultRestTimerSeconds,
+): SetRestTimerState => ({
+  durationSeconds,
+  remainingSeconds: durationSeconds,
+  isRunning: false,
+  endsAt: null,
+});
+
+const createEmptyNewTrainingExerciseDraft = (): NewTrainingExerciseDraft => ({
+  exerciseName: '',
+  muscleGroup: '',
+  baseLoad: '',
+  targetReps: '',
+  hint: '',
+});
+
+const cloneTrainingDraftExercises = <
+  Exercises extends
+    | TrainingDraftExerciseState['pendingExercises']
+    | TrainingDraftExerciseState['completedExercises'],
+>(
+  exercises: Exercises,
+): Exercises =>
+  exercises.map(exercise => ({
+    ...exercise,
+    sets: exercise.sets.map(setItem => ({...setItem})),
+  })) as Exercises;
+
+const getSetRestTimerKey = (exerciseId: string, setId: string) =>
+  `${exerciseId}:${setId}`;
+
+const removeRestTimerKeys = (
+  timers: Record<string, SetRestTimerState>,
+  timerKeys: string[],
+) => {
+  const nextTimers = {...timers};
+
+  timerKeys.forEach(timerKey => {
+    delete nextTimers[timerKey];
+  });
+
+  return nextTimers;
+};
+
 const TrainingCompletionModal = ({
   summary,
   onClose,
@@ -425,49 +523,60 @@ const TrainingCompletionModal = ({
       aria-modal="true"
       className="error-modal success-modal training-completion-modal"
       role="dialog">
-      <div className="training-completion-badge">
-        <Check size={28} />
-      </div>
-      <p className="eyebrow">Treino finalizado</p>
-      <h2 id="training-completion-title">Seu treino foi salvo</h2>
-      <p className="training-completion-copy">
-        O histórico já foi atualizado com as séries válidas desta execução.
-      </p>
-      <strong className="training-completion-name">{summary.workoutName}</strong>
+      <button
+        aria-label="Fechar informações do treino"
+        className="training-completion-close"
+        type="button"
+        onClick={onClose}>
+        <X size={16} />
+        Fechar
+      </button>
 
-      <div className="training-completion-highlight">
-        <span>Séries registradas</span>
-        <strong>{summary.totalSets}</strong>
-      </div>
+      <div className="training-completion-scroll">
+        <div className="training-completion-badge">
+          <Check size={28} />
+        </div>
+        <p className="eyebrow">Treino finalizado</p>
+        <h2 id="training-completion-title">Seu treino foi salvo</h2>
+        <p className="training-completion-copy">
+          O histórico já foi atualizado com as séries válidas desta execução.
+        </p>
+        <strong className="training-completion-name">{summary.workoutName}</strong>
 
-      <div className="training-completion-grid">
-        <div className="training-completion-card">
-          <span>Maior carga</span>
-          <strong>{formatTrainingMetric(summary.maxLoad, ' kg')}</strong>
+        <div className="training-completion-highlight">
+          <span>Séries registradas</span>
+          <strong>{summary.totalSets}</strong>
         </div>
-        <div className="training-completion-card">
-          <span>Menor carga</span>
-          <strong>{formatTrainingMetric(summary.minLoad, ' kg')}</strong>
-        </div>
-        <div className="training-completion-card">
-          <span>Maior repetição</span>
-          <strong>{formatTrainingMetric(summary.maxReps)}</strong>
-        </div>
-        <div className="training-completion-card">
-          <span>Menor repetição</span>
-          <strong>{formatTrainingMetric(summary.minReps)}</strong>
-        </div>
-      </div>
 
-      <div className="training-completion-groups">
-        <span>Séries por grupo muscular</span>
-        <div className="training-completion-pills">
-          {summary.seriesByGroup.map(group => (
-            <div key={group.label} className="training-completion-pill">
-              <small>{group.label}</small>
-              <strong>{group.count}</strong>
-            </div>
-          ))}
+        <div className="training-completion-grid">
+          <div className="training-completion-card">
+            <span>Maior carga</span>
+            <strong>{formatTrainingMetric(summary.maxLoad, ' kg')}</strong>
+          </div>
+          <div className="training-completion-card">
+            <span>Menor carga</span>
+            <strong>{formatTrainingMetric(summary.minLoad, ' kg')}</strong>
+          </div>
+          <div className="training-completion-card">
+            <span>Maior repetição</span>
+            <strong>{formatTrainingMetric(summary.maxReps)}</strong>
+          </div>
+          <div className="training-completion-card">
+            <span>Menor repetição</span>
+            <strong>{formatTrainingMetric(summary.minReps)}</strong>
+          </div>
+        </div>
+
+        <div className="training-completion-groups">
+          <span>Séries por grupo muscular</span>
+          <div className="training-completion-pills">
+            {summary.seriesByGroup.map(group => (
+              <div key={group.label} className="training-completion-pill">
+                <small>{group.label}</small>
+                <strong>{group.count}</strong>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -632,6 +741,7 @@ class AppErrorBoundary extends Component<
 function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [hasSplashSettled, setHasSplashSettled] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('dashboard');
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileDocument | null>(null);
@@ -671,6 +781,9 @@ function App() {
   const [trainingCompletedDrafts, setTrainingCompletedDrafts] = useState<
     TrainingDraftExerciseState['completedExercises']
   >([]);
+  const [isAddingTrainingExercise, setIsAddingTrainingExercise] = useState(false);
+  const [newTrainingExerciseDraft, setNewTrainingExerciseDraft] =
+    useState<NewTrainingExerciseDraft>(createEmptyNewTrainingExerciseDraft());
   const [trainingPendingFocusIndex, setTrainingPendingFocusIndex] = useState<number | null>(
     null,
   );
@@ -678,6 +791,22 @@ function App() {
     formatDateInputValue(new Date().toISOString()),
   );
   const [trainingOverallNotes, setTrainingOverallNotes] = useState('');
+  const [trainingUndoStack, setTrainingUndoStack] = useState<WebTrainingUndoSnapshot[]>(
+    [],
+  );
+  const [setRestTimers, setSetRestTimers] = useState<Record<string, SetRestTimerState>>(
+    {},
+  );
+  const [activeRestTimerMenuKey, setActiveRestTimerMenuKey] = useState<
+    string | null
+  >(null);
+  const [restTimerCompletionKey, setRestTimerCompletionKey] = useState<
+    string | null
+  >(null);
+  const hasRunningRestTimer = Object.values(setRestTimers).some(
+    timer => timer.isRunning,
+  );
+  const [notifiedRestTimerKeys, setNotifiedRestTimerKeys] = useState<string[]>([]);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const trainingImportInputRef = useRef<HTMLInputElement | null>(null);
   const workoutExerciseRefs = useRef<Array<HTMLElement | null>>([]);
@@ -691,6 +820,7 @@ function App() {
   const workoutExerciseDragRef = useRef<WorkoutExerciseDragState | null>(null);
   const trainingExerciseRefs = useRef<Array<HTMLElement | null>>([]);
   const trainingExerciseLoadInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const trainingDraftAutosavePausedRef = useRef(false);
 
   const signInForm = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
@@ -717,6 +847,12 @@ function App() {
     },
   });
 
+  useEffect(() => {
+    if (detailView?.kind === 'training-session') {
+      trainingDraftAutosavePausedRef.current = false;
+    }
+  }, [detailView]);
+
   useEffect(
     () =>
       observeAuthState(nextUser => {
@@ -738,13 +874,26 @@ function App() {
           setConsultWorkout(null);
           setTrainingPendingDrafts([]);
           setTrainingCompletedDrafts([]);
+          setIsAddingTrainingExercise(false);
+          setNewTrainingExerciseDraft(createEmptyNewTrainingExerciseDraft());
           setTrainingPendingFocusIndex(null);
           setTrainingOverallNotes('');
           setTrainingPerformedAt(formatDateInputValue(new Date().toISOString()));
+          setTrainingUndoStack([]);
+          setSetRestTimers({});
+          setNotifiedRestTimerKeys([]);
+          setActiveRestTimerMenuKey(null);
+          setRestTimerCompletionKey(null);
         }
       }),
     [],
   );
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setHasSplashSettled(true), 1800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -799,6 +948,95 @@ function App() {
   }, [workoutExerciseDrag]);
 
   useEffect(() => {
+    if (!hasRunningRestTimer) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setSetRestTimers(currentTimers => {
+        let hasChanges = false;
+        const nextTimers = Object.fromEntries(
+          Object.entries(currentTimers).map(([timerKey, timer]) => {
+            if (!timer.isRunning || timer.endsAt === null) {
+              return [timerKey, timer];
+            }
+
+            const remainingSeconds = Math.max(
+              0,
+              Math.ceil((timer.endsAt - Date.now()) / 1000),
+            );
+
+            if (
+              remainingSeconds === timer.remainingSeconds &&
+              (remainingSeconds > 0 || !timer.isRunning)
+            ) {
+              return [timerKey, timer];
+            }
+
+            hasChanges = true;
+
+            return [
+              timerKey,
+              {
+                ...timer,
+                remainingSeconds,
+                isRunning: remainingSeconds > 0,
+                endsAt: remainingSeconds > 0 ? timer.endsAt : null,
+              },
+            ];
+          }),
+        );
+
+        return hasChanges ? nextTimers : currentTimers;
+      });
+    }, 250);
+
+    return () => window.clearInterval(intervalId);
+  }, [hasRunningRestTimer]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const reusableTimerKeys = Object.entries(setRestTimers)
+        .filter(([, timer]) => timer.remainingSeconds > 0 || timer.isRunning)
+        .map(([timerKey]) => timerKey);
+
+      if (reusableTimerKeys.length > 0) {
+        setNotifiedRestTimerKeys(current => {
+          const nextKeys = current.filter(
+            timerKey => !reusableTimerKeys.includes(timerKey),
+          );
+
+          return nextKeys.length === current.length ? current : nextKeys;
+        });
+      }
+
+      const finishedTimerKey = Object.entries(setRestTimers).find(
+        ([timerKey, timer]) =>
+          timer.remainingSeconds === 0 &&
+          !timer.isRunning &&
+          timer.endsAt === null &&
+          !notifiedRestTimerKeys.includes(timerKey),
+      )?.[0];
+
+      if (!finishedTimerKey) {
+        return;
+      }
+
+      setNotifiedRestTimerKeys(current => {
+        if (current.includes(finishedTimerKey)) {
+          return current;
+        }
+
+        return [...current, finishedTimerKey];
+      });
+      setActiveRestTimerMenuKey(null);
+      setRestTimerCompletionKey(finishedTimerKey);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [notifiedRestTimerKeys, setRestTimers]);
+
+  useEffect(() => {
     if (!user) {
       return;
     }
@@ -812,9 +1050,19 @@ function App() {
     };
   }, [user]);
 
-  const filteredWorkouts = useMemo(() => {
-    return filterWorkoutsBySearch(workouts, workoutSearch);
-  }, [workoutSearch, workouts]);
+  const startedWorkoutIds = !user
+    ? new Set<string>()
+    : new Set(
+        workouts
+          .filter(workout =>
+            hasStartedTrainingDraft(getTrainingDraftAutosave(user.uid, workout.id)),
+          )
+          .map(workout => workout.id),
+      );
+  const filteredWorkouts = prioritizeStartedWorkouts(
+    filterWorkoutsBySearch(workouts, workoutSearch),
+    startedWorkoutIds,
+  );
 
   const totalExercises = useMemo(
     () => workouts.reduce((sum, workout) => sum + workout.exercises.length, 0),
@@ -845,22 +1093,21 @@ function App() {
         : null,
     [detailView, workouts],
   );
-  const startedWorkoutIds = !user
-    ? new Set<string>()
-    : new Set(
-        workouts
-          .filter(workout =>
-            hasStartedTrainingDraft(getTrainingDraftAutosave(user.uid, workout.id)),
-          )
-          .map(workout => workout.id),
-      );
-
   useEffect(() => {
-    if (!user || detailView?.kind !== 'training-session' || !activeTrainingWorkout) {
+    if (
+      !user ||
+      detailView?.kind !== 'training-session' ||
+      !activeTrainingWorkout ||
+      busyAction === 'save-session'
+    ) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
+      if (trainingDraftAutosavePausedRef.current) {
+        return;
+      }
+
       saveTrainingDraftAutosave(
         createTrainingDraftSnapshot({
           userId: user.uid,
@@ -877,6 +1124,7 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [
     activeTrainingWorkout,
+    busyAction,
     detailView,
     trainingCompletedDrafts,
     trainingOverallNotes,
@@ -1029,7 +1277,7 @@ function App() {
     profileAvatarCatalog.find(avatar => avatar.id === profileAvatarDraftId) ??
     profileAvatarCatalog.find(avatar => avatar.id === profileAvatarId) ??
     profileAvatarCatalog[0];
-  const authView = resolveAuthView({isAuthReady, user});
+  const authView = resolveAuthView({isAuthReady: isAuthReady && hasSplashSettled, user});
   const visibleProfileAvatars = isAvatarPickerCollapsed
     ? selectedProfileAvatar
       ? [selectedProfileAvatar]
@@ -1039,12 +1287,44 @@ function App() {
   const clearFeedback = () => {
     setErrorMessage(null);
     setSuccessModalMessage(null);
+    setRestTimerCompletionKey(null);
     setDeleteConfirmation(null);
     setStatusMessage(null);
   };
 
   const showError = (error: unknown, fallback: string) => {
     setErrorMessage(getErrorMessage(error, fallback));
+  };
+
+  const pushTrainingUndoSnapshot = () => {
+    setTrainingUndoStack(current => [
+      {
+        pendingExercises: cloneTrainingDraftExercises(trainingPendingDrafts),
+        completedExercises: cloneTrainingDraftExercises(trainingCompletedDrafts),
+        performedAt: trainingPerformedAt,
+        overallNotes: trainingOverallNotes,
+      },
+      ...current,
+    ].slice(0, MAX_TRAINING_UNDO_STEPS));
+  };
+
+  const handleUndoTrainingChange = () => {
+    const [lastSnapshot, ...remainingSnapshots] = trainingUndoStack;
+
+    if (!lastSnapshot) {
+      return;
+    }
+
+    clearFeedback();
+    setTrainingPendingDrafts(cloneTrainingDraftExercises(lastSnapshot.pendingExercises));
+    setTrainingCompletedDrafts(
+      cloneTrainingDraftExercises(lastSnapshot.completedExercises),
+    );
+    setTrainingPerformedAt(lastSnapshot.performedAt);
+    setTrainingOverallNotes(lastSnapshot.overallNotes);
+    setActiveRestTimerMenuKey(null);
+    setRestTimerCompletionKey(null);
+    setTrainingUndoStack(remainingSnapshots);
   };
 
   const requestDeleteConfirmation = (
@@ -1597,17 +1877,20 @@ function App() {
   const openTrainingSession = (workout: WorkoutDocument, returnTo: WorkspaceView) => {
     clearFeedback();
     setConsultWorkout(null);
+    setSetRestTimers({});
+    setNotifiedRestTimerKeys([]);
+    setActiveRestTimerMenuKey(null);
+    setRestTimerCompletionKey(null);
     const savedDraft = user ? getTrainingDraftAutosave(user.uid, workout.id) : null;
     const restoredDraftState = restoreTrainingDraftState(workout, savedDraft);
 
     setTrainingPendingDrafts(restoredDraftState.pendingExercises);
     setTrainingCompletedDrafts(restoredDraftState.completedExercises);
+    setIsAddingTrainingExercise(false);
+    setNewTrainingExerciseDraft(createEmptyNewTrainingExerciseDraft());
     setTrainingOverallNotes(savedDraft?.overallNotes ?? '');
-    setTrainingPerformedAt(
-      savedDraft
-        ? formatDateInputValue(savedDraft.performedAt)
-        : formatDateInputValue(new Date().toISOString()),
-    );
+    setTrainingPerformedAt(resolveDraftSessionDateInput(savedDraft?.performedAt));
+    setTrainingUndoStack([]);
     setDetailView({
       kind: 'training-session',
       workoutId: workout.id,
@@ -1620,6 +1903,12 @@ function App() {
       return;
     }
 
+    setSetRestTimers({});
+    setNotifiedRestTimerKeys([]);
+    setActiveRestTimerMenuKey(null);
+    setRestTimerCompletionKey(null);
+    setIsAddingTrainingExercise(false);
+    setNewTrainingExerciseDraft(createEmptyNewTrainingExerciseDraft());
     setDetailView(null);
     setWorkspaceView(detailView.returnTo);
   };
@@ -1658,6 +1947,7 @@ function App() {
     }
 
     clearFeedback();
+    trainingDraftAutosavePausedRef.current = true;
     setBusyAction('save-session');
 
     try {
@@ -1678,9 +1968,27 @@ function App() {
       });
 
       await saveTrainingSessionFromPanel(user.uid, sessionDocument);
+      setSessions(currentSessions =>
+        upsertTrainingSessionInHistory(currentSessions, sessionDocument),
+      );
       await deleteTrainingDraftAutosave(user.uid, activeTrainingWorkout.id);
+      setSetRestTimers({});
+      setNotifiedRestTimerKeys([]);
+      setActiveRestTimerMenuKey(null);
+      setRestTimerCompletionKey(null);
+      setIsAddingTrainingExercise(false);
+      setNewTrainingExerciseDraft(createEmptyNewTrainingExerciseDraft());
+      setTrainingPendingFocusIndex(null);
+      setTrainingPendingDrafts([]);
+      setTrainingCompletedDrafts([]);
+      setTrainingUndoStack([]);
+      setTrainingOverallNotes('');
+      setTrainingPerformedAt(formatDateInputValue(new Date().toISOString()));
+      setHistorySearch('');
+      setDetailView(null);
       setTrainingCompletionSummary(summary);
     } catch (error) {
+      trainingDraftAutosavePausedRef.current = false;
       showError(error, 'Não foi possível salvar a execução.');
     } finally {
       setBusyAction(null);
@@ -1719,8 +2027,27 @@ function App() {
       return;
     }
 
+    pushTrainingUndoSnapshot();
     setTrainingPendingDrafts(nextDraftState.pendingExercises);
     setTrainingCompletedDrafts(nextDraftState.completedExercises);
+    const removedTimerKeys = exercise.sets.map(setItem =>
+      getSetRestTimerKey(exercise.workoutExerciseId, setItem.id),
+    );
+    setSetRestTimers(current =>
+      removeRestTimerKeys(
+        current,
+        removedTimerKeys,
+      ),
+    );
+    setNotifiedRestTimerKeys(current =>
+      current.filter(timerKey => !removedTimerKeys.includes(timerKey)),
+    );
+    setActiveRestTimerMenuKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
+    setRestTimerCompletionKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
 
     if (nextDraftState.pendingExercises.length === 0) {
       return;
@@ -1732,6 +2059,86 @@ function App() {
     );
 
     setTrainingPendingFocusIndex(targetExerciseIndex);
+  };
+
+  const handleMarkTrainingExerciseNotPerformed = (exerciseIndex: number) => {
+    clearFeedback();
+
+    const exercise = trainingPendingDrafts[exerciseIndex];
+
+    if (!exercise || exercise.status === 'not-performed') {
+      return;
+    }
+
+    const nextDraftState = markTrainingDraftExerciseNotPerformed(
+      {
+        pendingExercises: trainingPendingDrafts,
+        completedExercises: trainingCompletedDrafts,
+      },
+      exerciseIndex,
+    );
+
+    if (!nextDraftState) {
+      return;
+    }
+
+    pushTrainingUndoSnapshot();
+    setTrainingPendingDrafts(nextDraftState.pendingExercises);
+    setTrainingCompletedDrafts(nextDraftState.completedExercises);
+
+    const removedTimerKeys = exercise.sets.map(setItem =>
+      getSetRestTimerKey(exercise.workoutExerciseId, setItem.id),
+    );
+    setSetRestTimers(current => removeRestTimerKeys(current, removedTimerKeys));
+    setNotifiedRestTimerKeys(current =>
+      current.filter(timerKey => !removedTimerKeys.includes(timerKey)),
+    );
+    setActiveRestTimerMenuKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
+    setRestTimerCompletionKey(current =>
+      current && removedTimerKeys.includes(current) ? null : current,
+    );
+
+    const targetExerciseIndex =
+      exerciseIndex + 1 < nextDraftState.pendingExercises.length
+        ? exerciseIndex + 1
+        : null;
+
+    if (targetExerciseIndex !== null) {
+      setTrainingPendingFocusIndex(targetExerciseIndex);
+    }
+  };
+
+  const handleNewTrainingExerciseDraftChange = (
+    field: keyof NewTrainingExerciseDraft,
+    value: string,
+  ) => {
+    setNewTrainingExerciseDraft(current => ({...current, [field]: value}));
+  };
+
+  const handleAddTrainingExercise = () => {
+    clearFeedback();
+
+    if (!newTrainingExerciseDraft.exerciseName.trim()) {
+      setErrorMessage('Informe o nome do exercício para adicionar ao treino.');
+      return;
+    }
+
+    const nextDraftState = addTrainingDraftExercise(
+      {
+        pendingExercises: trainingPendingDrafts,
+        completedExercises: trainingCompletedDrafts,
+      },
+      newTrainingExerciseDraft,
+    );
+
+    pushTrainingUndoSnapshot();
+    setTrainingPendingDrafts(nextDraftState.pendingExercises);
+    setTrainingCompletedDrafts(nextDraftState.completedExercises);
+    setNewTrainingExerciseDraft(createEmptyNewTrainingExerciseDraft());
+    setIsAddingTrainingExercise(false);
+    setTrainingPendingFocusIndex(nextDraftState.pendingExercises.length - 1);
   };
 
   const handleProfileAvatarSelected = (avatarId: string) => {
@@ -1812,10 +2219,143 @@ function App() {
         type: 'training-set',
         name: `${seriesNumber} de ${exerciseName || 'exercício'}`,
       }),
-      () =>
-        setTrainingPendingDrafts(current =>
-          removeDraftSet(current, exerciseIndex, setIndex),
-        ),
+      () => {
+        pushTrainingUndoSnapshot();
+        setTrainingPendingDrafts(current => {
+          const exercise = current[exerciseIndex];
+          const setItem = exercise?.sets[setIndex];
+
+          if (exercise && setItem) {
+            const timerKey = getSetRestTimerKey(
+              exercise.workoutExerciseId,
+              setItem.id,
+            );
+            setSetRestTimers(timers =>
+              removeRestTimerKeys(timers, [
+                timerKey,
+              ]),
+            );
+            setNotifiedRestTimerKeys(current =>
+              current.filter(currentKey => currentKey !== timerKey),
+            );
+            setActiveRestTimerMenuKey(current =>
+              current === timerKey ? null : current,
+            );
+            setRestTimerCompletionKey(current =>
+              current === timerKey ? null : current,
+            );
+          }
+
+          return removeDraftSet(current, exerciseIndex, setIndex);
+        });
+      },
+    );
+  };
+
+  const handleTrainingSetChange = (
+    exerciseIndex: number,
+    setIndex: number,
+    field: 'load' | 'reps' | 'note',
+    value: string,
+  ) => {
+    const currentValue =
+      trainingPendingDrafts[exerciseIndex]?.sets[setIndex]?.[field];
+
+    if (currentValue === value) {
+      return;
+    }
+
+    pushTrainingUndoSnapshot();
+    setTrainingPendingDrafts(current =>
+      updateDraftSet(
+        current,
+        exerciseIndex,
+        setIndex,
+        field,
+        value,
+      ),
+    );
+  };
+
+  const handleAddTrainingSet = (exerciseIndex: number) => {
+    if (!trainingPendingDrafts[exerciseIndex]) {
+      return;
+    }
+
+    pushTrainingUndoSnapshot();
+    setTrainingPendingDrafts(current => addDraftSet(current, exerciseIndex));
+  };
+
+  const getRestTimerState = (timerKey: string) =>
+    setRestTimers[timerKey] ?? createRestTimerState();
+
+  const configureRestTimer = (timerKey: string, durationSeconds: number) => {
+    setNotifiedRestTimerKeys(current =>
+      current.filter(currentKey => currentKey !== timerKey),
+    );
+    setSetRestTimers(current => ({
+      ...current,
+      [timerKey]: createRestTimerState(durationSeconds),
+    }));
+  };
+
+  const toggleRestTimer = (timerKey: string) => {
+    setSetRestTimers(current => {
+      const timer = current[timerKey] ?? createRestTimerState();
+
+      if (timer.isRunning) {
+        const remainingSeconds =
+          timer.endsAt === null
+            ? timer.remainingSeconds
+            : Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000));
+
+        return {
+          ...current,
+          [timerKey]: {
+            ...timer,
+            remainingSeconds,
+            isRunning: false,
+            endsAt: null,
+          },
+        };
+      }
+
+      const remainingSeconds =
+        timer.remainingSeconds > 0 ? timer.remainingSeconds : timer.durationSeconds;
+
+      setNotifiedRestTimerKeys(current =>
+        current.filter(currentKey => currentKey !== timerKey),
+      );
+
+      return {
+        ...current,
+        [timerKey]: {
+          ...timer,
+          remainingSeconds,
+          isRunning: true,
+          endsAt: Date.now() + remainingSeconds * 1000,
+        },
+      };
+    });
+  };
+
+  const resetRestTimer = (timerKey: string) => {
+    setNotifiedRestTimerKeys(current =>
+      current.filter(currentKey => currentKey !== timerKey),
+    );
+    setSetRestTimers(current => {
+      const timer = current[timerKey] ?? createRestTimerState();
+
+      return {
+        ...current,
+        [timerKey]: createRestTimerState(timer.durationSeconds),
+      };
+    });
+  };
+
+  const toggleRestTimerMenu = (timerKey: string) => {
+    setActiveRestTimerMenuKey(current =>
+      current === timerKey ? null : timerKey,
     );
   };
 
@@ -2341,7 +2881,7 @@ function App() {
                     />
                   </label>
                   <label>
-                    <span>Faixa de reps</span>
+                    <span>Repetições</span>
                     <input
                       value={exercise.targetReps}
                       onChange={event =>
@@ -2351,7 +2891,7 @@ function App() {
                           maskRepRangeInput(event.target.value),
                         )
                       }
-                      inputMode="numeric"
+                      inputMode="text"
                       placeholder="Ex: 8-10"
                     />
                   </label>
@@ -2572,7 +3112,14 @@ function App() {
                 <input
                   type="date"
                   value={trainingPerformedAt}
-                  onChange={event => setTrainingPerformedAt(event.target.value)}
+                  onChange={event => {
+                    if (event.target.value === trainingPerformedAt) {
+                      return;
+                    }
+
+                    pushTrainingUndoSnapshot();
+                    setTrainingPerformedAt(event.target.value);
+                  }}
                 />
               </label>
               <button
@@ -2594,11 +3141,125 @@ function App() {
             {activeTrainingWorkout.focus} - {activeTrainingWorkout.exercises.length} exercícios
           </p>
 
+          <div className="training-add-exercise">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() =>
+                setIsAddingTrainingExercise(current => !current)
+              }>
+              <Plus size={16} />
+              Adicionar novo exercício
+            </button>
+
+            {isAddingTrainingExercise ? (
+              <div className="training-add-exercise-form">
+                <label>
+                  <span>Nome do exercício</span>
+                  <input
+                    value={newTrainingExerciseDraft.exerciseName}
+                    onChange={event =>
+                      handleNewTrainingExerciseDraftChange(
+                        'exerciseName',
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Ex: Elevação lateral"
+                  />
+                </label>
+                <label>
+                  <span>Grupo muscular</span>
+                  <input
+                    value={newTrainingExerciseDraft.muscleGroup}
+                    onChange={event =>
+                      handleNewTrainingExerciseDraftChange(
+                        'muscleGroup',
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Ex: Ombro"
+                  />
+                </label>
+                <div className="editor-grid">
+                  <label>
+                    <span>Carga sugerida</span>
+                    <input
+                      value={newTrainingExerciseDraft.baseLoad}
+                      inputMode="decimal"
+                      onChange={event =>
+                        handleNewTrainingExerciseDraftChange(
+                          'baseLoad',
+                          maskDecimalInput(event.target.value),
+                        )
+                      }
+                      placeholder="0"
+                    />
+                  </label>
+                  <label>
+                    <span>Repetições</span>
+                    <input
+                      value={newTrainingExerciseDraft.targetReps}
+                      inputMode="text"
+                      onChange={event =>
+                        handleNewTrainingExerciseDraftChange(
+                          'targetReps',
+                          maskRepRangeInput(event.target.value),
+                        )
+                      }
+                      placeholder="8-12"
+                    />
+                  </label>
+                </div>
+                <label className="stacked-field">
+                  <span>Observação</span>
+                  <textarea
+                    value={newTrainingExerciseDraft.hint}
+                    onChange={event =>
+                      handleNewTrainingExerciseDraftChange(
+                        'hint',
+                        event.target.value,
+                      )
+                    }
+                    rows={3}
+                    placeholder="Ex: controlar a descida"
+                  />
+                </label>
+                <div className="training-add-exercise-actions">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      setIsAddingTrainingExercise(false);
+                      setNewTrainingExerciseDraft(
+                        createEmptyNewTrainingExerciseDraft(),
+                      );
+                    }}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={handleAddTrainingExercise}>
+                    <Plus size={16} />
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <label className="stacked-field">
             <span>Notas gerais da execução</span>
             <textarea
               value={trainingOverallNotes}
-              onChange={event => setTrainingOverallNotes(event.target.value)}
+              onChange={event => {
+                if (event.target.value === trainingOverallNotes) {
+                  return;
+                }
+
+                pushTrainingUndoSnapshot();
+                setTrainingOverallNotes(event.target.value);
+              }}
               rows={4}
               placeholder="Como o treino se comportou hoje"
             />
@@ -2608,10 +3269,15 @@ function App() {
             {trainingPendingDrafts.length ? (
               trainingPendingDrafts.map((exercise, exerciseIndex) => {
                 const performedRecord = getExercisePerformanceRecordFromSessions(activeTrainingWorkout.id, exercise, sessions);
+                const isNotPerformed = exercise.status === 'not-performed';
 
                 return (
                   <article
-                    className="exercise-card training-exercise-card"
+                    className={
+                      isNotPerformed
+                        ? 'exercise-card training-exercise-card training-exercise-card--not-performed'
+                        : 'exercise-card training-exercise-card'
+                    }
                     key={exercise.workoutExerciseId}
                     ref={element => {
                       trainingExerciseRefs.current[exerciseIndex] = element;
@@ -2622,26 +3288,53 @@ function App() {
                         <p className="exercise-meta-text">
                           {exercise.muscleGroup} - alvo {exercise.targetReps}
                         </p>
+                        {isNotPerformed ? (
+                          <span className="not-performed-badge">Não realizado</span>
+                        ) : null}
                       </div>
                       <div className="training-exercise-actions">
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => handleFinishTrainingExercise(exerciseIndex)}>
-                          <ChevronRight size={16} />
-                          Finalizar exercício
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() =>
-                            setTrainingPendingDrafts(current =>
-                              addDraftSet(current, exerciseIndex),
-                            )
-                          }>
-                          <Plus size={16} />
-                          Nova série
-                        </button>
+                        {!isNotPerformed ? (
+                          <>
+                            <button
+                              type="button"
+                              className="ghost-button"
+                              disabled={trainingUndoStack.length === 0}
+                              onClick={handleUndoTrainingChange}>
+                              <Undo2 size={16} />
+                              Desfazer alteração
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() =>
+                                handleMarkTrainingExerciseNotPerformed(
+                                  exerciseIndex,
+                                )
+                              }>
+                              <X size={16} />
+                              Não realizado
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => handleFinishTrainingExercise(exerciseIndex)}>
+                              <ChevronRight size={16} />
+                              Finalizar exercício
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-button"
+                              onClick={() => handleAddTrainingSet(exerciseIndex)}>
+                              <Plus size={16} />
+                              Nova série
+                            </button>
+                          </>
+                        ) : (
+                          <button type="button" className="danger-button" disabled>
+                            <X size={16} />
+                            Não realizado
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -2660,93 +3353,189 @@ function App() {
                     ) : null}
 
                   <div className="training-set-stack">
-                    {exercise.sets.map((setItem, setIndex) => (
-                      <div className="training-set-card" key={setItem.id}>
-                        <div className="exercise-card-head">
-                          <strong>Série - {setItem.seriesNumber}</strong>
-                          <button
-                            type="button"
-                            className="danger-button subtle"
-                            onClick={() =>
-                              requestRemoveDraftSet(
-                                exercise.exerciseName,
-                                exerciseIndex,
-                                setIndex,
-                                setItem.seriesNumber,
-                              )
-                            }>
-                            <Trash2 size={14} />
-                            Remover
-                          </button>
-                        </div>
+                    {isNotPerformed ? (
+                      <div className="not-performed-panel">
+                        Este exercício foi marcado como não realizado e não entrará
+                        no histórico salvo.
+                      </div>
+                    ) : exercise.sets.map((setItem, setIndex) => {
+                      const timerKey = getSetRestTimerKey(
+                        exercise.workoutExerciseId,
+                        setItem.id,
+                      );
+                      const restTimer = getRestTimerState(timerKey);
+                      const timerActionLabel = restTimer.isRunning
+                        ? 'Pausar'
+                        : restTimer.remainingSeconds === 0
+                          ? 'Reiniciar'
+                          : 'Iniciar';
+                      const isRestTimerMenuOpen =
+                        activeRestTimerMenuKey === timerKey;
 
-                        <div className="editor-grid">
-                          <label>
-                            <span>Carga</span>
-                            <input
-                              ref={element => {
-                                if (setIndex === 0) {
-                                  trainingExerciseLoadInputRefs.current[exerciseIndex] = element;
-                                }
-                              }}
-                              value={setItem.load}
-                              onChange={event =>
-                                setTrainingPendingDrafts(current =>
-                                  updateDraftSet(
-                                    current,
+                      return (
+                        <div className="training-set-card" key={setItem.id}>
+                          <div className="exercise-card-head">
+                            <strong>Série - {setItem.seriesNumber}</strong>
+                            <button
+                              type="button"
+                              className="danger-button subtle"
+                              onClick={() =>
+                                requestRemoveDraftSet(
+                                  exercise.exerciseName,
+                                  exerciseIndex,
+                                  setIndex,
+                                  setItem.seriesNumber,
+                                )
+                              }>
+                              <Trash2 size={14} />
+                              Remover
+                            </button>
+                          </div>
+
+                          <div className="rest-timer-float-area">
+                            <button
+                              aria-expanded={isRestTimerMenuOpen}
+                              aria-label={`Abrir opções de descanso. Tempo atual ${formatRestTimerTime(
+                                restTimer.remainingSeconds,
+                              )}`}
+                              className={
+                                restTimer.isRunning
+                                  ? 'rest-timer-floating-button active'
+                                  : 'rest-timer-floating-button'
+                              }
+                              type="button"
+                              onClick={() => toggleRestTimerMenu(timerKey)}>
+                              <Clock3 size={20} />
+                            </button>
+
+                            {isRestTimerMenuOpen ? (
+                              <div className="rest-timer-menu">
+                                <div className="rest-timer-menu-head">
+                                  <span>
+                                    <span className="rest-timer-menu-title">
+                                      Editar tempo
+                                    </span>
+                                    <span className="rest-timer-menu-status">
+                                      {restTimer.isRunning
+                                        ? 'Rodando'
+                                        : `${formatRestTimerTime(
+                                            restTimer.durationSeconds,
+                                          )} configurado`}
+                                    </span>
+                                  </span>
+                                  <strong>
+                                    {formatRestTimerTime(
+                                      restTimer.remainingSeconds,
+                                    )}
+                                  </strong>
+                                </div>
+                                <div className="rest-timer-presets">
+                                  {restTimerPresets.map(preset => {
+                                    const isActive =
+                                      restTimer.durationSeconds === preset.seconds;
+
+                                    return (
+                                      <button
+                                        key={preset.seconds}
+                                        type="button"
+                                        className={
+                                          isActive
+                                            ? 'rest-timer-preset active'
+                                            : 'rest-timer-preset'
+                                        }
+                                        onClick={() =>
+                                          configureRestTimer(
+                                            timerKey,
+                                            preset.seconds,
+                                          )
+                                        }>
+                                        {preset.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="rest-timer-actions">
+                                  <button
+                                    type="button"
+                                    className={
+                                      restTimer.isRunning
+                                        ? 'rest-timer-action active'
+                                        : 'rest-timer-action'
+                                    }
+                                    onClick={() => toggleRestTimer(timerKey)}>
+                                    {timerActionLabel}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rest-timer-reset"
+                                    onClick={() => resetRestTimer(timerKey)}>
+                                    Resetar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="editor-grid">
+                            <label>
+                              <span>Carga</span>
+                              <input
+                                ref={element => {
+                                  if (setIndex === 0) {
+                                    trainingExerciseLoadInputRefs.current[exerciseIndex] = element;
+                                  }
+                                }}
+                                value={setItem.load}
+                                onChange={event =>
+                                  handleTrainingSetChange(
                                     exerciseIndex,
                                     setIndex,
                                     'load',
                                     maskDecimalInput(event.target.value),
-                                  ),
-                                )
-                              }
-                              inputMode="decimal"
-                              placeholder="0"
-                            />
-                          </label>
-                          <label>
-                            <span>Reps</span>
-                            <input
-                              value={setItem.reps}
-                              onChange={event =>
-                                setTrainingPendingDrafts(current =>
-                                  updateDraftSet(
-                                    current,
+                                  )
+                                }
+                                inputMode="decimal"
+                                placeholder="0"
+                              />
+                            </label>
+                            <label>
+                              <span>Reps</span>
+                              <input
+                                value={setItem.reps}
+                                onChange={event =>
+                                  handleTrainingSetChange(
                                     exerciseIndex,
                                     setIndex,
                                     'reps',
                                     maskIntegerInput(event.target.value),
-                                  ),
-                                )
-                              }
-                              inputMode="numeric"
-                              placeholder="0"
-                            />
-                          </label>
-                        </div>
+                                  )
+                                }
+                                inputMode="text"
+                                placeholder="0"
+                              />
+                            </label>
+                          </div>
 
-                        <label className="stacked-field">
-                          <span>Anotação da série</span>
-                          <textarea
-                            value={setItem.note}
-                            onChange={event =>
-                              setTrainingPendingDrafts(current =>
-                                updateDraftSet(
-                                  current,
+                          <label className="stacked-field">
+                            <span>Anotação da série</span>
+                            <textarea
+                              value={setItem.note}
+                              onChange={event =>
+                                handleTrainingSetChange(
                                   exerciseIndex,
                                   setIndex,
                                   'note',
                                   event.target.value,
-                                ),
-                              )
-                            }
-                            rows={3}
-                            placeholder="Ex: última repetição travou."
-                          />
-                        </label>
-                      </div>
-                    ))}
+                                )
+                              }
+                              rows={3}
+                              placeholder="Ex: última repetição travou."
+                            />
+                          </label>
+                        </div>
+                      );
+                    })}
                   </div>
                   </article>
                 );
@@ -3042,6 +3831,13 @@ function App() {
           onClose={() => setSuccessModalMessage(null)}
         />
       ) : null}
+      {restTimerCompletionKey ? (
+        <SuccessModal
+          message="Descanso finalizado. Inicie a nova série"
+          actionLabel="Próxima série"
+          onClose={() => setRestTimerCompletionKey(null)}
+        />
+      ) : null}
       {deleteConfirmation ? (
         <DeleteConfirmationModal
           title={deleteConfirmation.title}
@@ -3059,17 +3855,19 @@ function App() {
         />
       ) : null}
       {authView === 'loading' ? (
-        <main className="auth-stage">
-          <section className="auth-panel auth-panel--loading" aria-live="polite">
-            <div className="auth-brand">
-              <BrandMark compact />
-              <div>
-                <p className="eyebrow">LogGYM</p>
-                <h2>Restaurando sua sessão</h2>
-              </div>
+        <main className="splash-stage">
+          <section className="splash-panel" aria-live="polite" aria-label="Carregando LogGYM">
+            <div className="splash-mark-wrap">
+              <BrandMark animated />
             </div>
-            <p className="support-copy">Carregando seus treinos salvos.</p>
-            <LoaderCircle className="spin auth-loading-icon" size={28} />
+            <div className="splash-copy">
+              <p className="eyebrow">LogGYM</p>
+              <h1>Preparando seu espaço de treino</h1>
+              <p>Restaurando sua sessão e carregando seus treinos salvos.</p>
+            </div>
+            <div className="splash-progress" aria-hidden="true">
+              <span />
+            </div>
           </section>
         </main>
       ) : authView === 'workspace' ? (

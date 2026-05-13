@@ -9,6 +9,10 @@ import {
   type TrainingDraftAutosavePayload,
 } from '@/features/workouts/trainingDraftAutosave';
 import type {WorkoutDetail} from '@/types/domain';
+import {
+  getSessionDateInputValue,
+  resolveTrainingDraftPerformedAt,
+} from '@/utils/sessionDate';
 
 type LegacyTrainingDraftAutosavePayload = Omit<
   TrainingDraftAutosavePayload,
@@ -258,5 +262,20 @@ describe('training draft autosave', () => {
       pendingExercises: [],
       completedExercises: [],
     });
+  });
+
+  it('resets stale autosave dates to the current training day', () => {
+    const currentDate = new Date(2026, 4, 5, 9, 30);
+
+    expect(
+      getSessionDateInputValue(
+        resolveTrainingDraftPerformedAt('2026-04-27T15:00:00.000Z', currentDate),
+      ),
+    ).toBe('2026-05-05');
+    expect(
+      getSessionDateInputValue(
+        resolveTrainingDraftPerformedAt('2026-05-05T15:00:00.000Z', currentDate),
+      ),
+    ).toBe('2026-05-05');
   });
 });

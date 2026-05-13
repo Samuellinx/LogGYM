@@ -188,6 +188,7 @@ export const hasStartedTrainingDraft = (
   }
 
   return [...draft.pendingExercises, ...draft.completedExercises].some(exercise =>
+    exercise.status === 'not-performed' ||
     exercise.sets.some(
       setItem =>
         setItem.load.trim() !== '' ||
@@ -209,6 +210,7 @@ const normalizeDraftExercise = (
   baseLoad: exercise.baseLoad,
   targetReps: exercise.targetReps,
   hint: exercise.hint,
+  status: exercise.status === 'not-performed' ? 'not-performed' : undefined,
   sets: exercise.sets.map((setItem, setIndex) =>
     normalizeDraftSet(setItem, setIndex + 1),
   ),
@@ -270,6 +272,8 @@ const parseDraftExercises = (
         baseLoad: exercise.baseLoad,
         targetReps: exercise.targetReps,
         hint: exercise.hint,
+        status:
+          exercise.status === 'not-performed' ? 'not-performed' : undefined,
         sets,
       };
     })
@@ -319,14 +323,16 @@ export const restoreTrainingDraftState = (
     ]),
   );
   const nextState = createEmptyTrainingDraftState();
+  const workoutExerciseIds = new Set(workout.exercises.map(exercise => exercise.id));
 
   workout.exercises.forEach(exercise => {
     const savedCompletedExercise = savedCompletedExercises.get(exercise.id);
     const savedPendingExercise = savedPendingExercises.get(exercise.id);
-    const targetList = savedCompletedExercise
+    const savedExercise = savedCompletedExercise ?? savedPendingExercise;
+    const isNotPerformed = savedExercise?.status === 'not-performed';
+    const targetList = savedCompletedExercise && !isNotPerformed
       ? nextState.completedExercises
       : nextState.pendingExercises;
-    const savedExercise = savedCompletedExercise ?? savedPendingExercise;
 
     targetList.push({
       workoutExerciseId: exercise.id,
@@ -336,12 +342,36 @@ export const restoreTrainingDraftState = (
       baseLoad: exercise.baseLoad,
       targetReps: exercise.targetReps,
       hint: exercise.note,
+      status: isNotPerformed ? 'not-performed' : undefined,
       sets: savedExercise?.sets.length
         ? savedExercise.sets.map((setItem, setIndex) =>
             normalizeDraftSet(setItem, setIndex + 1),
           )
         : [createBlankSet(1)],
     });
+  });
+
+  normalizedDraft.pendingExercises.forEach((exercise, index) => {
+    if (!workoutExerciseIds.has(exercise.workoutExerciseId)) {
+      nextState.pendingExercises.push(
+        normalizeDraftExercise(exercise, workout.exercises.length + index),
+      );
+    }
+  });
+
+  normalizedDraft.completedExercises.forEach((exercise, index) => {
+    if (!workoutExerciseIds.has(exercise.workoutExerciseId)) {
+      const normalizedExercise = normalizeDraftExercise(
+        exercise,
+        workout.exercises.length + normalizedDraft.pendingExercises.length + index,
+      );
+      const targetList =
+        normalizedExercise.status === 'not-performed'
+          ? nextState.pendingExercises
+          : nextState.completedExercises;
+
+      targetList.push(normalizedExercise);
+    }
   });
 
   return nextState;

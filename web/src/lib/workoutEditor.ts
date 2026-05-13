@@ -90,7 +90,7 @@ const formatWorkoutIssue = (issue: ZodIssue) => {
       case 'muscleGroup':
         return `${exerciseLabel}: escolha o grupo ou tipo.`;
       case 'targetReps':
-        return `${exerciseLabel}: informe a faixa de repetições.`;
+        return `${exerciseLabel}: informe as repetições.`;
       case 'baseLoad':
         return `${exerciseLabel}: use apenas números na carga.`;
       case 'note':
