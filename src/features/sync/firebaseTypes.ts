@@ -44,6 +44,7 @@ export type FirebaseWorkoutSessionDocument = {
   focus: string;
   overallNotes: string;
   performedAt: string;
+  finishedAt?: string | null;
   createdAt: string;
   exercises: FirebaseSessionExerciseDocument[];
   totalSets: number;

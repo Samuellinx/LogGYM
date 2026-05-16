@@ -3,14 +3,19 @@ import {
   isErrorWithCode,
   keepLocalCopy,
   pick,
+  saveDocuments,
 } from '@react-native-documents/picker';
-import {FileSystem} from 'react-native-file-access';
+import {Dirs, FileSystem} from 'react-native-file-access';
 import {read, utils} from 'xlsx';
 
 import {workoutInputSchema} from '@/features/workouts/workout.schemas';
-import {importWorkouts} from '@/features/workouts/workoutRepository';
+import {
+  getAllWorkoutDocumentsForSync,
+  importWorkouts,
+} from '@/features/workouts/workoutRepository';
 import type {SessionUser, WorkoutInput} from '@/types/domain';
 import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
+import {buildTrainingTextExportContents} from './trainingTextExport';
 
 const TRAINING_IMPORT_TYPES = [
   'text/plain',
@@ -19,6 +24,8 @@ const TRAINING_IMPORT_TYPES = [
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
+const TRAINING_EXPORT_DIR = `${Dirs.CacheDir}/loggym-training-export`;
+const TRAINING_EXPORT_MIME_TYPE = 'text/plain';
 const MAX_IMPORT_SIZE_BYTES = 10 * 1024 * 1024;
 const TRAINING_IMPORT_FILE_EXTENSION = /\.(txt|csv|xls|xlsx)$/iu;
 const MAX_IMPORT_SHEETS = 12;
@@ -67,6 +74,12 @@ export interface TrainingImportResult {
   workouts: number;
   exercises: number;
   skippedWorkouts: number;
+}
+
+export interface TrainingTextExportResult {
+  fileName: string;
+  workouts: number;
+  exercises: number;
 }
 
 const fieldAliases: Record<CanonicalField, string[]> = {
@@ -189,6 +202,7 @@ const normalizeKey = (value: string) =>
 const cleanText = (value: unknown) =>
   String(value ?? '')
     .replace(/\uFEFF/g, '')
+    .replace(/\r?\n/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -221,6 +235,22 @@ const resolveField = (label: string): CanonicalField | null => {
 
 const stripExtension = (fileName: string) =>
   fileName.replace(/\.[^.]+$/u, '').trim() || 'Treino importado';
+
+const getTrainingTextExportFileName = () => {
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+  return `loggym-treinos-${stamp}.txt`;
+};
+
+const ensureTrainingExportDirectory = async () => {
+  const exists = await FileSystem.exists(TRAINING_EXPORT_DIR);
+
+  if (!exists) {
+    await FileSystem.mkdir(TRAINING_EXPORT_DIR);
+  }
+};
+
+const toFileUri = (path: string) => `file://${path}`;
 
 const humanizeLabel = (value: string) =>
   cleanText(value)
@@ -1091,6 +1121,52 @@ export const importTrainingFileForCurrentUser = async (
   } finally {
     if (selectedFile && (await FileSystem.exists(selectedFile.localPath))) {
       await FileSystem.unlink(selectedFile.localPath);
+    }
+  }
+};
+
+export const exportTrainingTextForCurrentUser = async (
+  user: SessionUser,
+): Promise<TrainingTextExportResult | null> => {
+  const workouts = await getAllWorkoutDocumentsForSync(user.id);
+  const exportableWorkouts = workouts.filter(workout => workout.exercises.length > 0);
+  const contents = buildTrainingTextExportContents(exportableWorkouts);
+  const fileName = getTrainingTextExportFileName();
+
+  await ensureTrainingExportDirectory();
+
+  const tempFilePath = `${TRAINING_EXPORT_DIR}/${fileName}`;
+
+  try {
+    await FileSystem.writeFile(tempFilePath, contents, 'utf8');
+
+    const [savedDocument] = await saveDocuments({
+      sourceUris: [toFileUri(tempFilePath)],
+      mimeType: TRAINING_EXPORT_MIME_TYPE,
+      fileName,
+    });
+
+    if (savedDocument.error) {
+      throw new Error('Não foi possível salvar o TXT de treinos agora.');
+    }
+
+    return {
+      fileName: savedDocument.name ?? fileName,
+      workouts: exportableWorkouts.length,
+      exercises: exportableWorkouts.reduce(
+        (sum, workout) => sum + workout.exercises.length,
+        0,
+      ),
+    };
+  } catch (error) {
+    if (isUserCancellation(error)) {
+      return null;
+    }
+
+    throw error;
+  } finally {
+    if (await FileSystem.exists(tempFilePath)) {
+      await FileSystem.unlink(tempFilePath);
     }
   }
 };

@@ -42,6 +42,7 @@ const workout: WorkoutDetail = {
   scheduledDay: null,
   exerciseCount: 2,
   lastPerformedAt: null,
+  lastFinishedAt: null,
   updatedAt: '2026-04-24T10:00:00.000Z',
   exercises: [
     {

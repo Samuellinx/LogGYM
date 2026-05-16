@@ -6,8 +6,9 @@ import type {WorkoutDetail} from '@/types/domain';
 import {formatBaseLoadLabel} from '@/utils/baseLoad';
 import {
   formatExercisePerformanceRecord,
-  formatSessionDate,
+  formatSessionFinishedAt,
 } from '@/utils/formatters';
+import {resolveSessionFinishedAt} from '@/utils/sessionDate';
 import type {ExercisePerformanceRecord} from '@/features/workouts/trainingSessionUi';
 
 interface WorkoutConsultModalProps {
@@ -63,9 +64,14 @@ export const WorkoutConsultModal = ({
                 <Text style={styles.metaValue}>{workout.scheduledDay || 'Livre'}</Text>
               </View>
               <View style={styles.metaItem}>
-                <Text style={styles.metaLabel}>Última execução</Text>
+                <Text style={styles.metaLabel}>Última finalização</Text>
                 <Text style={styles.metaValue}>
-                  {formatSessionDate(workout.lastPerformedAt)}
+                  {formatSessionFinishedAt(
+                    resolveSessionFinishedAt({
+                      finishedAt: workout.lastFinishedAt,
+                      performedAt: workout.lastPerformedAt,
+                    }),
+                  )}
                 </Text>
               </View>
             </View>

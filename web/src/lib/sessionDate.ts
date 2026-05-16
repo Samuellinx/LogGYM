@@ -70,6 +70,12 @@ export const normalizeSessionDateInput = (value: string | Date) => {
   return new Date(normalizedValue).toISOString();
 };
 
+export const resolveSessionFinishedAt = (session: {
+  finishedAt?: string | null;
+  createdAt?: string | null;
+  performedAt?: string | null;
+}) => session.finishedAt ?? session.createdAt ?? session.performedAt ?? null;
+
 export const resolveDraftSessionDateInput = (
   savedPerformedAt: string | null | undefined,
   now = new Date(),

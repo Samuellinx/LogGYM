@@ -15,11 +15,11 @@ describe('web restored workout consult and history metrics', () => {
     expect(appSource).toContain('Consulta de treino');
   });
 
-  it('shows the last performed workout start time beside the day instead of updated metadata', () => {
-    expect(appSource).toContain('Horario ultimo treino:');
+  it('shows the last workout finalization date and time beside the day', () => {
+    expect(appSource).toContain('Finalizado em:');
     expect(appSource).toContain('getLatestWorkoutSession(workout.id, sessions)');
     expect(appSource).toContain(
-      'formatWorkoutLastSessionTime(latestSession?.performedAt)',
+      'latestSession ? resolveSessionFinishedAt(latestSession) : null',
     );
     expect(appSource).toContain('Não realizado');
     expect(appSource).not.toContain('Início:');

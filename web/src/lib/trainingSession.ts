@@ -6,7 +6,12 @@ import type {
   WorkoutExerciseInput,
   WorkoutSessionDocument,
 } from '../types';
-import {normalizeSessionDateInput} from './sessionDate';
+import {
+  normalizeSessionDateInput,
+  resolveSessionFinishedAt,
+} from './sessionDate';
+
+export {resolveSessionFinishedAt};
 
 export type TrainingCompletionGroupStat = {
   label: string;
@@ -392,7 +397,8 @@ export const buildTrainingSessionDocument = ({
     throw new Error('Adicione pelo menos uma série válida antes de salvar.');
   }
 
-  const createdAt = new Date().toISOString();
+  const finishedAt = new Date().toISOString();
+  const createdAt = finishedAt;
   const totalSets = validExercises.reduce(
     (sum, exercise) => sum + exercise.sets.length,
     0,
@@ -420,6 +426,7 @@ export const buildTrainingSessionDocument = ({
     focus: workout.focus,
     overallNotes: overallNotes.trim(),
     performedAt: normalizeSessionDateInput(performedAt),
+    finishedAt,
     createdAt,
     exercises: validExercises,
     totalSets,

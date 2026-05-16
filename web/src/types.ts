@@ -60,6 +60,7 @@ export type WorkoutSessionDocument = {
   focus: string;
   overallNotes: string;
   performedAt: string;
+  finishedAt?: string | null;
   createdAt: string;
   exercises: WorkoutSessionExerciseDocument[];
   totalSets: number;

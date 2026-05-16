@@ -96,7 +96,10 @@ import {
   normalizeWorkoutForSave,
   reorderWorkoutExercises,
 } from './lib/workoutEditor';
-import {importTrainingFileForCurrentUser} from './lib/trainingImport';
+import {
+  exportTrainingTextForCurrentUser,
+  importTrainingFileForCurrentUser,
+} from './lib/trainingImport';
 import {
   createTrainingDraftSnapshot,
   deleteAllTrainingDraftAutosavesForUser,
@@ -117,6 +120,7 @@ import {
   markTrainingDraftExerciseNotPerformed,
   mergeTrainingDraftExercisesForSave,
   removeDraftSet,
+  resolveSessionFinishedAt,
   updateDraftSet,
   upsertTrainingSessionInHistory,
   type ExercisePerformanceRecord,
@@ -423,6 +427,9 @@ const formatTrainingMetric = (value: number, suffix = '') => {
 };
 
 const workoutLastSessionTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
 });
@@ -433,13 +440,25 @@ const getSessionTimestamp = (session: WorkoutSessionDocument) => {
   return Number.isFinite(timestamp) ? timestamp : 0;
 };
 
+const getSessionFinishedTimestamp = (session: WorkoutSessionDocument) => {
+  const timestamp = new Date(resolveSessionFinishedAt(session) ?? '').getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 const getLatestWorkoutSession = (
   workoutId: string,
   sessions: WorkoutSessionDocument[],
 ) =>
   sessions
     .filter(session => session.workoutId === workoutId)
-    .sort((left, right) => getSessionTimestamp(right) - getSessionTimestamp(left))[0] ??
+    .sort((left, right) => {
+      const performedDelta = getSessionTimestamp(right) - getSessionTimestamp(left);
+
+      return performedDelta !== 0
+        ? performedDelta
+        : getSessionFinishedTimestamp(right) - getSessionFinishedTimestamp(left);
+    })[0] ??
   null;
 
 const formatSuggestedLoad = (value: string) => {
@@ -624,8 +643,12 @@ const WorkoutConsultModal = ({
             <CalendarDays size={16} />
             Dia: <strong>{workout.scheduledDay || 'Livre'}</strong>
             <Clock3 size={16} />
-            Horario ultimo treino:{' '}
-            <strong>{formatWorkoutLastSessionTime(latestSession?.performedAt)}</strong>
+            Finalizado em:{' '}
+            <strong>
+              {formatWorkoutLastSessionTime(
+                latestSession ? resolveSessionFinishedAt(latestSession) : null,
+              )}
+            </strong>
           </span>
         </div>
 
@@ -1573,6 +1596,26 @@ function App() {
       );
     } catch (error) {
       showError(error, 'Não foi possível importar o arquivo agora.');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleExportTrainingText = async () => {
+    if (!user) {
+      return;
+    }
+
+    clearFeedback();
+    setBusyAction('training-export');
+
+    try {
+      const result = await exportTrainingTextForCurrentUser(user);
+      setStatusMessage(
+        `Download do TXT iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos e ${result.exercises} exercícios. Esse arquivo pode ser usado fora do app e importado novamente pelo LogGYM.`,
+      );
+    } catch (error) {
+      showError(error, 'Não foi possível exportar seus treinos em TXT agora.');
     } finally {
       setBusyAction(null);
     }
@@ -3742,13 +3785,16 @@ function App() {
 
       <div className="profile-section-head">
         <div>
-          <p className="eyebrow">Importar treino externo</p>
-          <h2>Converta texto ou planilha em treinos prontos no app</h2>
+          <p className="eyebrow">Importar ou exportar treino externo</p>
+          <h2>Use texto ou planilha para levar treinos para fora ou para dentro do app</h2>
         </div>
       </div>
 
       <div className="profile-info-card">
-        <strong>Arquivos aceitos</strong>
+        <strong>Arquivo TXT de treino</strong>
+        <p>
+          Exporte seus treinos em .txt para ler fora do app ou importar novamente depois.
+        </p>
         <p>
           Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino, Exercício, Carga,
           Repetições, Dia e Cor.
@@ -3757,6 +3803,21 @@ function App() {
       </div>
 
       <div className="profile-action-stack">
+        <button
+          type="button"
+          className="secondary-button wide"
+          disabled={!user || isBusy}
+          onClick={handleExportTrainingText}>
+          {busyAction === 'training-export' ? (
+            <LoaderCircle className="spin" size={16} />
+          ) : (
+            <Download size={16} />
+          )}
+          {busyAction === 'training-export'
+            ? 'Exportando TXT...'
+            : 'Exportar treinos em TXT'}
+        </button>
+
         <button
           type="button"
           className="secondary-button wide"

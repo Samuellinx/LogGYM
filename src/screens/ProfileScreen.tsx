@@ -16,7 +16,10 @@ import {
   defaultProfileAvatarId,
   profileAvatarCatalog,
 } from '@/features/auth/profileAvatarCatalog';
-import {importTrainingFileForCurrentUser} from '@/features/imports/trainingImportService';
+import {
+  exportTrainingTextForCurrentUser,
+  importTrainingFileForCurrentUser,
+} from '@/features/imports/trainingImportService';
 import {useAppStore} from '@/store/useAppStore';
 import {theme} from '@/theme';
 import {toUserMessage} from '@/utils/errors';
@@ -24,7 +27,12 @@ import {formatSessionDate} from '@/utils/formatters';
 
 export const ProfileScreen = () => {
   const [activeAction, setActiveAction] = useState<
-    'export' | 'backup-import' | 'training-import' | 'profile-avatar' | null
+    | 'export'
+    | 'backup-import'
+    | 'training-export'
+    | 'training-import'
+    | 'profile-avatar'
+    | null
   >(null);
   const [backupPassword, setBackupPassword] = useState('');
   const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('');
@@ -191,6 +199,41 @@ export const ProfileScreen = () => {
         toUserMessage(
           error,
           'Não foi possível converter esse arquivo em estrutura de treino agora.',
+        ),
+      );
+    } finally {
+      setActiveAction(null);
+    }
+  };
+
+  const handleExportTrainingText = async () => {
+    if (!session?.user) {
+      return;
+    }
+
+    setActiveAction('training-export');
+
+    try {
+      const result = await exportTrainingTextForCurrentUser(session.user);
+
+      if (!result) {
+        return;
+      }
+
+      Alert.alert(
+        'TXT de treinos exportado',
+        [
+          'O arquivo de texto foi salvo com sucesso.',
+          `Arquivo: ${result.fileName}.`,
+          `Conteúdo: ${result.workouts} treinos e ${result.exercises} exercícios.`,
+          'Esse TXT pode ser usado fora do app e importado novamente pelo LogGYM.',
+        ].join(' '),
+      );
+    } catch (error) {
+      showError(
+        toUserMessage(
+          error,
+          'Não foi possível exportar seus treinos em TXT agora.',
         ),
       );
     } finally {
@@ -414,12 +457,16 @@ export const ProfileScreen = () => {
       />
 
       <SectionHeader
-        title="Importar treino externo"
-        subtitle="Converta texto ou planilha em treinos prontos no app"
+        title="Importar ou exportar treino externo"
+        subtitle="Use texto ou planilha para levar treinos para fora ou para dentro do app"
       />
 
       <View style={styles.backupCard}>
-        <Text style={styles.backupTitle}>Arquivos aceitos</Text>
+        <Text style={styles.backupTitle}>Arquivo TXT de treino</Text>
+        <Text style={styles.backupText}>
+          Exporte seus treinos em .txt para ler fora do app ou importar novamente
+          depois.
+        </Text>
         <Text style={styles.backupText}>
           Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino,
           Exercício, Carga, Repetições, Dia e Cor.
@@ -429,6 +476,17 @@ export const ProfileScreen = () => {
           incompletos.
         </Text>
       </View>
+
+      <Button
+        variant="secondary"
+        label={
+          activeAction === 'training-export'
+            ? 'Exportando TXT...'
+            : 'Exportar treinos em TXT'
+        }
+        onPress={handleExportTrainingText}
+        disabled={!session || isBusy}
+      />
 
       <Button
         variant="secondary"

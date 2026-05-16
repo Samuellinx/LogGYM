@@ -3,7 +3,8 @@ import {read, utils} from 'xlsx';
 import {z} from 'zod';
 
 import type {WorkoutDocument} from '../types';
-import {importWorkoutsForUser} from './workouts';
+import {importWorkoutsForUser, listAllWorkoutsForUser} from './workouts';
+import {buildTrainingTextExportContents} from './trainingTextExport';
 
 const weekdayOptions = [
   'Segunda',
@@ -53,6 +54,7 @@ const workoutImportSchema = z.object({
 
 const TRAINING_IMPORT_SIZE_BYTES = 10 * 1024 * 1024;
 const TRAINING_IMPORT_FILE_EXTENSION = /\.(txt|csv|xls|xlsx)$/iu;
+const TRAINING_EXPORT_MIME_TYPE = 'text/plain;charset=utf-8';
 const MAX_IMPORT_SHEETS = 12;
 const MAX_IMPORT_ROWS_PER_SHEET = 2000;
 const MAX_IMPORT_ROWS_TOTAL = 5000;
@@ -99,6 +101,12 @@ export interface TrainingImportResult {
   workouts: number;
   exercises: number;
   skippedWorkouts: number;
+}
+
+export interface TrainingTextExportResult {
+  fileName: string;
+  workouts: number;
+  exercises: number;
 }
 
 const fieldAliases: Record<CanonicalField, string[]> = {
@@ -202,12 +210,31 @@ const normalizeKey = (value: string) =>
 const cleanText = (value: unknown) =>
   String(value ?? '')
     .replace(/\uFEFF/g, '')
+    .replace(/\r?\n/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
 const clampText = (value: string, maxLength: number) => cleanText(value).slice(0, maxLength);
 
 const stripExtension = (fileName: string) => fileName.replace(/\.[^.]+$/u, '').trim() || 'Treino importado';
+
+const getTrainingTextExportFileName = () => {
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+  return `loggym-treinos-${stamp}.txt`;
+};
+
+const triggerTextDownload = (fileName: string, contents: string) => {
+  const blob = new Blob([contents], {type: TRAINING_EXPORT_MIME_TYPE});
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+
+  URL.revokeObjectURL(url);
+};
 
 const humanizeLabel = (value: string) =>
   cleanText(value)
@@ -1002,5 +1029,25 @@ export const importTrainingFileForCurrentUser = async (
     workouts: sanitized.workouts.length,
     exercises: sanitized.exercises,
     skippedWorkouts: sanitized.skippedWorkouts,
+  };
+};
+
+export const exportTrainingTextForCurrentUser = async (
+  user: User,
+): Promise<TrainingTextExportResult> => {
+  const workouts = await listAllWorkoutsForUser(user.uid);
+  const exportableWorkouts = workouts.filter(workout => workout.exercises.length > 0);
+  const contents = buildTrainingTextExportContents(exportableWorkouts);
+  const fileName = getTrainingTextExportFileName();
+
+  triggerTextDownload(fileName, contents);
+
+  return {
+    fileName,
+    workouts: exportableWorkouts.length,
+    exercises: exportableWorkouts.reduce(
+      (sum, workout) => sum + workout.exercises.length,
+      0,
+    ),
   };
 };

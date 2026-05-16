@@ -48,6 +48,7 @@ type BackupWorkoutSessionRow = {
   workout_name: string;
   focus: string;
   performed_at: string;
+  finished_at: string | null;
   overall_notes: string;
   duration_minutes: number;
   created_at: string;
@@ -221,6 +222,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
         workout_name,
         focus,
         performed_at,
+        COALESCE(finished_at, created_at, performed_at) AS finished_at,
         overall_notes,
         duration_minutes,
         created_at
@@ -294,6 +296,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
         workoutName: item.workout_name,
         focus: item.focus,
         performedAt: item.performed_at,
+        finishedAt: item.finished_at ?? item.created_at,
         overallNotes: item.overall_notes,
         durationMinutes: Number(item.duration_minutes),
         createdAt: item.created_at,
@@ -497,8 +500,8 @@ export const importBackupForCurrentUser = async (
       for (const session of payload.data.workoutSessions) {
         await tx.executeAsync(
           `INSERT INTO workout_sessions (
-            id, user_id, workout_id, workout_name, focus, performed_at, overall_notes, duration_minutes, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            id, user_id, workout_id, workout_name, focus, performed_at, finished_at, overall_notes, duration_minutes, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
             session.id,
             user.id,
@@ -506,6 +509,7 @@ export const importBackupForCurrentUser = async (
             session.workoutName,
             session.focus,
             session.performedAt,
+            session.finishedAt ?? session.createdAt,
             session.overallNotes,
             session.durationMinutes,
             session.createdAt,

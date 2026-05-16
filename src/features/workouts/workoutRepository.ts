@@ -56,6 +56,7 @@ type WorkoutSummaryRow = {
   scheduled_day: string | null;
   exercise_count: number | null;
   last_performed_at: string | null;
+  last_finished_at: string | null;
   updated_at: string;
 };
 
@@ -88,6 +89,7 @@ type WorkoutHistoryRow = {
   workout_name: string;
   focus: string;
   performed_at: string;
+  finished_at: string | null;
   overall_notes: string;
   total_sets: number | null;
   total_volume: number | null;
@@ -123,6 +125,7 @@ type WorkoutSessionSyncRow = {
   workout_name: string;
   focus: string;
   performed_at: string;
+  finished_at: string | null;
   overall_notes: string;
   created_at: string;
 };
@@ -182,6 +185,7 @@ const mapWorkoutSummary = (row: WorkoutSummaryRow): WorkoutSummary => ({
   scheduledDay: row.scheduled_day,
   exerciseCount: Number(row.exercise_count ?? 0),
   lastPerformedAt: row.last_performed_at,
+  lastFinishedAt: row.last_finished_at,
   updatedAt: row.updated_at,
 });
 
@@ -191,6 +195,7 @@ const mapWorkoutHistory = (row: WorkoutHistoryRow): WorkoutHistoryItem => ({
   workoutName: row.workout_name,
   focus: row.focus,
   performedAt: row.performed_at,
+  finishedAt: row.finished_at,
   overallNotes: row.overall_notes,
   totalSets: Number(row.total_sets ?? 0),
   totalVolume: Number(row.total_volume ?? 0),
@@ -603,6 +608,7 @@ const mapSessionDocument = (
     focus: sessionRow.focus,
     overallNotes: sessionRow.overall_notes,
     performedAt: sessionRow.performed_at,
+    finishedAt: sessionRow.finished_at ?? sessionRow.created_at,
     createdAt: sessionRow.created_at,
     exercises,
     totalSets: setRows.length,
@@ -624,6 +630,7 @@ export const getSessionDocumentForSync = async (
       workout_name,
       focus,
       performed_at,
+      finished_at,
       overall_notes,
       created_at
     FROM workout_sessions
@@ -792,10 +799,11 @@ export const replaceLocalDataFromRemote = async ({
           workout_name,
           focus,
           performed_at,
+          finished_at,
           overall_notes,
           duration_minutes,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           session.id,
           userId,
@@ -803,6 +811,7 @@ export const replaceLocalDataFromRemote = async ({
           session.workoutName,
           session.focus,
           session.performedAt,
+          session.finishedAt ?? session.createdAt,
           session.overallNotes,
           0,
           session.createdAt,
@@ -861,6 +870,14 @@ export const listWorkouts = async (userId: string) => {
       w.scheduled_day,
       COUNT(DISTINCT we.id) AS exercise_count,
       MAX(ws.performed_at) AS last_performed_at,
+      (
+        SELECT COALESCE(ws_latest.finished_at, ws_latest.created_at, ws_latest.performed_at)
+        FROM workout_sessions ws_latest
+        WHERE ws_latest.workout_id = w.id
+        ORDER BY ws_latest.performed_at DESC,
+          COALESCE(ws_latest.finished_at, ws_latest.created_at, ws_latest.performed_at) DESC
+        LIMIT 1
+      ) AS last_finished_at,
       w.updated_at
     FROM workouts w
     LEFT JOIN workout_exercises we ON we.workout_id = w.id
@@ -889,6 +906,14 @@ export const getWorkoutDetail = async (
       w.scheduled_day,
       COUNT(DISTINCT we.id) AS exercise_count,
       MAX(ws.performed_at) AS last_performed_at,
+      (
+        SELECT COALESCE(ws_latest.finished_at, ws_latest.created_at, ws_latest.performed_at)
+        FROM workout_sessions ws_latest
+        WHERE ws_latest.workout_id = w.id
+        ORDER BY ws_latest.performed_at DESC,
+          COALESCE(ws_latest.finished_at, ws_latest.created_at, ws_latest.performed_at) DESC
+        LIMIT 1
+      ) AS last_finished_at,
       w.updated_at
     FROM workouts w
     LEFT JOIN workout_exercises we ON we.workout_id = w.id
@@ -1247,13 +1272,14 @@ export const saveTrainingSession = async (
   }
 
   const sessionId = createId();
-  const createdAt = new Date().toISOString();
+  const finishedAt = new Date().toISOString();
+  const createdAt = finishedAt;
 
   await db.transaction(async tx => {
     await tx.executeAsync(
       `INSERT INTO workout_sessions (
-        id, user_id, workout_id, workout_name, focus, performed_at, overall_notes, duration_minutes, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        id, user_id, workout_id, workout_name, focus, performed_at, finished_at, overall_notes, duration_minutes, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         sessionId,
         userId,
@@ -1261,6 +1287,7 @@ export const saveTrainingSession = async (
         validatedInput.workoutName,
         validatedInput.focus,
         validatedInput.performedAt,
+        finishedAt,
         validatedInput.overallNotes,
         0,
         createdAt,
@@ -1351,6 +1378,7 @@ export const listHistory = async (userId: string) => {
       ws.workout_name,
       ws.focus,
       ws.performed_at,
+      COALESCE(ws.finished_at, ws.created_at, ws.performed_at) AS finished_at,
       ws.overall_notes,
       COUNT(ss.id) AS total_sets,
       COALESCE(SUM(ss.load * ss.reps), 0) AS total_volume,

@@ -41,6 +41,7 @@ const backupWorkoutSessionSchema = z.object({
   workoutName: z.string().trim().min(2).max(80),
   focus: z.string().trim().min(2).max(30),
   performedAt: isoDateSchema,
+  finishedAt: isoDateSchema.optional(),
   overallNotes: z.string().trim().max(1000),
   durationMinutes: z.number().int().min(0).max(1440),
   createdAt: isoDateSchema,

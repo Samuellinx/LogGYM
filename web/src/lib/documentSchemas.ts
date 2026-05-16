@@ -56,6 +56,7 @@ export const workoutSessionDocumentSchema = z.object({
   focus: z.string().trim().min(1).max(30),
   overallNotes: z.string().trim().max(1200),
   performedAt: isoDateSchema,
+  finishedAt: isoDateSchema.nullable().optional(),
   createdAt: isoDateSchema,
   exercises: z.array(workoutSessionExerciseSchema).min(1).max(24),
   totalSets: z.number().int().min(1).max(400),

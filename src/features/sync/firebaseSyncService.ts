@@ -64,6 +64,7 @@ const workoutSessionSchema = z.object({
   focus: z.string().trim().min(1).max(30),
   overallNotes: z.string().trim().max(1200),
   performedAt: z.string().trim().min(10).max(40),
+  finishedAt: z.string().trim().min(10).max(40).nullable().optional(),
   createdAt: z.string().trim().min(10).max(40),
   exercises: z.array(sessionExerciseSchema).min(1).max(24),
   totalSets: z.number().int().min(1).max(400),

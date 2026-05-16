@@ -56,6 +56,7 @@ export interface WorkoutSummary {
   scheduledDay: string | null;
   exerciseCount: number;
   lastPerformedAt: string | null;
+  lastFinishedAt: string | null;
   updatedAt: string;
 }
 
@@ -91,6 +92,7 @@ export interface WorkoutHistoryItem {
   workoutName: string;
   focus: string;
   performedAt: string;
+  finishedAt: string | null;
   overallNotes: string;
   totalSets: number;
   totalVolume: number;

@@ -19,6 +19,20 @@ export const formatSessionDate = (value: string | null) => {
   return format(date, "dd 'de' MMM", {locale: ptBR});
 };
 
+export const formatSessionFinishedAt = (value: string | null) => {
+  if (!value) {
+    return 'Ainda não finalizado';
+  }
+
+  const date = new Date(value);
+
+  if (!Number.isFinite(date.getTime())) {
+    return 'Ainda não finalizado';
+  }
+
+  return format(date, "dd 'de' MMM yyyy, HH:mm", {locale: ptBR});
+};
+
 export const formatDateLong = (value: string) =>
   format(new Date(value), "dd 'de' MMM yyyy, HH:mm", {locale: ptBR});
 

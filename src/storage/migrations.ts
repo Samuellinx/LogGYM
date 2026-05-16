@@ -111,4 +111,13 @@ export const migrations: Migration[] = [
       `UPDATE users SET avatar_id = 'caio-surge' WHERE avatar_id IS NULL OR TRIM(avatar_id) = '';`,
     ],
   },
+  {
+    id: '005_workout_session_finished_at',
+    statements: [
+      `ALTER TABLE workout_sessions ADD COLUMN finished_at TEXT;`,
+      `UPDATE workout_sessions
+       SET finished_at = created_at
+       WHERE finished_at IS NULL OR TRIM(finished_at) = '';`,
+    ],
+  },
 ];
