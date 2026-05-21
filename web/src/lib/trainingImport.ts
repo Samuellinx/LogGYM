@@ -3,8 +3,15 @@ import {read, utils} from 'xlsx';
 import {z} from 'zod';
 
 import type {WorkoutDocument} from '../types';
-import {importWorkoutsForUser, listAllWorkoutsForUser} from './workouts';
-import {buildTrainingTextExportContents} from './trainingTextExport';
+import {
+  importWorkoutsForUser,
+  listAllSessionsForUser,
+  listAllWorkoutsForUser,
+} from './workouts';
+import {
+  buildTrainingTextExportContents,
+  countTrainingTextExportSessions,
+} from './trainingTextExport';
 
 const weekdayOptions = [
   'Segunda',
@@ -107,6 +114,7 @@ export interface TrainingTextExportResult {
   fileName: string;
   workouts: number;
   exercises: number;
+  sessions: number;
 }
 
 const fieldAliases: Record<CanonicalField, string[]> = {
@@ -1035,9 +1043,13 @@ export const importTrainingFileForCurrentUser = async (
 export const exportTrainingTextForCurrentUser = async (
   user: User,
 ): Promise<TrainingTextExportResult> => {
-  const workouts = await listAllWorkoutsForUser(user.uid);
+  const [workouts, sessions] = await Promise.all([
+    listAllWorkoutsForUser(user.uid),
+    listAllSessionsForUser(user.uid),
+  ]);
   const exportableWorkouts = workouts.filter(workout => workout.exercises.length > 0);
-  const contents = buildTrainingTextExportContents(exportableWorkouts);
+  const contents = buildTrainingTextExportContents(exportableWorkouts, sessions);
+  const exportedSessions = countTrainingTextExportSessions(exportableWorkouts, sessions);
   const fileName = getTrainingTextExportFileName();
 
   triggerTextDownload(fileName, contents);
@@ -1049,5 +1061,6 @@ export const exportTrainingTextForCurrentUser = async (
       (sum, workout) => sum + workout.exercises.length,
       0,
     ),
+    sessions: exportedSessions,
   };
 };

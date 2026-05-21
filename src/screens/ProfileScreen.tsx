@@ -225,7 +225,7 @@ export const ProfileScreen = () => {
         [
           'O arquivo de texto foi salvo com sucesso.',
           `Arquivo: ${result.fileName}.`,
-          `Conteúdo: ${result.workouts} treinos e ${result.exercises} exercícios.`,
+          `Conteúdo: ${result.workouts} treinos, ${result.exercises} exercícios e ${result.sessions} treinos realizados no histórico.`,
           'Esse TXT pode ser usado fora do app e importado novamente pelo LogGYM.',
         ].join(' '),
       );
@@ -464,8 +464,8 @@ export const ProfileScreen = () => {
       <View style={styles.backupCard}>
         <Text style={styles.backupTitle}>Arquivo TXT de treino</Text>
         <Text style={styles.backupText}>
-          Exporte seus treinos em .txt para ler fora do app ou importar novamente
-          depois.
+          Exporte seus treinos em .txt com histórico de datas, cargas e
+          repetições para ler fora do app ou importar novamente depois.
         </Text>
         <Text style={styles.backupText}>
           Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino,

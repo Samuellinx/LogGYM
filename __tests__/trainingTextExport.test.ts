@@ -11,6 +11,23 @@ const workout = {
   scheduledDay: 'Segunda',
   accentColor: '#0A84FF',
   notes: 'Priorizar controle de movimento.',
+  sessions: [
+    {
+      performedAt: '2026-05-05T21:37:00',
+      finishedAt: '2026-05-05T22:25:00',
+      createdAt: '2026-05-05T22:25:00',
+      exercises: [
+        {
+          exerciseName: 'Supino reto',
+          muscleGroup: 'Série de trabalho',
+          sets: [
+            {load: 62.5, reps: 8, note: ''},
+            {load: 60, reps: 9, note: 'Última repetição travou.'},
+          ],
+        },
+      ],
+    },
+  ],
   exercises: [
     {
       name: 'Supino reto',
@@ -68,6 +85,12 @@ describe('training text export', () => {
     expect(webContents).toContain('Carga: 60');
     expect(webContents).toContain('Repetições: 8-10');
     expect(webContents).toContain('Observações: Controlar a descida.');
+    expect(webContents).toContain('Histórico realizado: 1 treino anterior');
+    expect(webContents).toContain('Data do treino realizado: 05/05/2026 22:25');
+    expect(webContents).toContain('Exercício realizado: Supino reto');
+    expect(webContents).toContain('Série realizada 1: carga 62.5, repetições 8');
+    expect(webContents).toContain('Série realizada 2: carga 60, repetições 9');
+    expect(webContents).toContain('Anotação realizada 2: Última repetição travou.');
     expect(webContents).toContain('---');
     expect(webContents).toContain('Treino: Pernas 1');
     expect(webContents).not.toContain('undefined');

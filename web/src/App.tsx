@@ -1612,7 +1612,7 @@ function App() {
     try {
       const result = await exportTrainingTextForCurrentUser(user);
       setStatusMessage(
-        `Download do TXT iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos e ${result.exercises} exercícios. Esse arquivo pode ser usado fora do app e importado novamente pelo LogGYM.`,
+        `Download do TXT iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos, ${result.exercises} exercícios e ${result.sessions} treinos realizados no histórico. Esse arquivo pode ser usado fora do app e importado novamente pelo LogGYM.`,
       );
     } catch (error) {
       showError(error, 'Não foi possível exportar seus treinos em TXT agora.');
@@ -3793,7 +3793,8 @@ function App() {
       <div className="profile-info-card">
         <strong>Arquivo TXT de treino</strong>
         <p>
-          Exporte seus treinos em .txt para ler fora do app ou importar novamente depois.
+          Exporte seus treinos em .txt com histórico de datas, cargas e repetições para ler fora
+          do app ou importar novamente depois.
         </p>
         <p>
           Importe arquivos .txt, .csv, .xls ou .xlsx com colunas como Treino, Exercício, Carga,

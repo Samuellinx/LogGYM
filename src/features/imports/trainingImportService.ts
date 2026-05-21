@@ -10,12 +10,16 @@ import {read, utils} from 'xlsx';
 
 import {workoutInputSchema} from '@/features/workouts/workout.schemas';
 import {
+  getAllSessionDocumentsForSync,
   getAllWorkoutDocumentsForSync,
   importWorkouts,
 } from '@/features/workouts/workoutRepository';
 import type {SessionUser, WorkoutInput} from '@/types/domain';
 import {accentSpectrum, setTypeOptions, weekdayOptions} from '@/utils/constants';
-import {buildTrainingTextExportContents} from './trainingTextExport';
+import {
+  buildTrainingTextExportContents,
+  countTrainingTextExportSessions,
+} from './trainingTextExport';
 
 const TRAINING_IMPORT_TYPES = [
   'text/plain',
@@ -80,6 +84,7 @@ export interface TrainingTextExportResult {
   fileName: string;
   workouts: number;
   exercises: number;
+  sessions: number;
 }
 
 const fieldAliases: Record<CanonicalField, string[]> = {
@@ -1128,9 +1133,13 @@ export const importTrainingFileForCurrentUser = async (
 export const exportTrainingTextForCurrentUser = async (
   user: SessionUser,
 ): Promise<TrainingTextExportResult | null> => {
-  const workouts = await getAllWorkoutDocumentsForSync(user.id);
+  const [workouts, sessions] = await Promise.all([
+    getAllWorkoutDocumentsForSync(user.id),
+    getAllSessionDocumentsForSync(user.id),
+  ]);
   const exportableWorkouts = workouts.filter(workout => workout.exercises.length > 0);
-  const contents = buildTrainingTextExportContents(exportableWorkouts);
+  const contents = buildTrainingTextExportContents(exportableWorkouts, sessions);
+  const exportedSessions = countTrainingTextExportSessions(exportableWorkouts, sessions);
   const fileName = getTrainingTextExportFileName();
 
   await ensureTrainingExportDirectory();
@@ -1157,6 +1166,7 @@ export const exportTrainingTextForCurrentUser = async (
         (sum, workout) => sum + workout.exercises.length,
         0,
       ),
+      sessions: exportedSessions,
     };
   } catch (error) {
     if (isUserCancellation(error)) {
