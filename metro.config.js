@@ -14,9 +14,9 @@ const config = {
     // created/removed while Metro is crawling the tree on Windows, which
     // causes fs.watch ENOENT crashes in the fallback watcher.
     blockList: exclusionList([
-      /node_modules[\/\\].+[\/\\]android[\/\\]\.cxx[\/\\].*/,
-      /node_modules[\/\\].+[\/\\]android[\/\\]build[\/\\].*/,
-      /android[\/\\]app[\/\\]build[\/\\].*/,
+      /node_modules[/\\].+[/\\]android[/\\]\.cxx[/\\].*/,
+      /node_modules[/\\].+[/\\]android[/\\]build[/\\].*/,
+      /android[/\\]app[/\\]build[/\\].*/,
     ]),
   },
 };

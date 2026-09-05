@@ -1,4 +1,6 @@
-export type AuthProvider = 'google' | 'dev-local' | 'password';
+import type {AuthProvider} from '@/shared/firestoreDocuments';
+
+export type {AuthProvider} from '@/shared/firestoreDocuments';
 
 export interface SessionUser {
   id: string;

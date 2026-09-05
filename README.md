@@ -91,6 +91,7 @@ LOGGYM_ENABLE_DEV_LOGIN=false
 LOGGYM_FIREBASE_USE_EMULATORS=false
 LOGGYM_FIREBASE_AUTH_EMULATOR_HOST=10.0.2.2:9099
 LOGGYM_FIREBASE_FIRESTORE_EMULATOR_HOST=10.0.2.2:8080
+LOGGYM_FIREBASE_STORAGE_EMULATOR_HOST=10.0.2.2:9199
 ```
 
 Observações de segurança em DEV:
@@ -125,6 +126,7 @@ Resumo do obrigatório:
 6. adicionar o app Web e preencher `web/.env`
 7. publicar `firestore.rules` e `firestore.indexes.json`
 8. autorizar `localhost` no Firebase Auth para usar o painel web em DEV
+9. abrir o painel web por `http://localhost:5173/`; `127.0.0.1` pode ser tratado como outro domínio pelo Firebase Auth
 
 ## Doctor
 
@@ -306,10 +308,14 @@ Resumo curto:
 ## Validação executada neste workspace
 
 - `npm run typecheck`
+- `npm test -- --runInBand`
 - `npm run lint`
 - `npm run web:lint`
 - `npm run web:build`
 - `npm run firebase:doctor`
+
+O comando `npm run verify` executa a validação principal de código: tipagem,
+testes, lint raiz, lint web e build web.
 
 Status atual do doctor neste workspace:
 

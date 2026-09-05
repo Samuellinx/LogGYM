@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 
 import {firebaseAuth, firebaseAuthPersistenceReady, googleProvider} from './firebase';
+import {getUnauthorizedDomainMessage} from './authMessages';
 
 const toAuthMessage = (error: unknown, fallback: string) => {
   if (!(error instanceof FirebaseError)) {
@@ -26,7 +27,11 @@ const toAuthMessage = (error: unknown, fallback: string) => {
     case 'auth/network-request-failed':
       return new Error('Não foi possível conectar agora. Verifique sua internet.');
     case 'auth/unauthorized-domain':
-      return new Error('Este endereço ainda não está autorizado para login.');
+      return new Error(
+        getUnauthorizedDomainMessage(
+          typeof window === 'undefined' ? undefined : window.location.hostname,
+        ),
+      );
     case 'auth/operation-not-allowed':
       return new Error('Este método de acesso não está disponível no momento.');
     case 'auth/too-many-requests':

@@ -690,6 +690,101 @@ h3 {
   font-size: 1.1rem;
 }
 
+.history-metrics-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.history-insight-card {
+  min-height: 122px;
+}
+
+.history-insight-card small {
+  color: var(--accent);
+}
+
+.history-insight-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.history-progress-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.history-progress-panel .panel-head svg {
+  color: var(--accent);
+}
+
+.history-week-list,
+.history-focus-list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-week-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) minmax(118px, auto);
+  align-items: center;
+  gap: 12px;
+}
+
+.history-week-row span,
+.history-focus-row span {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.history-week-row strong {
+  color: var(--text);
+  font-size: 0.88rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.history-week-track {
+  height: 11px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.history-week-bar {
+  min-width: 2px;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+}
+
+.history-focus-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+.history-focus-row + .history-focus-row {
+  border-top: 1px solid var(--border);
+}
+
+.history-focus-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.history-focus-row strong {
+  color: var(--text);
+}
+
+.history-focus-row em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .history-card-actions {
   display: flex;
   align-items: flex-start;
@@ -739,6 +834,12 @@ h3 {
 
 .session-card-note {
   color: var(--text-soft);
+}
+
+.history-progress-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .progress-chart-card,
@@ -2143,6 +2244,7 @@ select:focus {
   .workspace-metrics--dashboard,
   .dashboard-layout,
   .dashboard-mini-grid,
+  .history-insight-grid,
   .exercise-progress-grid {
     grid-template-columns: 1fr;
   }
@@ -2182,6 +2284,7 @@ select:focus {
   .exercise-card-head,
   .dashboard-activity-head,
   .history-summary,
+  .history-focus-row,
   .session-card-top--history,
   .progress-chart-head,
   .progress-point-head,
@@ -2245,5 +2348,18 @@ select:focus {
 
   .search-box {
     min-width: 100%;
+  }
+
+  .history-week-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .history-week-row strong {
+    text-align: left;
+  }
+
+  .history-focus-row {
+    align-items: flex-start;
   }
 }

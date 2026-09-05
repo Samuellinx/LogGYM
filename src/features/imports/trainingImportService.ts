@@ -972,7 +972,7 @@ const sanitizeWorkoutSeeds = (workouts: WorkoutSeed[], fallbackName: string) => 
 
   if (validWorkouts.length > MAX_IMPORTED_WORKOUTS) {
     throw new Error(
-      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importacao.`,
+      `O arquivo excede o limite de ${MAX_IMPORTED_WORKOUTS} treinos por importação.`,
     );
   }
 

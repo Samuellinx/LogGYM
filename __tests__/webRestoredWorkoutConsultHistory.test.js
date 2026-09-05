@@ -5,42 +5,61 @@ const appSource = readFileSync(
   path.join(__dirname, '..', 'web', 'src', 'App.tsx'),
   'utf8',
 );
+const historyWorkspaceSource = readFileSync(
+  path.join(__dirname, '..', 'web', 'src', 'components', 'HistoryWorkspace.tsx'),
+  'utf8',
+);
+const feedbackModalsSource = readFileSync(
+  path.join(__dirname, '..', 'web', 'src', 'components', 'FeedbackModals.tsx'),
+  'utf8',
+);
 
 describe('web restored workout consult and history metrics', () => {
   it('keeps the workout consult action and modal wired in the web app', () => {
     expect(appSource).toContain('const [consultWorkout, setConsultWorkout]');
     expect(appSource).toContain('Consultar treino');
     expect(appSource).toContain('primary-button--consult');
-    expect(appSource).toContain('workout-consult-modal');
-    expect(appSource).toContain('Consulta de treino');
+    expect(feedbackModalsSource).toContain('workout-consult-modal');
+    expect(feedbackModalsSource).toContain('Consulta de treino');
   });
 
   it('shows the last workout finalization date and time beside the day', () => {
-    expect(appSource).toContain('Finalizado em:');
-    expect(appSource).toContain('getLatestWorkoutSession(workout.id, sessions)');
-    expect(appSource).toContain(
+    expect(feedbackModalsSource).toContain('Finalizado em:');
+    expect(feedbackModalsSource).toContain('getLatestWorkoutSession(workout.id, sessions)');
+    expect(feedbackModalsSource).toContain(
       'latestSession ? resolveSessionFinishedAt(latestSession) : null',
     );
-    expect(appSource).toContain('Não realizado');
+    expect(feedbackModalsSource).toContain('Não realizado');
     expect(appSource).not.toContain('Início:');
     expect(appSource).not.toContain('Atualizado:');
   });
 
   it('keeps the total lifted metrics visible in web history cards', () => {
-    expect(appSource).toContain('history-card-metrics');
-    expect(appSource).toContain('Maior carga -');
-    expect(appSource).toContain('Total levantado -');
-    expect(appSource).toContain('{sessionItem.totalSets} séries');
+    expect(historyWorkspaceSource).toContain('history-card-metrics');
+    expect(historyWorkspaceSource).toContain('Maior carga -');
+    expect(historyWorkspaceSource).toContain('Total levantado -');
+    expect(historyWorkspaceSource).toContain('{sessionItem.totalSets} séries');
+  });
+
+  it('keeps the weekly progress insights visible in web history', () => {
+    expect(appSource).toContain('<HistoryWorkspace');
+    expect(historyWorkspaceSource).toContain('Progresso dos treinos');
+    expect(historyWorkspaceSource).toContain('Treinos na semana');
+    expect(historyWorkspaceSource).toContain('Semana a semana');
+    expect(historyWorkspaceSource).toContain('Foco da semana');
+    expect(historyWorkspaceSource).toContain('Recorde de carga');
   });
 
   it('shows each exercise registered max load before falling back to suggested load', () => {
-    expect(appSource).toContain(
-      'getExercisePerformanceRecordFromSessions(workout.id, exercise, sessions)',
-    );
-    expect(appSource).toContain('Maior carga registrada:');
-    expect(appSource).toContain('formatExercisePerformanceRecord(registeredPerformanceRecord)');
-    expect(appSource).toContain('Carga sugerida:');
-    expect(appSource).toContain('Não informada');
+    expect(feedbackModalsSource).toContain('getExercisePerformanceRecordFromSessions');
+    expect(feedbackModalsSource).toContain('workout.id');
+    expect(feedbackModalsSource).toContain('exercise');
+    expect(feedbackModalsSource).toContain('sessions');
+    expect(feedbackModalsSource).toContain('Maior carga registrada:');
+    expect(feedbackModalsSource).toContain('formatExercisePerformanceRecord');
+    expect(feedbackModalsSource).toContain('registeredPerformanceRecord');
+    expect(feedbackModalsSource).toContain('Carga sugerida:');
+    expect(feedbackModalsSource).toContain('formatSuggestedLoad(exercise.baseLoad)');
   });
 
   it('shows the performed max load and reps above the suggested load during training', () => {

@@ -8,6 +8,9 @@ Painel React + Vite para gerenciar treinos do mesmo usuário usado no app mobile
 npm run dev
 ```
 
+Abra o painel em `http://localhost:5173/` para testar Google em DEV. Evite
+`127.0.0.1`, porque o Firebase Auth valida o domínio exato da página.
+
 ## Build
 
 ```bash

@@ -1,72 +1,20 @@
+import type {
+  WorkoutDocument,
+  WorkoutSessionDocument,
+} from '../../src/shared/firestoreDocuments';
+
 export type AuthMode = 'signin' | 'signup' | 'forgot';
 export type WorkspaceView = 'dashboard' | 'workouts' | 'history' | 'profile';
-export type AuthProvider = 'google' | 'password' | 'dev-local';
 
-export type UserProfileDocument = {
-  uid: string;
-  email: string;
-  name: string;
-  photo: string | null;
-  avatarId: string;
-  givenName: string | null;
-  familyName: string | null;
-  provider: AuthProvider;
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string;
-};
-
-export type WorkoutExerciseInput = {
-  id: string;
-  name: string;
-  muscleGroup: string;
-  baseLoad: string;
-  targetReps: string;
-  note: string;
-  orderIndex: number;
-};
-
-export type WorkoutDocument = {
-  id: string;
-  userId: string;
-  name: string;
-  focus: string;
-  notes: string;
-  accentColor: string;
-  scheduledDay: string | null;
-  exercises: WorkoutExerciseInput[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type WorkoutSessionSetDocument = {
-  load: number;
-  reps: number;
-  note: string;
-};
-
-export type WorkoutSessionExerciseDocument = {
-  workoutExerciseId: string;
-  exerciseName: string;
-  muscleGroup: string;
-  sets: WorkoutSessionSetDocument[];
-};
-
-export type WorkoutSessionDocument = {
-  id: string;
-  userId: string;
-  workoutId: string | null;
-  workoutName: string;
-  focus: string;
-  overallNotes: string;
-  performedAt: string;
-  finishedAt?: string | null;
-  createdAt: string;
-  exercises: WorkoutSessionExerciseDocument[];
-  totalSets: number;
-  totalVolume: number;
-  topLoad: number;
-};
+export type {
+  AuthProvider,
+  UserProfileDocument,
+  WorkoutDocument,
+  WorkoutExerciseInput,
+  WorkoutSessionDocument,
+  WorkoutSessionExerciseDocument,
+  WorkoutSessionSetDocument,
+} from '../../src/shared/firestoreDocuments';
 
 export type DashboardPersonalRecord = {
   exerciseName: string;

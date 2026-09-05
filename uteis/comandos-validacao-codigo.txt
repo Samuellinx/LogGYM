@@ -25,6 +25,8 @@ npm run lint:fix
 npm run verify
 ```
 
+Esse comando executa tipagem, testes, lint raiz, lint web e build web.
+
 ## Jest
 
 ```powershell
@@ -35,4 +37,10 @@ npm test
 
 ```powershell
 npm run web:lint
+```
+
+## Build do painel web
+
+```powershell
+npm run web:build
 ```

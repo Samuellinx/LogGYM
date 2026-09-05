@@ -1,6 +1,4 @@
 ﻿import {useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react';
-import {Component} from 'react';
-import type {ErrorInfo, ReactNode} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {User} from 'firebase/auth';
 import {useForm} from 'react-hook-form';
@@ -9,7 +7,6 @@ import {
   ArrowLeft,
   BarChart3,
   CalendarDays,
-  Check,
   ChevronRight,
   Clock3,
   Download,
@@ -37,6 +34,16 @@ import {
 import {z} from 'zod';
 
 import './index.css';
+import {AppErrorBoundary} from './components/AppErrorBoundary';
+import {BrandMark} from './components/BrandMark';
+import {
+  DeleteConfirmationModal,
+  ErrorModal,
+  SuccessModal,
+  TrainingCompletionModal,
+  WorkoutConsultModal,
+} from './components/FeedbackModals';
+import {HistoryWorkspace} from './components/HistoryWorkspace';
 import {ProfileAvatar} from './components/ProfileAvatar';
 import {
   observeAuthState,
@@ -47,14 +54,9 @@ import {
   signUpWithEmailPassword,
 } from './lib/auth';
 import {resolveAuthView} from './lib/authGate';
-import {
-  exportBackupForCurrentUser,
-  getUserAuthProvider,
-  importBackupFileForCurrentUser,
-} from './lib/backup';
+import {getErrorMessage} from './lib/errorMessages';
 import {
   buildDashboardSnapshot,
-  filterSessionsBySearch,
   filterWorkoutsBySearch,
   formatCompactNumber,
   formatLoad,
@@ -90,16 +92,14 @@ import {
   updateUserProfileAvatar,
   watchUserProfile,
 } from './lib/profile';
+import {getUserAuthProvider} from './lib/profileIdentity';
 import {firebaseAuth} from './lib/firebase';
 import {
   createWorkoutExerciseDraft,
   normalizeWorkoutForSave,
   reorderWorkoutExercises,
 } from './lib/workoutEditor';
-import {
-  exportTrainingTextForCurrentUser,
-  importTrainingFileForCurrentUser,
-} from './lib/trainingImport';
+import {formatExercisePerformanceRecord} from './lib/trainingFormat';
 import {
   createTrainingDraftSnapshot,
   deleteAllTrainingDraftAutosavesForUser,
@@ -120,10 +120,8 @@ import {
   markTrainingDraftExerciseNotPerformed,
   mergeTrainingDraftExercisesForSave,
   removeDraftSet,
-  resolveSessionFinishedAt,
   updateDraftSet,
   upsertTrainingSessionInHistory,
-  type ExercisePerformanceRecord,
   type TrainingCompletionSummary,
 } from './lib/trainingSession';
 import {
@@ -233,88 +231,6 @@ const createWorkoutDraft = (userId = ''): WorkoutDocument => {
   };
 };
 
-const BrandMark = ({
-  compact = false,
-  animated = false,
-}: {
-  compact?: boolean;
-  animated?: boolean;
-}) => (
-  <div
-    className={[
-      compact ? 'brand-mark brand-mark--compact' : 'brand-mark',
-      animated ? 'brand-mark--animated' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')}>
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="brandStrokeWeb" x1="12" y1="12" x2="52" y2="52">
-          <stop offset="0" stopColor="#A6FF63" />
-          <stop offset="1" stopColor="#3FD68C" />
-        </linearGradient>
-      </defs>
-
-      <circle
-        className="brand-piece brand-piece--halo"
-        cx="32"
-        cy="32"
-        r="22"
-        fill="none"
-        stroke="rgba(166,255,99,0.16)"
-        strokeWidth="2.5"
-      />
-      <path
-        className="brand-piece brand-piece--bar"
-        d="M22 41 L41 23"
-        stroke="url(#brandStrokeWeb)"
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <g className="brand-piece brand-piece--lower-node">
-        <circle
-          cx="19.5"
-          cy="43.5"
-          r="7"
-          fill="none"
-          stroke="url(#brandStrokeWeb)"
-          strokeWidth="3.4"
-        />
-        <circle cx="19.5" cy="43.5" r="2.8" fill="#09110C" />
-      </g>
-      <g className="brand-piece brand-piece--upper-node">
-        <circle
-          cx="44.5"
-          cy="20.5"
-          r="7"
-          fill="none"
-          stroke="url(#brandStrokeWeb)"
-          strokeWidth="3.4"
-        />
-        <circle cx="44.5" cy="20.5" r="2.8" fill="#09110C" />
-      </g>
-      <path
-        className="brand-piece brand-piece--chart"
-        d="M17 22 L27 31 L34 25 L46 36"
-        fill="none"
-        stroke="#4FCBFF"
-        strokeWidth="3.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        className="brand-piece brand-piece--arrow"
-        d="M41.5 35.5 H46 V31"
-        fill="none"
-        stroke="#4FCBFF"
-        strokeWidth="3.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  </div>
-);
-
 type WorkspaceDetailView =
   | {
       kind: 'exercise-progress';
@@ -357,132 +273,8 @@ type WebTrainingUndoSnapshot = {
   overallNotes: string;
 };
 
-const normalizeToken = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-
 const formatDateInputValue = (value: string) => value.slice(0, 10);
 const MAX_TRAINING_UNDO_STEPS = 50;
-
-const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
-
-const ErrorModal = ({
-  message,
-  onClose,
-}: {
-  message: string;
-  onClose: () => void;
-}) => (
-  <div className="error-modal-backdrop" role="presentation">
-    <section
-      aria-labelledby="error-modal-title"
-      aria-modal="true"
-      className="error-modal"
-      role="dialog">
-      <p className="eyebrow">Erro</p>
-      <h2 id="error-modal-title">Não foi possível concluir a ação</h2>
-      <p>{message}</p>
-      <button className="primary-button wide" type="button" onClick={onClose}>
-        Entendi
-      </button>
-    </section>
-  </div>
-);
-
-const SuccessModal = ({
-  message,
-  actionLabel = 'Continuar',
-  onClose,
-}: {
-  message: string;
-  actionLabel?: string;
-  onClose: () => void;
-}) => (
-  <div className="error-modal-backdrop" role="presentation">
-    <section
-      aria-labelledby="success-modal-title"
-      aria-modal="true"
-      className="error-modal success-modal"
-      role="dialog">
-      <p className="eyebrow">Sucesso</p>
-      <h2 id="success-modal-title">Tudo certo</h2>
-      <p>{message}</p>
-      <button className="primary-button wide" type="button" onClick={onClose}>
-        {actionLabel}
-      </button>
-    </section>
-  </div>
-);
-
-const formatTrainingMetric = (value: number, suffix = '') => {
-  const formatted = Number.isInteger(value)
-    ? String(value)
-    : value.toFixed(1).replace('.', ',');
-
-  return `${formatted}${suffix}`;
-};
-
-const workoutLastSessionTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-const getSessionTimestamp = (session: WorkoutSessionDocument) => {
-  const timestamp = new Date(session.performedAt).getTime();
-
-  return Number.isFinite(timestamp) ? timestamp : 0;
-};
-
-const getSessionFinishedTimestamp = (session: WorkoutSessionDocument) => {
-  const timestamp = new Date(resolveSessionFinishedAt(session) ?? '').getTime();
-
-  return Number.isFinite(timestamp) ? timestamp : 0;
-};
-
-const getLatestWorkoutSession = (
-  workoutId: string,
-  sessions: WorkoutSessionDocument[],
-) =>
-  sessions
-    .filter(session => session.workoutId === workoutId)
-    .sort((left, right) => {
-      const performedDelta = getSessionTimestamp(right) - getSessionTimestamp(left);
-
-      return performedDelta !== 0
-        ? performedDelta
-        : getSessionFinishedTimestamp(right) - getSessionFinishedTimestamp(left);
-    })[0] ??
-  null;
-
-const formatSuggestedLoad = (value: string) => {
-  const load = value.trim();
-
-  return load.length > 0 ? load : 'Não informada';
-};
-
-const formatExercisePerformanceRecord = (record: ExercisePerformanceRecord) =>
-  `${formatLoad(record.load)} - ${formatTrainingMetric(record.reps)} reps`;
-
-const formatWorkoutLastSessionTime = (value?: string | null) => {
-  if (!value) {
-    return 'Não realizado';
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isFinite(date.getTime())) {
-    return 'Não realizado';
-  }
-
-  return workoutLastSessionTimeFormatter.format(date);
-};
 
 const createRestTimerState = (
   durationSeconds = defaultRestTimerSeconds,
@@ -528,238 +320,6 @@ const removeRestTimerKeys = (
 
   return nextTimers;
 };
-
-const TrainingCompletionModal = ({
-  summary,
-  onClose,
-}: {
-  summary: TrainingCompletionSummary;
-  onClose: () => void;
-}) => (
-  <div className="error-modal-backdrop" role="presentation">
-    <section
-      aria-labelledby="training-completion-title"
-      aria-modal="true"
-      className="error-modal success-modal training-completion-modal"
-      role="dialog">
-      <button
-        aria-label="Fechar informações do treino"
-        className="training-completion-close"
-        type="button"
-        onClick={onClose}>
-        <X size={16} />
-        Fechar
-      </button>
-
-      <div className="training-completion-scroll">
-        <div className="training-completion-badge">
-          <Check size={28} />
-        </div>
-        <p className="eyebrow">Treino finalizado</p>
-        <h2 id="training-completion-title">Seu treino foi salvo</h2>
-        <p className="training-completion-copy">
-          O histórico já foi atualizado com as séries válidas desta execução.
-        </p>
-        <strong className="training-completion-name">{summary.workoutName}</strong>
-
-        <div className="training-completion-highlight">
-          <span>Séries registradas</span>
-          <strong>{summary.totalSets}</strong>
-        </div>
-
-        <div className="training-completion-grid">
-          <div className="training-completion-card">
-            <span>Maior carga</span>
-            <strong>{formatTrainingMetric(summary.maxLoad, ' kg')}</strong>
-          </div>
-          <div className="training-completion-card">
-            <span>Menor carga</span>
-            <strong>{formatTrainingMetric(summary.minLoad, ' kg')}</strong>
-          </div>
-          <div className="training-completion-card">
-            <span>Maior repetição</span>
-            <strong>{formatTrainingMetric(summary.maxReps)}</strong>
-          </div>
-          <div className="training-completion-card">
-            <span>Menor repetição</span>
-            <strong>{formatTrainingMetric(summary.minReps)}</strong>
-          </div>
-        </div>
-
-        <div className="training-completion-groups">
-          <span>Séries por grupo muscular</span>
-          <div className="training-completion-pills">
-            {summary.seriesByGroup.map(group => (
-              <div key={group.label} className="training-completion-pill">
-                <small>{group.label}</small>
-                <strong>{group.count}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <button className="primary-button wide" type="button" onClick={onClose}>
-        Continuar
-      </button>
-    </section>
-  </div>
-);
-
-const WorkoutConsultModal = ({
-  workout,
-  sessions,
-  onClose,
-}: {
-  workout: WorkoutDocument;
-  sessions: WorkoutSessionDocument[];
-  onClose: () => void;
-}) => {
-  const latestSession = getLatestWorkoutSession(workout.id, sessions);
-
-  return (
-    <div className="error-modal-backdrop" role="presentation">
-      <section
-        aria-labelledby="workout-consult-title"
-        aria-modal="true"
-        className="error-modal workout-consult-modal"
-        role="dialog">
-        <div className="workout-consult-head">
-          <div>
-            <p className="eyebrow">Consulta de treino</p>
-            <h2 id="workout-consult-title">{workout.name}</h2>
-            <p>
-              {workout.focus} - {workout.exercises.length} exercícios
-            </p>
-          </div>
-          <button className="workout-consult-close" type="button" onClick={onClose}>
-            <X size={16} />
-            Fechar
-          </button>
-        </div>
-
-        <div className="workout-consult-meta">
-          <span>
-            <CalendarDays size={16} />
-            Dia: <strong>{workout.scheduledDay || 'Livre'}</strong>
-            <Clock3 size={16} />
-            Finalizado em:{' '}
-            <strong>
-              {formatWorkoutLastSessionTime(
-                latestSession ? resolveSessionFinishedAt(latestSession) : null,
-              )}
-            </strong>
-          </span>
-        </div>
-
-        <div className="workout-consult-notes">
-          <span>Observações</span>
-          <p>{workout.notes || 'Sem observações extras para este treino.'}</p>
-        </div>
-
-        <div className="workout-consult-exercises">
-          <span className="workout-consult-section-title">Exercícios</span>
-          {workout.exercises.map((exercise, index) => {
-            const registeredPerformanceRecord = getExercisePerformanceRecordFromSessions(workout.id, exercise, sessions);
-
-            return (
-              <article className="workout-consult-exercise" key={exercise.id}>
-                <div className="workout-consult-exercise-head">
-                  <span>{index + 1}</span>
-                  <div>
-                    <strong>{exercise.name}</strong>
-                    <p>
-                      {exercise.muscleGroup} - alvo{' '}
-                      {exercise.targetReps || 'não informado'}
-                    </p>
-                  </div>
-                </div>
-
-                <p className="workout-consult-load">
-                  {registeredPerformanceRecord !== null
-                    ? `Maior carga registrada: ${formatExercisePerformanceRecord(registeredPerformanceRecord)}`
-                    : `Carga sugerida: ${formatSuggestedLoad(exercise.baseLoad)}`}
-                </p>
-
-                {exercise.note ? (
-                  <p className="workout-consult-exercise-note">{exercise.note}</p>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      </section>
-    </div>
-  );
-};
-
-const DeleteConfirmationModal = ({
-  title,
-  description,
-  confirmLabel,
-  onConfirm,
-  onCancel,
-}: DeleteConfirmationCopy & {
-  onConfirm: () => void;
-  onCancel: () => void;
-}) => (
-  <div className="error-modal-backdrop" role="presentation">
-    <section
-      aria-labelledby="delete-confirmation-title"
-      aria-modal="true"
-      className="error-modal delete-confirmation-modal"
-      role="dialog">
-      <p className="eyebrow">Confirmação</p>
-      <h2 id="delete-confirmation-title">{title}</h2>
-      <p>{description}</p>
-      <div className="modal-actions">
-        <button className="secondary-button" type="button" onClick={onCancel}>
-          Cancelar
-        </button>
-        <button className="danger-button" type="button" onClick={onConfirm}>
-          {confirmLabel}
-        </button>
-      </div>
-    </section>
-  </div>
-);
-
-class AppErrorBoundary extends Component<
-  {children: ReactNode},
-  {errorMessage: string | null}
-> {
-  state = {
-    errorMessage: null,
-  };
-
-  static getDerivedStateFromError(error: unknown) {
-    return {
-      errorMessage: getErrorMessage(
-        error,
-        'O app encontrou uma falha inesperada ao montar esta tela.',
-      ),
-    };
-  }
-
-  componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
-    console.error('Erro capturado pelo LogGYM:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.errorMessage) {
-      return (
-        <div className="panel-shell panel-shell--auth">
-          <ErrorModal
-            message={this.state.errorMessage}
-            onClose={() => this.setState({errorMessage: null})}
-          />
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
@@ -1098,10 +658,6 @@ function App() {
   );
   const totalTrackedSets = dashboardSnapshot.totalTrackedSets;
 
-  const filteredHistory = useMemo(
-    () => filterSessionsBySearch(sessions, historySearch),
-    [historySearch, sessions],
-  );
   const exerciseProgress = useMemo<ExerciseProgressData | null>(
     () =>
       detailView?.kind === 'exercise-progress'
@@ -1180,10 +736,6 @@ function App() {
     return () => window.clearTimeout(focusTimeoutId);
   }, [trainingPendingFocusIndex, trainingPendingDrafts]);
 
-  const historyTotalVolume = useMemo(
-    () => filteredHistory.reduce((sum, sessionItem) => sum + sessionItem.totalVolume, 0),
-    [filteredHistory],
-  );
   const progressChartPath = useMemo(
     () =>
       exerciseProgress
@@ -1514,6 +1066,7 @@ function App() {
     setBusyAction('export');
 
     try {
+      const {exportBackupForCurrentUser} = await import('./lib/backup');
       const result = await exportBackupForCurrentUser(
         user,
         backupPassword,
@@ -1559,6 +1112,7 @@ function App() {
     setBusyAction('backup-import');
 
     try {
+      const {importBackupFileForCurrentUser} = await import('./lib/backup');
       const result = await importBackupFileForCurrentUser(user, file, backupPassword);
       setBackupPassword('');
       setBackupPasswordConfirm('');
@@ -1587,6 +1141,7 @@ function App() {
     setBusyAction('training-import');
 
     try {
+      const {importTrainingFileForCurrentUser} = await import('./lib/trainingImport');
       const result = await importTrainingFileForCurrentUser(user, file);
       const refreshed = await refreshWorkspaceData(user.uid);
       setWorkouts(refreshed.workouts);
@@ -1610,6 +1165,7 @@ function App() {
     setBusyAction('training-export');
 
     try {
+      const {exportTrainingTextForCurrentUser} = await import('./lib/trainingImport');
       const result = await exportTrainingTextForCurrentUser(user);
       setStatusMessage(
         `Download do TXT iniciado. Arquivo: ${result.fileName}. Conteúdo: ${result.workouts} treinos, ${result.exercises} exercícios e ${result.sessions} treinos realizados no histórico. Esse arquivo pode ser usado fora do app e importado novamente pelo LogGYM.`,
@@ -2402,18 +1958,6 @@ function App() {
     );
   };
 
-  const getHistorySecondaryText = (sessionItem: WorkoutSessionDocument) => {
-    const normalizedWorkoutName = normalizeToken(sessionItem.workoutName);
-    const normalizedFocus = normalizeToken(sessionItem.focus);
-    const dateLabel = formatSessionDate(sessionItem.performedAt);
-
-    if (!sessionItem.focus || normalizedWorkoutName === normalizedFocus) {
-      return dateLabel;
-    }
-
-    return `${sessionItem.focus} - ${dateLabel}`;
-  };
-
   const renderDashboardWorkspace = () => (
     <>
       <section className="workspace-metrics workspace-metrics--dashboard">
@@ -2973,88 +2517,14 @@ function App() {
   );
 
   const renderHistoryWorkspace = () => (
-    <section className="history-layout">
-      <div className="column-panel">
-        <div className="panel-head">
-          <div>
-            <p className="eyebrow">Histórico</p>
-            <h2>Treinos salvos</h2>
-          </div>
-
-          <label className="search-box">
-            <Search size={20} />
-            <input
-              placeholder="Supino, legs, upper..."
-              value={historySearch}
-              onChange={event => setHistorySearch(event.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="history-summary">
-          <strong>{filteredHistory.length} - sessões</strong>
-          <p>{formatVolume(historyTotalVolume)} de volume total</p>
-        </div>
-
-        <div className="session-list session-list--history">
-          {filteredHistory.length ? (
-            filteredHistory.map(sessionItem => (
-              <article className="session-card session-card--history" key={sessionItem.id}>
-                <div className="session-card-top session-card-top--history">
-                  <div className="session-card-copy">
-                    <strong>{sessionItem.workoutName}</strong>
-                    <span>{getHistorySecondaryText(sessionItem)}</span>
-                  </div>
-
-                  <div className="history-card-actions">
-                    <div className="history-card-metrics">
-                      <strong>Maior carga - {formatLoad(sessionItem.topLoad)}</strong>
-                      <strong>
-                        Total levantado - {formatVolume(sessionItem.totalVolume)}
-                      </strong>
-                    </div>
-                    <button
-                      type="button"
-                      className="danger-button subtle"
-                      disabled={busyAction === `delete-session-${sessionItem.id}`}
-                      onClick={() => requestDeleteSession(sessionItem)}>
-                      {busyAction === `delete-session-${sessionItem.id}` ? (
-                        <LoaderCircle className="spin" size={16} />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-
-                <p>{sessionItem.totalSets} séries</p>
-
-                {sessionItem.overallNotes ? (
-                  <p className="session-card-note">{sessionItem.overallNotes}</p>
-                ) : null}
-
-                <div className="chip-row">
-                  {sessionItem.exercises.map(exercise => (
-                    <button
-                      key={`${sessionItem.id}-${exercise.exerciseName}`}
-                      type="button"
-                      className="soft-chip soft-chip--button"
-                      onClick={() => openExerciseProgress(exercise.exerciseName, 'history')}>
-                      {exercise.exerciseName}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))
-          ) : (
-            <div className="empty-card">
-              Sem execuções para mostrar. Conclua um treino para preencher o histórico.
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
+    <HistoryWorkspace
+      sessions={sessions}
+      historySearch={historySearch}
+      busyAction={busyAction}
+      onHistorySearchChange={setHistorySearch}
+      onDeleteSession={requestDeleteSession}
+      onOpenExerciseProgress={openExerciseProgress}
+    />
   );
 
   const renderExerciseProgressWorkspace = () => (

@@ -7,6 +7,10 @@ import type {
 } from '@/features/sync/firebaseTypes';
 import type {SessionUser} from '@/types/domain';
 import {
+  workoutDocumentSchema,
+  workoutSessionDocumentSchema,
+} from '@/shared/firestoreDocuments';
+import {
   buildFirebaseUserProfileDocument,
   clearSyncQueueItems,
   getAllSessionDocumentsForSync,
@@ -18,58 +22,6 @@ import {getDatabase} from '@/storage/database';
 
 const metadataValueRow = z.object({
   value: z.string(),
-});
-
-const workoutExerciseSchema = z.object({
-  id: z.string().trim().min(1).max(120),
-  name: z.string().trim().min(2).max(60),
-  muscleGroup: z.string().trim().min(1).max(40),
-  baseLoad: z.string().trim().max(60),
-  targetReps: z.string().trim().min(1).max(20),
-  note: z.string().trim().max(220),
-  orderIndex: z.number().int().min(0).max(64),
-});
-
-const workoutDocumentSchema = z.object({
-  id: z.string().trim().min(1).max(120),
-  userId: z.string().trim().min(1).max(120),
-  name: z.string().trim().min(2).max(60),
-  focus: z.string().trim().min(1).max(30),
-  notes: z.string().trim().max(260),
-  accentColor: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/),
-  scheduledDay: z.string().trim().max(20).nullable(),
-  exercises: z.array(workoutExerciseSchema).min(1).max(12),
-  createdAt: z.string().trim().min(10).max(40),
-  updatedAt: z.string().trim().min(10).max(40),
-});
-
-const sessionSetSchema = z.object({
-  load: z.number().finite().min(0).max(10000),
-  reps: z.number().int().min(0).max(1000),
-  note: z.string().trim().max(220),
-});
-
-const sessionExerciseSchema = z.object({
-  workoutExerciseId: z.string().trim().max(120),
-  exerciseName: z.string().trim().min(1).max(80),
-  muscleGroup: z.string().trim().min(1).max(40),
-  sets: z.array(sessionSetSchema).min(1).max(20),
-});
-
-const workoutSessionSchema = z.object({
-  id: z.string().trim().min(1).max(120),
-  userId: z.string().trim().min(1).max(120),
-  workoutId: z.string().trim().max(120).nullable(),
-  workoutName: z.string().trim().min(2).max(80),
-  focus: z.string().trim().min(1).max(30),
-  overallNotes: z.string().trim().max(1200),
-  performedAt: z.string().trim().min(10).max(40),
-  finishedAt: z.string().trim().min(10).max(40).nullable().optional(),
-  createdAt: z.string().trim().min(10).max(40),
-  exercises: z.array(sessionExerciseSchema).min(1).max(24),
-  totalSets: z.number().int().min(1).max(400),
-  totalVolume: z.number().finite().min(0).max(5000000),
-  topLoad: z.number().finite().min(0).max(10000),
 });
 
 const getMetadataKey = (userId: string) => `firebase.sync.seeded:${userId}`;
@@ -196,7 +148,7 @@ const flushSyncQueue = async (userId: string) => {
         completedItemIds.push(item.id);
         break;
       case 'upsert_session': {
-        const parsed = parseQueuedPayload(item.payload, workoutSessionSchema);
+        const parsed = parseQueuedPayload(item.payload, workoutSessionDocumentSchema);
 
         if (!parsed) {
           completedItemIds.push(item.id);
@@ -247,7 +199,7 @@ const loadRemoteSessions = async (
   const documents: FirebaseWorkoutSessionDocument[] = [];
 
   snapshot.docs.forEach(documentSnapshot => {
-    const parsed = workoutSessionSchema.safeParse({
+    const parsed = workoutSessionDocumentSchema.safeParse({
       id: documentSnapshot.id,
       ...documentSnapshot.data(),
     });

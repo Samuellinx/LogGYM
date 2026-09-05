@@ -1,6 +1,6 @@
 import type {User} from 'firebase/auth';
 
-import type {UserProfileDocument} from '../types';
+import type {AuthProvider, UserProfileDocument} from '../types';
 
 export const resolveProfileDisplayName = ({
   user,
@@ -26,4 +26,18 @@ export const buildProfileNameParts = (name: string) => {
     givenName: givenName ?? 'Atleta',
     familyName: familyNameParts.join(' ').trim() || null,
   };
+};
+
+export const getUserAuthProvider = (
+  user: Pick<User, 'providerData'>,
+): AuthProvider => {
+  if (user.providerData.some(item => item.providerId === 'google.com')) {
+    return 'google';
+  }
+
+  if (user.providerData.some(item => item.providerId === 'password')) {
+    return 'password';
+  }
+
+  return 'password';
 };

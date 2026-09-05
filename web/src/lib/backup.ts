@@ -2,11 +2,11 @@ import type {User} from 'firebase/auth';
 import {z} from 'zod';
 
 import type {
-  AuthProvider,
   WorkoutDocument,
   WorkoutSessionDocument,
   WorkoutSessionExerciseDocument,
 } from '../types';
+import {getUserAuthProvider} from './profileIdentity';
 import {
   listAllSessionsForUser,
   listAllWorkoutsForUser,
@@ -143,17 +143,7 @@ const triggerDownload = (fileName: string, contents: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const getUserAuthProvider = (user: User): AuthProvider => {
-  if (user.providerData.some(item => item.providerId === 'google.com')) {
-    return 'google';
-  }
-
-  if (user.providerData.some(item => item.providerId === 'password')) {
-    return 'password';
-  }
-
-  return 'password';
-};
+export {getUserAuthProvider} from './profileIdentity';
 
 const getUserDisplayName = (user: User) =>
   user.displayName?.trim() || user.email?.split('@')[0]?.trim() || 'Atleta';
