@@ -38,6 +38,7 @@ export const buildExerciseProgressData = (
             performedAt: session.performedAt,
             workoutName: session.workoutName,
             load: setItem.load,
+            ...(setItem.loadLabel ? {loadLabel: setItem.loadLabel} : {}),
             reps: setItem.reps,
             volume: setItem.load * setItem.reps,
             note: setItem.note,

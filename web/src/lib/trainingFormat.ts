@@ -16,4 +16,6 @@ export const formatSuggestedLoad = (value: string) => {
 };
 
 export const formatExercisePerformanceRecord = (record: ExercisePerformanceRecord) =>
-  `${formatLoad(record.load)} - ${formatTrainingMetric(record.reps)} reps`;
+  `${record.loadLabel?.trim() || formatLoad(record.load)} - ${formatTrainingMetric(
+    record.reps,
+  )} reps`;

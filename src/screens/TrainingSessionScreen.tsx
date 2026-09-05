@@ -70,10 +70,15 @@ import {
   formatExercisePerformanceRecord,
 } from '@/utils/formatters';
 import {
-  maskDecimalInput,
   maskIntegerInput,
+  maskLoadInput,
   maskRepRangeInput,
 } from '@/utils/inputMasks';
+import {
+  buildSessionSetLoadFields,
+  MAX_LOAD_LABEL_LENGTH,
+  parseLoadInputNumber,
+} from '@/shared/loadInput';
 import {
   normalizeSessionDateInput,
   resolveTrainingDraftPerformedAt,
@@ -251,7 +256,7 @@ const buildCompletionSummary = (
     exercise.sets
       .map(set => ({
         exerciseName: exercise.exerciseName,
-        load: parseNumber(set.load),
+        load: parseLoadInputNumber(set.load),
         reps: parseNumber(set.reps),
         groupLabel: resolveMuscleGroupLabel(exercise.exerciseName, workoutFocus),
       }))
@@ -842,7 +847,7 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
           exerciseName: exercise.exerciseName,
           muscleGroup: exercise.muscleGroup,
           sets: exercise.sets.map(set => ({
-            load: parseNumber(set.load),
+            ...buildSessionSetLoadFields(set.load),
             reps: parseNumber(set.reps),
             note: set.note.trim(),
           })),
@@ -961,11 +966,12 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                       label="Carga sugerida"
                       placeholder="0"
                       value={newExerciseDraft.baseLoad}
-                      keyboardType="decimal-pad"
+                      keyboardType="default"
+                      maxLength={MAX_LOAD_LABEL_LENGTH}
                       onChangeText={value =>
                         handleNewExerciseDraftChange(
                           'baseLoad',
-                          maskDecimalInput(value),
+                          maskLoadInput(value),
                         )
                       }
                     />
@@ -1278,10 +1284,11 @@ export const TrainingSessionScreen = ({navigation, route}: Props) => {
                               exerciseIndex,
                               setIndex,
                               'load',
-                              maskDecimalInput(value),
+                              maskLoadInput(value),
                             )
                           }
-                          keyboardType="decimal-pad"
+                          keyboardType="default"
+                          maxLength={MAX_LOAD_LABEL_LENGTH}
                           placeholder="0"
                           placeholderTextColor={theme.colors.textSoft}
                           style={styles.metricInput}

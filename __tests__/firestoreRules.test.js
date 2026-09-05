@@ -26,4 +26,12 @@ describe('firestore rules', () => {
       '|| isTimestampText(data.finishedAt))',
     );
   });
+
+  it('allows saved workout sets to include a short text load label', () => {
+    const setRule = getFunctionBody('isSessionSet');
+
+    expect(setRule).toContain("'loadLabel'");
+    expect(setRule).toContain("!value.keys().hasAny(['loadLabel'])");
+    expect(setRule).toContain('isString(value.loadLabel, 0, 8)');
+  });
 });

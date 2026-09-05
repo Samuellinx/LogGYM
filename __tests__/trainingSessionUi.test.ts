@@ -79,6 +79,15 @@ describe('training session ui helpers', () => {
     ).toBe(true);
     expect(
       isTrainingDraftSetCompleted({
+        id: 'set-text-load',
+        seriesNumber: 2,
+        load: '2 placas',
+        reps: '10',
+        note: '',
+      }),
+    ).toBe(true);
+    expect(
+      isTrainingDraftSetCompleted({
         id: 'set-2',
         seriesNumber: 2,
         load: '40',

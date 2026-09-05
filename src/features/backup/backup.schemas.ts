@@ -55,6 +55,7 @@ const backupSessionSetSchema = z.object({
   muscleGroup: z.string().trim().min(2).max(40),
   setIndex: z.number().int().min(0).max(1000),
   load: z.number().min(0).max(10000),
+  loadLabel: z.string().trim().max(8).optional(),
   reps: z.number().int().min(0).max(1000),
   note: z.string().trim().max(220),
   performedAt: isoDateSchema,

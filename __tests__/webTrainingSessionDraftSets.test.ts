@@ -80,6 +80,18 @@ describe('web training session draft sets', () => {
         baseLoad: '40',
         targetReps: '8-10',
         hint: '',
+        sets: [{id: 'set-text-load', seriesNumber: 1, load: '2 placas', reps: '8', note: ''}],
+      }),
+    ).toBe(true);
+    expect(
+      canFinalizeTrainingDraftExercise({
+        workoutExerciseId: 'exercise-1',
+        orderIndex: 0,
+        exerciseName: 'Supino',
+        muscleGroup: 'Peito',
+        baseLoad: '40',
+        targetReps: '8-10',
+        hint: '',
         sets: [{id: 'set-1', seriesNumber: 1, load: '50', reps: '', note: ''}],
       }),
     ).toBe(false);

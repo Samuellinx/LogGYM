@@ -74,10 +74,11 @@ import {
   buildSparklinePath,
 } from './lib/exerciseProgress';
 import {
-  maskDecimalInput,
   maskIntegerInput,
+  maskLoadInput,
   maskRepRangeInput,
 } from './lib/inputMasks';
+import {MAX_LOAD_LABEL_LENGTH} from '../../src/shared/loadInput';
 import {
   defaultProfileAvatarId,
   profileAvatarCatalog,
@@ -2460,11 +2461,12 @@ function App() {
                         updateExercise(
                           exercise.id,
                           'baseLoad',
-                          maskDecimalInput(event.target.value),
+                          maskLoadInput(event.target.value),
                         )
                       }
-                      inputMode="decimal"
-                      placeholder="Ex: 20"
+                      inputMode="text"
+                      maxLength={MAX_LOAD_LABEL_LENGTH}
+                      placeholder="Ex: 2 placas"
                     />
                   </label>
                   <label>
@@ -2589,7 +2591,7 @@ function App() {
                     key={`${point.workoutName}-${point.performedAt}-${point.load}-${point.reps}`}>
                     <div className="progress-point-head">
                       <strong>{point.workoutName}</strong>
-                      <span>{formatLoad(point.load)}</span>
+                      <span>{point.loadLabel?.trim() || formatLoad(point.load)}</span>
                     </div>
                     <p>
                       {point.reps} reps - {formatSessionDate(point.performedAt)}
@@ -2698,14 +2700,15 @@ function App() {
                     <span>Carga sugerida</span>
                     <input
                       value={newTrainingExerciseDraft.baseLoad}
-                      inputMode="decimal"
+                      inputMode="text"
+                      maxLength={MAX_LOAD_LABEL_LENGTH}
                       onChange={event =>
                         handleNewTrainingExerciseDraftChange(
                           'baseLoad',
-                          maskDecimalInput(event.target.value),
+                          maskLoadInput(event.target.value),
                         )
                       }
-                      placeholder="0"
+                      placeholder="2 placas"
                     />
                   </label>
                   <label>
@@ -3005,10 +3008,11 @@ function App() {
                                     exerciseIndex,
                                     setIndex,
                                     'load',
-                                    maskDecimalInput(event.target.value),
+                                    maskLoadInput(event.target.value),
                                   )
                                 }
-                                inputMode="decimal"
+                                inputMode="text"
+                                maxLength={MAX_LOAD_LABEL_LENGTH}
                                 placeholder="0"
                               />
                             </label>

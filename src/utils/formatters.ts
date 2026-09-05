@@ -56,11 +56,13 @@ export const formatReps = (value: number) =>
 
 export const formatExercisePerformanceRecord = ({
   load,
+  loadLabel,
   reps,
 }: {
   load: number;
+  loadLabel?: string;
   reps: number;
-}) => `${formatLoad(load)} - ${formatReps(reps)} reps`;
+}) => `${loadLabel?.trim() || formatLoad(load)} - ${formatReps(reps)} reps`;
 
 export const formatVolume = (value: number) =>
   `${Math.round(value).toLocaleString('pt-BR')} kg`;

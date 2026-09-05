@@ -116,7 +116,9 @@ export const ExerciseProgressScreen = ({route}: Props) => {
           <View key={`${point.workoutName}-${point.performedAt}-${point.load}`} style={styles.pointCard}>
             <View style={styles.pointHeader}>
               <Text style={styles.pointWorkout}>{point.workoutName}</Text>
-              <Text style={styles.pointLoad}>{formatLoad(point.load)}</Text>
+              <Text style={styles.pointLoad}>
+                {point.loadLabel?.trim() || formatLoad(point.load)}
+              </Text>
             </View>
             <Text style={styles.pointMeta}>
               {point.reps} reps · {formatSessionDate(point.performedAt)}

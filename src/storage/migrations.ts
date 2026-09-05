@@ -120,4 +120,13 @@ export const migrations: Migration[] = [
        WHERE finished_at IS NULL OR TRIM(finished_at) = '';`,
     ],
   },
+  {
+    id: '006_session_set_load_label',
+    statements: [
+      `ALTER TABLE session_sets ADD COLUMN load_label TEXT NOT NULL DEFAULT '';`,
+      `UPDATE session_sets
+       SET load_label = ''
+       WHERE load_label IS NULL;`,
+    ],
+  },
 ];

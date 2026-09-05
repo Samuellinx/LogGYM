@@ -62,6 +62,7 @@ type BackupSessionSetRow = {
   muscle_group: string;
   set_index: number;
   load: number;
+  load_label: string | null;
   reps: number;
   note: string;
   performed_at: string;
@@ -240,6 +241,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
         ss.muscle_group,
         ss.set_index,
         ss.load,
+        ss.load_label,
         ss.reps,
         ss.note,
         ss.performed_at,
@@ -309,6 +311,7 @@ const buildBackupPayload = async (user: SessionUser): Promise<BackupFilePayload>
         muscleGroup: item.muscle_group,
         setIndex: Number(item.set_index),
         load: Number(item.load),
+        ...(item.load_label ? {loadLabel: item.load_label} : {}),
         reps: Number(item.reps),
         note: item.note,
         performedAt: item.performed_at,
@@ -520,8 +523,8 @@ export const importBackupForCurrentUser = async (
       for (const set of payload.data.sessionSets) {
         await tx.executeAsync(
           `INSERT INTO session_sets (
-            id, session_id, template_exercise_id, exercise_name, muscle_group, set_index, load, reps, note, performed_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            id, session_id, template_exercise_id, exercise_name, muscle_group, set_index, load, load_label, reps, note, performed_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
             set.id,
             set.sessionId,
@@ -530,6 +533,7 @@ export const importBackupForCurrentUser = async (
             set.muscleGroup,
             set.setIndex,
             set.load,
+            set.loadLabel ?? '',
             set.reps,
             set.note,
             set.performedAt,

@@ -10,6 +10,10 @@ import {
   normalizeSessionDateInput,
   resolveSessionFinishedAt,
 } from './sessionDate';
+import {
+  buildSessionSetLoadFields,
+  parseLoadInputNumber,
+} from '../../../src/shared/loadInput';
 
 export {resolveSessionFinishedAt};
 
@@ -30,6 +34,7 @@ export type TrainingCompletionSummary = {
 
 export type ExercisePerformanceRecord = {
   load: number;
+  loadLabel?: string;
   reps: number;
 };
 
@@ -130,6 +135,7 @@ export const getExercisePerformanceRecordFromSessions = (
         .flatMap(sessionExercise =>
           sessionExercise.sets.map(setItem => ({
             load: setItem.load,
+            loadLabel: setItem.loadLabel,
             reps: setItem.reps,
           })),
         ),
@@ -164,7 +170,7 @@ export const buildTrainingCompletionSummary = (
     exercise.sets
       .map(setItem => ({
         groupLabel: exercise.muscleGroup.trim() || 'Outros',
-        load: parseNumber(setItem.load),
+        load: parseLoadInputNumber(setItem.load),
         reps: parseNumber(setItem.reps),
       }))
       .filter(
@@ -224,9 +230,8 @@ export const addDraftSet = (exercises: TrainingDraftExercise[], exerciseIndex: n
   );
 
 export const isTrainingDraftSetCompleted = (setItem: TrainingDraftSet) =>
-  Number.isFinite(parseNumber(setItem.load)) &&
+  parseLoadInputNumber(setItem.load) > 0 &&
   Number.isFinite(parseNumber(setItem.reps)) &&
-  parseNumber(setItem.load) > 0 &&
   parseNumber(setItem.reps) > 0;
 
 export const canFinalizeTrainingDraftExercise = (
@@ -379,7 +384,7 @@ export const buildTrainingSessionDocument = ({
       muscleGroup: exercise.muscleGroup,
       sets: exercise.sets
         .map(setItem => ({
-          load: parseNumber(setItem.load),
+          ...buildSessionSetLoadFields(setItem.load),
           reps: parseNumber(setItem.reps),
           note: setItem.note.trim(),
         }))

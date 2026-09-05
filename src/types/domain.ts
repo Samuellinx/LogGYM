@@ -68,6 +68,7 @@ export interface WorkoutDetail extends WorkoutSummary {
 
 export interface SessionSetInput {
   load: number;
+  loadLabel?: string;
   reps: number;
   note: string;
 }
@@ -129,6 +130,7 @@ export interface ProgressPoint {
   performedAt: string;
   workoutName: string;
   load: number;
+  loadLabel?: string;
   reps: number;
   volume: number;
   note: string;

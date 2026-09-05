@@ -87,10 +87,12 @@ service cloud.firestore {
 
     function isSessionSet(value) {
       return value is map
-        && value.keys().hasOnly(['load', 'reps', 'note'])
+        && value.keys().hasOnly(['load', 'loadLabel', 'reps', 'note'])
         && value.load is number
         && value.load >= 0
         && value.load <= 10000
+        && (!value.keys().hasAny(['loadLabel'])
+          || isString(value.loadLabel, 0, 8))
         && value.reps is int
         && value.reps >= 0
         && value.reps <= 1000

@@ -22,7 +22,7 @@ const workout = {
           muscleGroup: 'Série de trabalho',
           sets: [
             {load: 62.5, reps: 8, note: ''},
-            {load: 60, reps: 9, note: 'Última repetição travou.'},
+            {load: 2, loadLabel: '2 placas', reps: 9, note: 'Última repetição travou.'},
           ],
         },
       ],
@@ -89,7 +89,7 @@ describe('training text export', () => {
     expect(webContents).toContain('Data do treino realizado: 05/05/2026 22:25');
     expect(webContents).toContain('Exercício realizado: Supino reto');
     expect(webContents).toContain('Série realizada 1: carga 62.5, repetições 8');
-    expect(webContents).toContain('Série realizada 2: carga 60, repetições 9');
+    expect(webContents).toContain('Série realizada 2: carga 2 placas, repetições 9');
     expect(webContents).toContain('Anotação realizada 2: Última repetição travou.');
     expect(webContents).toContain('---');
     expect(webContents).toContain('Treino: Pernas 1');

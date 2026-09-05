@@ -60,6 +60,7 @@ export const workoutFormSchema = z.object({
 
 export const sessionSetInputSchema = z.object({
   load: z.number().finite().min(0).max(10000),
+  loadLabel: z.string().trim().max(8).optional(),
   reps: z.number().int().min(0).max(1000),
   note: z.string().trim().max(220),
 });

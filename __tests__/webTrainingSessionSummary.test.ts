@@ -1,4 +1,7 @@
-import {buildTrainingCompletionSummary} from '../web/src/lib/trainingSession';
+import {
+  buildTrainingCompletionSummary,
+  buildTrainingSessionDocument,
+} from '../web/src/lib/trainingSession';
 import type {TrainingDraftExercise} from '../web/src/types';
 
 describe('web training session completion summary', () => {
@@ -43,6 +46,46 @@ describe('web training session completion summary', () => {
       minLoad: 45,
       maxReps: 10,
       minReps: 6,
+    });
+  });
+
+  it('preserves short text load labels when saving a session', () => {
+    const exercises: TrainingDraftExercise[] = [
+      {
+        workoutExerciseId: 'exercise-1',
+        orderIndex: 0,
+        exerciseName: 'Supino inclinado',
+        muscleGroup: 'Peito',
+        baseLoad: '2 placas',
+        targetReps: '8-10',
+        hint: '',
+        sets: [{id: 'set-1', seriesNumber: 1, load: '2 placas', reps: '10', note: ''}],
+      },
+    ];
+
+    const session = buildTrainingSessionDocument({
+      userId: 'user-1',
+      workout: {
+        id: 'workout-1',
+        userId: 'user-1',
+        name: 'Peito',
+        focus: 'Peito',
+        notes: '',
+        accentColor: '#39D98A',
+        scheduledDay: null,
+        exercises: [],
+        createdAt: '2026-05-01T10:00:00.000Z',
+        updatedAt: '2026-05-01T10:00:00.000Z',
+      },
+      performedAt: '2026-05-01T10:00:00.000Z',
+      overallNotes: '',
+      exercises,
+    });
+
+    expect(session.exercises[0]?.sets[0]).toMatchObject({
+      load: 2,
+      loadLabel: '2 placas',
+      reps: 10,
     });
   });
 });

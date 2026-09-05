@@ -3,14 +3,17 @@ import type {
   TrainingDraftExerciseState,
   TrainingDraftSet,
 } from './trainingDraftAutosave';
+import {parseLoadInputNumber} from '@/shared/loadInput';
 
 export type ExercisePerformanceRecord = {
   load: number;
+  loadLabel?: string;
   reps: number;
 };
 
 type ExercisePerformancePoint = {
   load: number;
+  loadLabel?: string;
   reps: number;
 };
 
@@ -69,6 +72,7 @@ export const getExercisePerformanceRecord = (
     if (!record || point.load > record.load) {
       return {
         load: point.load,
+        ...(point.loadLabel ? {loadLabel: point.loadLabel} : {}),
         reps: point.reps,
       };
     }
@@ -76,6 +80,7 @@ export const getExercisePerformanceRecord = (
     if (point.load === record.load && point.reps > record.reps) {
       return {
         load: point.load,
+        ...(point.loadLabel ? {loadLabel: point.loadLabel} : {}),
         reps: point.reps,
       };
     }
@@ -99,9 +104,8 @@ export const getNextTrainingExerciseIndex = (
 const parsePositiveNumber = (value: string) => Number(value.replace(',', '.').trim());
 
 export const isTrainingDraftSetCompleted = (setItem: TrainingDraftSet) =>
-  Number.isFinite(parsePositiveNumber(setItem.load)) &&
+  parseLoadInputNumber(setItem.load) > 0 &&
   Number.isFinite(parsePositiveNumber(setItem.reps)) &&
-  parsePositiveNumber(setItem.load) > 0 &&
   parsePositiveNumber(setItem.reps) > 0;
 
 export const canFinalizeTrainingDraftExercise = (

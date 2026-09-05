@@ -11,6 +11,7 @@ export type ExportableWorkoutExercise = {
 
 export type ExportableWorkoutSessionSet = {
   load: number | string;
+  loadLabel?: string | null;
   reps: number | string;
   note?: string | null;
 };
@@ -257,7 +258,7 @@ export const buildTrainingTextExportContents = (
           }
 
           exercise.sets.forEach((set, setIndex) => {
-            const load = formatExportNumber(set.load);
+            const load = formatExportNumber(set.loadLabel) || formatExportNumber(set.load);
             const reps = formatExportNumber(set.reps);
             const parts = [
               load ? `carga ${load}` : '',

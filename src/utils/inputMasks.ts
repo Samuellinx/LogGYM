@@ -1,3 +1,5 @@
+export {maskLoadInput} from '@/shared/loadInput';
+
 export const maskIntegerInput = (value: string) => value.replace(/\D/gu, '');
 
 export const maskDecimalInput = (value: string) => {

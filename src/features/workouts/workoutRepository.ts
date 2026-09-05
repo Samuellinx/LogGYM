@@ -114,6 +114,7 @@ type ProgressRow = {
   workout_name: string;
   performed_at: string;
   load: number;
+  load_label: string | null;
   reps: number;
   note: string;
 };
@@ -136,6 +137,7 @@ type SessionSetSyncRow = {
   muscle_group: string;
   set_index: number;
   load: number;
+  load_label: string | null;
   reps: number;
   note: string;
 };
@@ -592,6 +594,7 @@ const mapSessionDocument = (
 
     currentExercise.sets.push({
       load: Number(row.load),
+      ...(row.load_label ? {loadLabel: row.load_label} : {}),
       reps: Number(row.reps),
       note: row.note,
     });
@@ -652,6 +655,7 @@ export const getSessionDocumentForSync = async (
       muscle_group,
       set_index,
       load,
+      load_label,
       reps,
       note
     FROM session_sets
@@ -831,11 +835,12 @@ export const replaceLocalDataFromRemote = async ({
               muscle_group,
               set_index,
               load,
+              load_label,
               reps,
               note,
               performed_at,
               created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
             [
               createId(),
               session.id,
@@ -844,6 +849,7 @@ export const replaceLocalDataFromRemote = async ({
               exercise.muscleGroup,
               currentIndex,
               set.load,
+              set.loadLabel ?? '',
               set.reps,
               set.note,
               session.performedAt,
@@ -1300,8 +1306,8 @@ export const saveTrainingSession = async (
       for (const set of exercise.sets) {
         await tx.executeAsync(
           `INSERT INTO session_sets (
-            id, session_id, template_exercise_id, exercise_name, muscle_group, set_index, load, reps, note, performed_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            id, session_id, template_exercise_id, exercise_name, muscle_group, set_index, load, load_label, reps, note, performed_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
             createId(),
             sessionId,
@@ -1310,6 +1316,7 @@ export const saveTrainingSession = async (
             exercise.muscleGroup,
             currentIndex,
             set.load,
+            set.loadLabel ?? '',
             set.reps,
             set.note,
             validatedInput.performedAt,
@@ -1482,6 +1489,7 @@ export const getExerciseProgress = async (
       ws.workout_name,
       ss.performed_at,
       ss.load,
+      ss.load_label,
       ss.reps,
       ss.note
     FROM session_sets ss
@@ -1495,6 +1503,7 @@ export const getExerciseProgress = async (
     performedAt: row.performed_at,
     workoutName: row.workout_name,
     load: Number(row.load),
+    ...(row.load_label ? {loadLabel: row.load_label} : {}),
     reps: Number(row.reps),
     volume: Number(row.load) * Number(row.reps),
     note: row.note,

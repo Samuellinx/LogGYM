@@ -43,6 +43,7 @@ export type ExerciseProgressPoint = {
   performedAt: string;
   workoutName: string;
   load: number;
+  loadLabel?: string;
   reps: number;
   volume: number;
   note: string;

@@ -1,6 +1,7 @@
 import {
   maskDecimalInput,
   maskIntegerInput,
+  maskLoadInput,
   maskRepRangeInput,
 } from '../src/utils/inputMasks';
 
@@ -20,5 +21,12 @@ describe('input masks', () => {
     expect(maskRepRangeInput('8a-1b0')).toBe('8-10');
     expect(maskRepRangeInput('8--10')).toBe('8-10');
     expect(maskRepRangeInput('abc')).toBe('');
+  });
+
+  it('allows short text labels for load fields', () => {
+    expect(maskLoadInput('2 placas')).toBe('2 placas');
+    expect(maskLoadInput('10 KG')).toBe('10 KG');
+    expect(maskLoadInput('12 placas')).toBe('12 placa');
+    expect(maskLoadInput('2@ placas!')).toBe('2 placas');
   });
 });

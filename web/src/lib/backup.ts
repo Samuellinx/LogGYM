@@ -76,6 +76,7 @@ const backupSessionSetSchema = z.object({
   muscleGroup: z.string().trim().min(1).max(40),
   setIndex: z.number().int().min(0).max(1000),
   load: z.number().min(0).max(10000),
+  loadLabel: z.string().trim().max(8).optional(),
   reps: z.number().int().min(0).max(1000),
   note: z.string().trim().max(220),
   performedAt: isoDateSchema,
@@ -260,6 +261,7 @@ const buildBackupPayload = async (user: User): Promise<BackupFilePayload> => {
         muscleGroup: exercise.muscleGroup,
         setIndex,
         load: set.load,
+        ...(set.loadLabel ? {loadLabel: set.loadLabel} : {}),
         reps: set.reps,
         note: set.note,
         performedAt: session.performedAt,
@@ -314,6 +316,7 @@ const groupExercisesForSession = (
     if (existing) {
       existing.sets.push({
         load: set.load,
+        ...(set.loadLabel ? {loadLabel: set.loadLabel} : {}),
         reps: set.reps,
         note: set.note,
       });
@@ -327,6 +330,7 @@ const groupExercisesForSession = (
       sets: [
         {
           load: set.load,
+          ...(set.loadLabel ? {loadLabel: set.loadLabel} : {}),
           reps: set.reps,
           note: set.note,
         },

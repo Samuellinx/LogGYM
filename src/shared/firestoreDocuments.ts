@@ -41,6 +41,7 @@ export type WorkoutDocument = {
 
 export type WorkoutSessionSetDocument = {
   load: number;
+  loadLabel?: string;
   reps: number;
   note: string;
 };
@@ -96,6 +97,7 @@ export const workoutExerciseInputSchema = z.object({
 
 export const workoutSessionSetSchema = z.object({
   load: z.number().finite().min(0).max(10000),
+  loadLabel: z.string().trim().max(8).optional(),
   reps: z.number().int().min(0).max(1000),
   note: z.string().trim().max(220),
 });
