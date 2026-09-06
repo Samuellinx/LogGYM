@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
   chipRow: {
     flexDirection: 'row',
@@ -803,7 +803,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
   batchControls: {
     flexDirection: 'row',
@@ -907,7 +907,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
   loadPreviewValue: {
     ...theme.typography.body,

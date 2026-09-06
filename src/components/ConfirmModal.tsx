@@ -33,6 +33,7 @@ export const ConfirmModal = ({
       <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
 
       <View accessibilityRole="alert" style={styles.modalCard}>
+        <Text style={styles.eyebrow}>Confirmação</Text>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.description}>{description}</Text>
 
@@ -62,6 +63,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: theme.spacing.md,
+  },
+  eyebrow: {
+    ...theme.typography.caption,
+    color: theme.colors.warning,
+    textTransform: 'uppercase',
+    letterSpacing: 0,
   },
   title: {
     ...theme.typography.title,

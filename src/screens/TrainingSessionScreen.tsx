@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
   restTimerMenuStatus: {
     ...theme.typography.caption,

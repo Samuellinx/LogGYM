@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
   },
   input: {
     borderRadius: theme.radius.md,
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
-    minHeight: 50,
+    minHeight: 52,
     ...theme.typography.body,
   },
   multiline: {

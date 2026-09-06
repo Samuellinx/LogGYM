@@ -17,6 +17,7 @@
   --success-bg: rgba(57, 217, 138, 0.14);
   --danger-bg: rgba(255, 111, 125, 0.14);
   --card-shadow: 0 26px 70px rgba(0, 0, 0, 0.32);
+  color-scheme: dark;
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 500;
@@ -25,14 +26,16 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background:
-    radial-gradient(circle at top left, rgba(124, 255, 79, 0.1), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(81, 199, 255, 0.1), transparent 32%),
-    linear-gradient(180deg, #05070b, #081018 62%, #07131a);
+  background: linear-gradient(180deg, #05070b, #081018 62%, #07131a);
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(124, 255, 79, 0.28);
+  color: var(--text);
 }
 
 html,
@@ -46,6 +49,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: transparent;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 button,
@@ -108,7 +114,7 @@ strong {
   height: 280px;
   top: 6%;
   right: -110px;
-  background: rgba(81, 199, 255, 0.09);
+  background: rgba(81, 199, 255, 0.05);
 }
 
 .panel-shell::after {
@@ -116,7 +122,7 @@ strong {
   height: 340px;
   left: -150px;
   bottom: 8%;
-  background: rgba(124, 255, 79, 0.08);
+  background: rgba(124, 255, 79, 0.04);
 }
 
 .panel-shell--auth {
@@ -302,7 +308,7 @@ strong {
   margin-bottom: 5px;
   font-size: 0.74rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--accent);
 }
@@ -327,12 +333,12 @@ label small,
 }
 
 h1 {
-  font-size: clamp(2.3rem, 4vw, 4rem);
+  font-size: 3.25rem;
   line-height: 1;
 }
 
 h2 {
-  font-size: clamp(1.45rem, 2vw, 2rem);
+  font-size: 1.75rem;
   line-height: 1.1;
 }
 
@@ -1374,7 +1380,7 @@ label {
 label span {
   font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   color: rgba(245, 247, 250, 0.54);
 }
 
@@ -1387,7 +1393,7 @@ select {
   color: var(--text);
   border-radius: 18px;
   padding: 15px 16px;
-  min-height: 46px;
+  min-height: 48px;
   outline: none;
   transition:
     border-color 160ms ease,
@@ -1397,6 +1403,18 @@ select {
 
 textarea {
   resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(158, 168, 182, 0.72);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 input:focus,
@@ -1457,6 +1475,16 @@ select:focus {
 .exercise-card-head,
 .header-actions {
   justify-content: space-between;
+  min-width: 0;
+}
+
+.workout-card-top > *,
+.session-card-top > *,
+.exercise-head > *,
+.exercise-card-head > *,
+.header-actions > *,
+.panel-head > * {
+  min-width: 0;
 }
 
 .card-actions {
@@ -1486,12 +1514,16 @@ select:focus {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   padding: 9px 13px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(245, 247, 250, 0.76);
   font-size: 0.86rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .soft-chip--accent {
@@ -1591,9 +1623,11 @@ select:focus {
   background: transparent;
   color: var(--text);
   font-size: 0.9rem;
-  min-height: 46px;
+  line-height: 1.2;
+  min-height: 48px;
+  max-width: 100%;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
   overflow-wrap: anywhere;
   transition:
     transform 160ms ease,
@@ -1681,6 +1715,13 @@ select:focus {
   cursor: not-allowed;
 }
 
+.primary-button:disabled:hover,
+.secondary-button:disabled:hover,
+.ghost-button:disabled:hover,
+.danger-button:disabled:hover {
+  transform: none;
+}
+
 .primary-button:focus-visible,
 .secondary-button:focus-visible,
 .ghost-button:focus-visible,
@@ -1712,13 +1753,16 @@ select:focus {
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 22px;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
   background: rgba(5, 7, 11, 0.78);
   backdrop-filter: blur(12px);
 }
 
 .error-modal {
   width: min(100%, 460px);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
   display: grid;
   gap: 14px;
   padding: 24px;
@@ -2255,6 +2299,16 @@ select:focus {
 }
 
 @media (max-width: 760px) {
+  h1 {
+    font-size: 2.05rem;
+    line-height: 1.08;
+  }
+
+  h2 {
+    font-size: 1.42rem;
+    line-height: 1.16;
+  }
+
   .panel-shell--auth {
     padding: 16px;
   }
@@ -2361,5 +2415,34 @@ select:focus {
 
   .history-focus-row {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel-shell--auth,
+  .panel-shell--workspace,
+  .brand-stage {
+    padding: 12px;
+  }
+
+  .brand-stage-inner,
+  .auth-panel,
+  .column-panel,
+  .workspace-hero {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .workspace-tabs,
+  .modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .ghost-button,
+  .danger-button,
+  .tab-chip {
+    width: 100%;
   }
 }

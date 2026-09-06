@@ -16,6 +16,7 @@ export const TagChip = ({
   accentColor = theme.colors.accent,
 }: TagChipProps) => (
   <Pressable
+    accessibilityRole={onPress ? 'button' : undefined}
     onPress={onPress}
     style={[
       styles.chip,
@@ -35,6 +36,7 @@ export const TagChip = ({
 
 const styles = StyleSheet.create({
   chip: {
+    minHeight: 40,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 10,
     borderRadius: theme.radius.pill,
@@ -44,5 +46,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...theme.typography.caption,
+    flexShrink: 1,
+    textAlign: 'center',
   },
 });

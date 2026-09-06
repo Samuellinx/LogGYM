@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.accent,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    letterSpacing: 0,
   },
   heroTitle: {
     ...theme.typography.title,

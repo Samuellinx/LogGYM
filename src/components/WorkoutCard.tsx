@@ -58,7 +58,11 @@ export const WorkoutCard = ({
       {onDuplicate || onClearTraining || onStart || onConsult ? (
         <View style={styles.actions}>
           {onDuplicate ? (
-            <Pressable onPress={onDuplicate} style={styles.actionPill}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Duplicar treino"
+              onPress={onDuplicate}
+              style={styles.actionPill}>
               <Repeat2 color={theme.colors.textMuted} size={16} />
             </Pressable>
           ) : null}
@@ -173,6 +177,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
     minHeight: 38,
     minWidth: 128,
+    flexGrow: 1,
     flexShrink: 1,
     maxWidth: '100%',
   },
@@ -205,6 +210,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,111,125,0.18)',
     minHeight: 38,
     minWidth: 128,
+    flexGrow: 1,
     flexShrink: 1,
     maxWidth: '100%',
   },

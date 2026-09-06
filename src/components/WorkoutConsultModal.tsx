@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.accent,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0,
   },
   title: {
     ...theme.typography.title,

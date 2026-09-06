@@ -38,13 +38,13 @@ export const theme = {
       fontSize: 30,
       lineHeight: 36,
       fontWeight: '700' as TextStyle['fontWeight'],
-      letterSpacing: -0.8,
+      letterSpacing: 0,
     },
     title: {
       fontSize: 22,
       lineHeight: 28,
       fontWeight: '700' as TextStyle['fontWeight'],
-      letterSpacing: -0.5,
+      letterSpacing: 0,
     },
     subtitle: {
       fontSize: 16,
